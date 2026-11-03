@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spielebibliothek</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="#/">Spielebibliothek</a>
+    <nav>
+      <span id="benutzer" class="benutzer" hidden></span>
+      <a class="knopf leise" href="https://upload.cuby0401.uk" target="_blank" rel="noopener">Spiel hochladen</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="uebersicht">
+      <p id="meldung" class="meldung" hidden></p>
+      <div id="kacheln" class="kacheln"></div>
+    </section>
+
+    <section id="spielansicht" hidden>
+      <div class="spielleiste">
+        <a class="knopf leise" href="#/">← Übersicht</a>
+        <h1 id="spieltitel"></h1>
+        <button id="vollbild" class="knopf" type="button">Vollbild</button>
+      </div>
+      <div class="spielbereich">
+        <div id="rahmen" class="rahmen"></div>
+        <aside class="bestenliste">
+          <h2>Bestenliste</h2>
+          <p class="leise">Kommt in Phase 5.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

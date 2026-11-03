@@ -1,0 +1,39 @@
+# Spielebibliothek – Docker-Compose-Stack
+# Liegt auf der NAS unter /volume1/docker/spielebibliothek/compose.yaml
+# Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
+#
+# Stand: Phase 1 (nur caddy, Port im LAN). Weitere Dienste kommen phasenweise dazu:
+#   Phase 2 cloudflared · Phase 4 savesvc · Phase 6 filebrowser
+
+name: spielebibliothek
+
+services:
+  caddy:
+    image: caddy:2
+    container_name: spielebibliothek-caddy
+    restart: unless-stopped
+    # Feste UID, bekommt auf /volume1/games/spiele nur r-X per ACL (siehe scripts/nas-setup.sh)
+    user: "10020:10020"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      # Caddy will Konfig/Daten schreiben – als Nicht-root nur nach /tmp
+      XDG_CONFIG_HOME: /tmp/config
+      XDG_DATA_HOME: /tmp/data
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro
+      - ./lib:/srv/lib:ro
+      - /volume1/games/spiele:/srv/spiele:ro
+    # PHASE 1: vorübergehend im LAN/Tailnet erreichbar. In Phase 2 ENTFERNEN –
+    # danach veröffentlicht kein Dienst mehr einen Port am Host.
+    ports:
+      - "${LAN_PORT:-8088}:8080"
+    networks: [intern]
+
+networks:
+  intern:
+    name: spielebibliothek

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zähler</title>
+  <script src="/lib/gamesave.js"></script>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+           font: 16px/1.5 system-ui, sans-serif; background: #fdfbf6; color: #222; }
+    main { text-align: center; }
+    #zahl { font-size: 5rem; font-weight: 700; margin: 0.2em 0; font-variant-numeric: tabular-nums; }
+    button { font: inherit; padding: 0.5em 1em; margin: 0.2em; border-radius: 6px;
+             border: 1px solid #999; background: #fff; cursor: pointer; }
+    button.gross { font-size: 1.4rem; background: #2f6f4f; color: #fff; border-color: #2f6f4f; }
+    #status { color: #666; min-height: 1.5em; }
+    ol { text-align: left; display: inline-block; margin: 0.5em 0 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Zähler</h1>
+    <div id="zahl">0</div>
+    <button class="gross" id="plus" type="button">+1</button>
+    <div>
+      <button id="speichern" type="button">Speichern</button>
+      <button id="laden" type="button">Laden</button>
+      <button id="zuruecksetzen" type="button">Zurücksetzen</button>
+      <button id="score" type="button">Als Score einreichen</button>
+    </div>
+    <p id="status"></p>
+    <div id="liste"></div>
+  </main>
+
+  <script>
+    "use strict";
+    // Testspiel: speichert einen Zähler und reicht ihn als Score ein.
+    let zahl = 0;
+    const $ = (id) => document.getElementById(id);
+    const zeige = () => { $("zahl").textContent = zahl; };
+    const status = (t) => { $("status").textContent = t; };
+
+    async function sicher(aktion, text) {
+      try {
+        await aktion();
+        if (text) status(text);
+      } catch (e) {
+        status("Fehler: " + (e && e.message ? e.message : e));
+      }
+    }
+
+    async function bestenliste() {
+      const top = await GameSave.leaderboard();
+      const ol = document.createElement("ol");
+      for (const e of top) {
+        const li = document.createElement("li");
+        li.textContent = e.player + ": " + e.score;
+        ol.append(li);
+      }
+      $("liste").replaceChildren(ol);
+    }
+
+    $("plus").onclick = () => { zahl++; zeige(); };
+    $("speichern").onclick = () => sicher(() => GameSave.save("spielstand", { zahl }), "Gespeichert.");
+    $("laden").onclick = () => sicher(async () => {
+      const { data } = await GameSave.load("spielstand");
+      zahl = data && typeof data.zahl === "number" ? data.zahl : 0;
+      zeige();
+    }, "Geladen.");
+    $("zuruecksetzen").onclick = () => sicher(async () => {
+      await GameSave.remove("spielstand");
+      zahl = 0; zeige();
+    }, "Spielstand gelöscht.");
+    $("score").onclick = () => sicher(async () => {
+      await GameSave.submitScore(zahl);
+      await bestenliste();
+    }, "Score eingereicht.");
+
+    (async () => {
+      if (typeof GameSave === "undefined") {
+        status("GameSave fehlt – Spiel läuft ohne Speichern.");
+        return;
+      }
+      await sicher(async () => {
+        const { data } = await GameSave.load("spielstand");
+        if (data && typeof data.zahl === "number") { zahl = data.zahl; zeige(); }
+        const ich = await GameSave.player();
+        status(GameSave.available
+          ? "Angemeldet als " + ich + "."
+          : "Außerhalb der Bibliothek: Speichern nur bis zum Neuladen.");
+      });
+    })();
+  </script>
+</body>
+</html>

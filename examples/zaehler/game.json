@@ -1,0 +1,8 @@
+{
+  "title": "Zähler",
+  "description": "Testspiel: zählt hoch, speichert den Stand und hat eine Bestenliste.",
+  "thumbnail": "thumb.svg",
+  "saveVersion": 1,
+  "leaderboard": { "enabled": true, "order": "desc", "label": "Punkte" },
+  "leaderboardSeason": 1
+}

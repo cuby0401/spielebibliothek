@@ -1,0 +1,90 @@
+:root {
+  --grund: #f6f5f2;
+  --flaeche: #ffffff;
+  --text: #1d1d1f;
+  --leise: #6b6b70;
+  --linie: #e2e0db;
+  --akzent: #2f6f4f;
+  --akzent-text: #ffffff;
+  --warn: #9a5b00;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #151517;
+    --flaeche: #1f1f22;
+    --text: #ececef;
+    --leise: #9a9aa2;
+    --linie: #333338;
+    --akzent: #5fb98b;
+    --akzent-text: #0d1a13;
+    --warn: #e0a24a;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: inherit; }
+
+.kopf {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--linie);
+  background: var(--flaeche);
+}
+.marke { font-weight: 650; text-decoration: none; font-size: 1.1rem; }
+.kopf nav { display: flex; align-items: center; gap: 1rem; }
+.benutzer { color: var(--leise); }
+
+main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
+
+.knopf {
+  display: inline-block; border: 1px solid var(--akzent); border-radius: 6px;
+  padding: 0.35rem 0.8rem; background: var(--akzent); color: var(--akzent-text);
+  font: inherit; text-decoration: none; cursor: pointer;
+}
+.knopf.leise { background: transparent; color: var(--text); border-color: var(--linie); }
+.knopf[disabled], .knopf[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+.leise { color: var(--leise); }
+
+.meldung { padding: 0.75rem 1rem; border: 1px solid var(--linie); border-radius: 8px; background: var(--flaeche); }
+
+.kacheln {
+  display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.kachel {
+  display: flex; flex-direction: column;
+  background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; overflow: hidden;
+}
+.kachel .bild {
+  aspect-ratio: 16 / 9; background: var(--linie);
+  display: grid; place-items: center; color: var(--leise); font-size: 2rem;
+}
+.kachel .bild img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kachel .inhalt { padding: 0.75rem 0.9rem 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
+.kachel h2 { margin: 0; font-size: 1.05rem; }
+.kachel .autor { color: var(--leise); font-size: 0.85rem; }
+.kachel .beschreibung { margin: 0; flex: 1; }
+.kachel .warnung { color: var(--warn); font-size: 0.85rem; margin: 0; }
+.kachel .knopf { align-self: flex-start; margin-top: 0.4rem; }
+
+.spielleiste { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.spielleiste h1 { flex: 1; margin: 0; font-size: 1.2rem; }
+.spielbereich { display: grid; grid-template-columns: 1fr 240px; gap: 1rem; }
+.rahmen { background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 10; }
+.rahmen:fullscreen { aspect-ratio: auto; border-radius: 0; }
+.rahmen iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+.bestenliste { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; padding: 0.75rem 1rem; }
+.bestenliste h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+
+@media (max-width: 760px) {
+  .spielbereich { grid-template-columns: 1fr; }
+  .rahmen { aspect-ratio: 3 / 4; }
+}

@@ -1,0 +1,42 @@
+# Spielebibliothek – Caddy
+# Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
+#
+# Caddy lauscht im Container auf :8080 (läuft als Nicht-root ohne Capabilities).
+# TLS macht Cloudflare, deshalb nur HTTP.
+
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:8080 {
+	# Für alle Antworten
+	header {
+		Cache-Control "no-cache"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	# GameSave-Bibliothek und Bridge
+	handle_path /lib/* {
+		root * /srv/lib
+		file_server
+	}
+
+	# Hochgeladene Spiele, nur lesend, ohne Verzeichnis-Listing.
+	# Dateityp-Whitelist und CSP folgen in Phase 7.
+	handle_path /play/* {
+		root * /srv/spiele
+		file_server
+	}
+
+	# /api/* → savesvc folgt in Phase 4
+
+	# Bibliotheksseite
+	handle {
+		root * /srv/site
+		file_server
+	}
+}
