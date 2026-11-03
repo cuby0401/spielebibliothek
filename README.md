@@ -29,7 +29,7 @@ docs/          Betriebsnotizen
 ## Deploy
 
 ```sh
-scripts/deploy.sh             # Stack übertragen und starten
+scripts/deploy.sh             # Stack übertragen (git-verfolgte Dateien) und starten
 scripts/deploy.sh --examples  # zusätzlich Testspiele nach spiele/seb/
 ```
 

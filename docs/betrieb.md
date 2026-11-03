@@ -17,8 +17,8 @@ Die genauen ACLs setzt `scripts/nas-setup.sh`.
 1. **UGOS → Dateiverwaltung/Freigabeordner:** neuen Freigabeordner `games` auf volume1 anlegen.
    - Papierkorb für diesen Ordner ausschalten (sonst legt UGOS `#recycle/` an und gelöschte Spiele sammeln sich dort).
    - Zugriff: nur `Sebi` Lesen/Schreiben. Keine SMB-Freigabe für Kollegen.
-2. **Stack übertragen** (vom Mac): `scripts/deploy.sh` – legt auch `/volume1/docker/spielebibliothek/` an.
-   (Vor Schritt 3 startet caddy noch nicht sinnvoll, siehe unten.)
+2. **Stack übertragen** (vom Mac): `scripts/deploy.sh --no-start` – legt `/volume1/docker/spielebibliothek/` an.
+   Noch nicht starten: Docker würde fehlende Mount-Pfade unter `/volume1/games` sonst als root anlegen.
 3. **Rechte setzen** (auf der NAS, braucht sudo):
    ```sh
    ssh -t $NAS sudo sh /volume1/docker/spielebibliothek/scripts/nas-setup.sh
