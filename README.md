@@ -22,8 +22,8 @@ docs/          Betriebsnotizen
 
 | Phase | Inhalt | Status |
 |---|---|---|
-| 0 | Ordner, Repo, Cloudflare prüfen | siehe [docs/betrieb.md](docs/betrieb.md) |
-| 1 | Statische Bibliothek im LAN | Code fertig, Abnahme nach Deploy |
+| 0 | Ordner, Repo, Cloudflare prüfen | ✓ abgenommen 03.11.2026 |
+| 1 | Statische Bibliothek im LAN | ✓ abgenommen 03.11.2026 |
 | 2–9 | Tunnel, Sandbox-Spike, savesvc, Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
 
 ## Deploy

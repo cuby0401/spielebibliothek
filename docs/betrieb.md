@@ -24,7 +24,7 @@ Die genauen ACLs setzt `scripts/nas-setup.sh`.
    ssh -t $NAS sudo sh /volume1/docker/spielebibliothek/scripts/nas-setup.sh
    ```
 4. **Cloudflare prüfen:** Zone `cuby0401.uk` aktiv (✓ 03.11.2026: Nameserver `melissa`/`everton.ns.cloudflare.com`),
-   Zero-Trust-Team vorhanden → Team-Name notieren (`<team>.cloudflareaccess.com`, wird in Phase 4 für die JWT-Prüfung gebraucht).
+   Zero-Trust-Team `cold-glitter-fc3b.cloudflareaccess.com` (✓ 03.11.2026, wird in Phase 4 für die JWT-Prüfung gebraucht).
 
 **Achtung UGOS:** Wenn die Rechte des Freigabeordners später in der UGOS-Oberfläche geändert werden,
 kann UGOS die ACLs überschreiben. Danach `nas-setup.sh` erneut laufen lassen.

@@ -16,6 +16,10 @@ services:
     user: "10020:10020"
     read_only: true
     cap_drop: [ALL]
+    # Das caddy-Binary trägt die File-Capability cap_net_bind_service. Fehlt sie im
+    # Bounding-Set, verweigert der Kernel den Start ("exec: operation not permitted").
+    # Wegen no-new-privileges wird sie trotzdem nicht gewährt; Caddy nutzt ohnehin :8080.
+    cap_add: [NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
     tmpfs:
       - /tmp
