@@ -308,13 +308,9 @@ function menueEinrichten() {
 	const darf = {
 		admin: ich.admin,
 		entwickler: ich.uploader || ich.admin,
-		echteradmin: ich.echterAdmin && !ich.ansicht,
 	};
 	for (const a of menue.querySelectorAll("[data-rolle]")) a.hidden = !darf[a.dataset.rolle];
-	for (const a of menue.querySelectorAll("[data-ansicht]")) {
-		a.onclick = (e) => { e.preventDefault(); ansichtWechseln(a.dataset.ansicht || null); };
-	}
-	// Band oben, solange eine Rolle simuliert wird
+	// Band oben, solange eine Rolle simuliert wird (gestartet im Admin-Panel → Übersicht)
 	if (ich.ansicht) {
 		el("ansicht-text").textContent = `Du siehst die Bibliothek als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"} – so wie Kollegen mit dieser Rolle. Spielstände und Favoriten bleiben deine.`;
 		el("ansicht-band").hidden = false;

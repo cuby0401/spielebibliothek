@@ -29,6 +29,11 @@ async function uebersicht(c) {
 		kz(d.zaehler.scores, "Bestenlisten-Einträge"), kz(d.offeneAntraege, "offene Anträge"),
 		kz(groesse(d.datenbank), "Datenbank"), kz(d.sicherung ? datumZeit(d.sicherung) : "–", "letzte DB-Kopie fürs Backup")));
 	c.append(h("p", { class: "leise", text: "Backup: borgmatic sichert jede Nacht um 02:00 – den Erfolg zeigt das borgmatic-Log auf der NAS (docker logs borgmatic)." }));
+	// „Ansicht als …“ (E26/E27): gilt für diesen Tab, beendet wird über das lila Band in der Bibliothek
+	const ansichtStarten = (rolle) => { Bridge.ansicht = rolle; location.href = "/#/"; };
+	c.append(h("h2", { text: "Bibliothek als Rolle ansehen" }),
+		h("p", { class: "leise", text: "Zeigt die Bibliothek in diesem Tab so, wie Kollegen mit dieser Rolle sie sehen – mit einem eigenen, anfangs leeren Konto. Bestenliste und Anträge sind dabei gesperrt. Beenden über das lila Band oben in der Bibliothek." }),
+		h("div", { class: "zeile" }, knopf("Ansicht als Spieler", () => ansichtStarten("spieler")), knopf("Ansicht als Entwickler", () => ansichtStarten("entwickler"))));
 	c.append(h("h2", { text: "Letzte Aktivität" }), tabelle(["Spieler", "Spiel", "Zeit"],
 		d.aktivitaet.map((a) => h("tr", {}, h("td", { text: a.player }), h("td", { text: a.title }), h("td", { text: datumZeit(a.zeit) })))));
 	c.append(h("h2", { text: "Letzte Uploads und Konto-Änderungen" }), tabelle(["Zeit", "Wer", "Was", "Ordner"],
@@ -206,7 +211,7 @@ async function zeigen() {
 		const ich = await Bridge.json("GET", "/api/me");
 		if (!ich.admin) {
 			$("reiter").hidden = true;
-			return meldung(ich.ansicht ? `„Ansicht als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"}“ ist aktiv – das Admin-Panel ist gesperrt. Beenden über dein Menü in der Bibliothek.`
+			return meldung(ich.ansicht ? `„Ansicht als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"}“ ist aktiv – das Admin-Panel ist gesperrt. Beenden über das lila Band oben in der Bibliothek.`
 				: "Kein Zugriff – das Admin-Panel ist nur für Admins.", true);
 		}
 	} catch (e) { return meldung(e.message, true); }
