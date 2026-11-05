@@ -16,6 +16,14 @@ progress { flex: 1; min-width: 8rem; }
 .eintrag .titel { font-weight: 650; }
 .eintrag .info { color: var(--leise); font-size: 0.85rem; }
 .eintrag .warnung { color: var(--warn); font-size: 0.85rem; }
+.art { border: 1px solid var(--linie); border-radius: 8px; padding: 0.5rem 0.8rem; display: grid; gap: 0.35rem; }
+.art legend { font-weight: 600; padding: 0 0.3rem; }
+.art .haken, .eintrag .haken { display: flex; gap: 0.5rem; align-items: baseline; font-weight: normal; }
+.eintrag { align-items: flex-start; }
+.eintrag .bereich { flex: 1; min-width: 16rem; display: grid; gap: 0.35rem; }
+.eintrag .zeile-klein { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.entwurf-box { background: #e9b94922; border-left: 3px solid #e9b949; padding: 0.35rem 0.6rem; border-radius: 4px; }
+.knopf.klein { padding: 0.15rem 0.55rem; font-size: 0.85rem; }
 .knopf.gefahr { background: transparent; color: var(--warn); border-color: var(--warn); }
 .meldung.ok { border-color: var(--akzent); }
 .meldung.fehler { border-color: var(--warn); color: var(--warn); }

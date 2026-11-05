@@ -48,6 +48,7 @@ async function spieleSeite(c) {
 			h("td", {}, h("strong", { text: s.title }), h("div", { class: "leise", text: s.id + (s.complete ? "" : " · unvollständig") })),
 			h("td", { text: String(s.spieler) }), h("td", { text: datumZeit(s.zuletzt) }),
 			h("td", { text: s.leaderboard.enabled ? `S${s.leaderboardSeason} · ${s.scores}` : "aus" }),
+			h("td", { text: s.fehler && s.fehler.arten ? `${s.fehler.arten24h || 0} neu · ${s.fehler.anzahl}×` : "–" }),
 			h("td", {}, h("div", { class: "zeile" }, schalter("versteckt", "ausblenden"), schalter("hervorgehoben", "empfehlen"))),
 			h("td", {}, h("div", { class: "zeile" },
 				s.leaderboard.enabled ? knopf("Bestenliste", () => bestenlisteDetail(c, s)) : null,
@@ -62,7 +63,16 @@ async function spieleSeite(c) {
 				}, "gefahr"))));
 	});
 	c.append(h("p", { class: "leise", text: "„Ausblenden“ versteckt ein Spiel in der Übersicht für alle außer dir (die Dateien bleiben unter play erreichbar). „Empfehlen“ heftet es mit Marke nach den Favoriten oben an." }),
-		tabelle(["Spiel", "Spieler", "Zuletzt", "Bestenliste", "Sichtbarkeit", ""], zeilen));
+		tabelle(["Spiel", "Spieler", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
+	const fehler = await Bridge.json("GET", "/api/entwickler/fehler?alle=true");
+	c.append(h("h2", { text: "Fehlerberichte aller Spiele" }),
+		fehler.length ? tabelle(["Spiel", "Fehler", "Ort", "Anzahl", "Zuletzt", "Browser", ""], fehler.map((f) => h("tr", {},
+			h("td", {}, f.title, f.entwurf ? h("span", { class: "leise", text: " (Entwurf)" }) : null),
+			h("td", {}, h("code", { text: f.meldung })),
+			h("td", { text: (f.quelle || "inline") + (f.zeile ? ":" + f.zeile : "") }),
+			h("td", { text: String(f.anzahl) }), h("td", { text: datumZeit(f.letztes) }), h("td", { text: f.browser || "" }),
+			h("td", {}, knopf("Erledigt", async () => { await Bridge.json("DELETE", "/api/entwickler/fehler/" + f.id); zeigen(); })))))
+			: h("p", { class: "leise", text: "Keine Fehler gemeldet." }));
 }
 
 async function bestenlisteDetail(c, s) {

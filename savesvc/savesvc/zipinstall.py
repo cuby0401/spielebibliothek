@@ -68,8 +68,9 @@ def _wurzel(eintraege: list[tuple[tuple[str, ...], zipfile.ZipInfo]]) -> int:
     raise UngueltigesZip("index.html fehlt – sie muss im ZIP ganz oben liegen (oder in genau einem Ordner)")
 
 
-def installieren(zip_pfad: Path, ziel: Path) -> Ergebnis:
-    """Entpackt zip_pfad nach ziel (ersetzt einen vorhandenen Ordner atomar)."""
+def installieren(zip_pfad: Path, ziel: Path, wegraeumen=None) -> Ergebnis:
+    """Entpackt zip_pfad nach ziel (ersetzt einen vorhandenen Ordner atomar).
+    wegraeumen(): verschiebt einen vorhandenen ziel-Ordner (z. B. ins Versionsarchiv) – sonst wird er gelöscht."""
     try:
         z = zipfile.ZipFile(zip_pfad)
     except (zipfile.BadZipFile, OSError):
@@ -131,8 +132,11 @@ def installieren(zip_pfad: Path, ziel: Path) -> Ergebnis:
             # atomar austauschen
             alt = None
             if ziel.exists():
-                alt = eltern / f".alt-{ziel.name}-{secrets.token_hex(4)}"
-                ziel.rename(alt)
+                if wegraeumen:
+                    wegraeumen()
+                else:
+                    alt = eltern / f".alt-{ziel.name}-{secrets.token_hex(4)}"
+                    ziel.rename(alt)
             neu.rename(ziel)
             if alt:
                 shutil.rmtree(alt, ignore_errors=True)

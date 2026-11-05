@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 from fastapi.responses import JSONResponse
 
-from . import games, rollen
+from . import games, rollen, versionen
 from .auth import Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 from .db import Datenbank, ZuGross
@@ -63,7 +63,16 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     spieler = Pruefer(e, benutzerliste, schluessel_quelle)
     app = FastAPI(title="Spielebibliothek – Speicher-Dienst", docs_url=None, redoc_url=None, openapi_url=None)
 
-    def spiel(user: str = P(...), game: str = P(...)):
+    def spiel(request: Request, user: str = P(...), game: str = P(...), player: str = Depends(spieler)):
+        # Entwürfe (<ordner>~entwurf) nur für den Entwickler selbst und echte Admins
+        if game.endswith(versionen.ENTWURF):
+            basis = game[: -len(versionen.ENTWURF)]
+            darf = player == user or rollen.rolle(e, request, player)["echterAdmin"]
+            ordner = e.spiele_dir / user / game
+            gueltig = games.gueltige_id(user, basis) and ordner.is_dir() and not ordner.is_symlink()
+            if not (darf and gueltig):
+                raise HTTPException(404, "Spiel nicht gefunden")
+            return f"{user}/{game}", ordner
         ordner = games.spielordner(e.spiele_dir, user, game)
         if not ordner:
             raise HTTPException(404, "Spiel nicht gefunden")
@@ -150,6 +159,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     def score(request: Request, player: str = Depends(spieler), sp=Depends(spiel), body: dict[str, Any] = Body(...)):
         if rollen.simuliert(e, request, player):
             raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Bestenlisten-Einträge gespeichert")
+        if sp[0].endswith(versionen.ENTWURF):
+            raise HTTPException(409, "Im Entwurf werden keine Bestenlisten-Einträge gespeichert – erst nach dem Veröffentlichen")
         lb = games.bestenliste_einstellungen(sp[1])
         if not lb["enabled"]:
             raise HTTPException(409, "dieses Spiel hat keine Bestenliste")

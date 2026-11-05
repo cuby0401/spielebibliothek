@@ -242,11 +242,17 @@ async function zeigeSeite(name) {
 	else { kopf.append(zurueck); el("seite").prepend(kopf); }
 }
 
-async function zeigeSpiel(id) {
-	const spiel = spiele.find((s) => s.id === id && s.complete);
+async function zeigeSpiel(id, entwurfSpiel) {
+	const spiel = entwurfSpiel || spiele.find((s) => s.id === id && s.complete);
 	if (!spiel) {
 		location.hash = "#/";
 		return;
+	}
+	el("entwurf-hinweis").hidden = !entwurfSpiel;
+	if (entwurfSpiel) {
+		el("entwurf-hinweis").textContent = "Entwurf – nur du siehst ihn. " +
+			(spiel.spielstaendeKopiert ? "Dein Spielstand wurde als Kopie übernommen. " : "Dein Spielstand im Entwurf ist getrennt vom echten. ") +
+			"Bestenlisten-Einträge werden erst nach dem Veröffentlichen gespeichert. Veröffentlichen auf der Upload-Seite.";
 	}
 	aktuellesSpiel = spiel.id;
 	bestenlisteZeigen(spiel);
@@ -256,7 +262,8 @@ async function zeigeSpiel(id) {
 	el("spielansicht").hidden = false;
 	el("spielansicht").classList.toggle("gross", einstellungen.grossansicht);
 	el("spielansicht").classList.toggle("ohne-bestenliste", !einstellungen.bestenliste);
-	document.title = spiel.title + " – Spielebibliothek";
+	document.title = spiel.title + (entwurfSpiel ? " (Entwurf)" : "") + " – Spielebibliothek";
+	if (entwurfSpiel) el("spieltitel").textContent = spiel.title + " (Entwurf)";
 	try {
 		const iframe = await Bridge.starten(spiel, el("rahmen"));
 		iframe.focus();
@@ -269,8 +276,20 @@ async function zeigeSpiel(id) {
 	}
 }
 
+// Entwurf testen (nur Entwickler selbst und Admin – der Server prüft)
+async function zeigeEntwurf(user, ordner) {
+	try {
+		const d = await Bridge.json("POST", `/api/entwickler/entwurf/${encodeURIComponent(user)}/${encodeURIComponent(ordner)}`);
+		await zeigeSpiel(d.id, d);
+	} catch (e) {
+		if (!(e instanceof Bridge.SitzungAbgelaufen)) { meldung("Entwurf nicht verfügbar: " + e.message); location.hash = "#/"; }
+	}
+}
+
 function route() {
 	el("menue").hidden = true;
+	const ent = location.hash.match(/^#\/entwurf\/([a-z0-9][a-z0-9_-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*)$/);
+	if (ent) { letzteRoute = location.hash; return zeigeEntwurf(ent[1], ent[2]); }
 	const m = location.hash.match(/^#\/spiel\/(.+)$/);
 	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1]); }
 	const s = location.hash.match(/^#\/([a-z-]+)$/);

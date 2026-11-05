@@ -43,6 +43,13 @@
           Mac: Ordner rechtsklicken → „Komprimieren“. Windows: Rechtsklick → „Senden an“ → „ZIP-komprimierter Ordner“.
           Max. 100 MB. <code>.exe</code>, Skripte und versteckte Dateien werden übersprungen.
         </p>
+        <fieldset class="art">
+          <legend>Wie hochladen?</legend>
+          <label class="haken"><input type="radio" name="art" value="entwurf" checked>
+            <span><strong>Als Entwurf</strong> – nur du siehst ihn, testen in der Bibliothek, dann veröffentlichen</span></label>
+          <label class="haken"><input type="radio" name="art" value="live">
+            <span><strong>Sofort veröffentlichen</strong> – für alle sichtbar; die bisherige Version wird aufgehoben</span></label>
+        </fieldset>
         <div class="zeile">
           <button class="knopf" type="submit">Hochladen</button>
           <progress id="fortschritt" max="100" value="0" hidden></progress>

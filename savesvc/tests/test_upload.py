@@ -214,3 +214,72 @@ def test_intern_mit_token(umgebung, rsa_schluessel, token, tmp_path, monkeypatch
     assert c.delete("/intern/spiele/paul/snake", headers=t).status_code == 204 and not (umgebung.spiele / "paul" / "snake").exists()
     assert c.delete("/intern/entwickler/emil", headers=t).status_code == 204
     assert {x["aktion"] for x in c.get("/intern/ereignisse", headers=t).json()} >= {"Upload-Konto angelegt", "gelöscht (Admin)"}
+
+
+# ---------- Entwürfe und Versionen ----------
+
+def angemeldeter(uclient):
+    uclient.store.setzen("paul", "richtiges-passwort-123")
+    anmelden(uclient)
+    return uclient
+
+
+def hoch(c, ordner, inhalt, entwurf=False):
+    return c.post(f"/api/upload/spiele/{ordner}" + ("?entwurf=true" if entwurf else ""),
+                  files={"datei": ("s.zip", zip_bytes({"index.html": inhalt}), "application/zip")}, headers=c.als())
+
+
+def test_entwurf_veroeffentlichen_und_versionen(uclient, umgebung, monkeypatch):
+    c = angemeldeter(uclient)
+    basis = umgebung.spiele / "paul"
+    assert hoch(c, "rennen", "v1").status_code == 200                       # neu, direkt live
+    assert hoch(c, "rennen", "v2-entwurf", entwurf=True).status_code == 200
+    assert (basis / "rennen" / "index.html").read_text() == "v1"           # live unverändert
+    assert (basis / "rennen~entwurf" / "index.html").read_text() == "v2-entwurf"
+    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
+    assert s["entwurf"]["dateien"] == 1 and s["versionen"] == []
+    assert c.post("/api/upload/spiele/rennen/veroeffentlichen", headers=c.als()).status_code == 200
+    assert (basis / "rennen" / "index.html").read_text() == "v2-entwurf" and not (basis / "rennen~entwurf").exists()
+    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
+    assert len(s["versionen"]) == 1 and s["entwurf"] is None
+    # Zurücksetzen auf v1 – die aktuelle Version bleibt dabei erhalten
+    vid = s["versionen"][0]["id"]
+    assert c.post("/api/upload/spiele/rennen/zuruecksetzen", json={"version": vid}, headers=c.als()).status_code == 200
+    assert (basis / "rennen" / "index.html").read_text() == "v1"
+    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
+    assert len(s["versionen"]) == 1 and s["versionen"][0]["id"] != vid
+    assert c.post("/api/upload/spiele/rennen/zuruecksetzen", json={"version": "../../etc"}, headers=c.als()).status_code == 404
+
+
+def test_nur_letzte_versionen_bleiben(uclient, umgebung, monkeypatch):
+    import savesvc.versionen as v
+    from datetime import datetime as echt, timezone
+    zaehler = iter(range(100))
+    class Zeit:
+        @staticmethod
+        def now(tz=None):
+            return echt(2026, 11, 5, 10, 0, next(zaehler), tzinfo=timezone.utc)
+        strptime = staticmethod(echt.strptime)
+        fromtimestamp = staticmethod(echt.fromtimestamp)
+    monkeypatch.setattr(v, "datetime", Zeit)
+    c = angemeldeter(uclient)
+    for i in range(8):
+        hoch(c, "rennen", f"v{i}")
+    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
+    assert len(s["versionen"]) == v.VERSIONEN_MAX
+
+
+def test_nur_entwurf_neues_spiel_und_verwerfen(uclient, umgebung):
+    c = angemeldeter(uclient)
+    assert hoch(c, "neu", "x", entwurf=True).status_code == 200
+    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["neu"]
+    assert s["live"] is None and s["entwurf"] is not None
+    assert c.delete("/api/upload/spiele/neu/entwurf", headers=c.als()).status_code == 204
+    assert "neu" not in {x["ordner"] for x in c.get("/api/upload/spiele", headers=c.als()).json()}
+
+
+def test_loeschen_raeumt_alles_weg(uclient, umgebung):
+    c = angemeldeter(uclient)
+    hoch(c, "weg", "1"); hoch(c, "weg", "2"); hoch(c, "weg", "3", entwurf=True)
+    assert c.delete("/api/upload/spiele/weg", headers=c.als()).status_code == 204
+    assert not [p for p in (umgebung.spiele / "paul").iterdir() if p.name.startswith("weg")]

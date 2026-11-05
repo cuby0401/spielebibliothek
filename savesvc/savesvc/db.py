@@ -3,7 +3,7 @@
 import json
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 VERLAUF_MAX = 5          # alte Stände je (player, game, key)
@@ -33,6 +33,11 @@ CREATE TABLE IF NOT EXISTS einstellungen (player TEXT PRIMARY KEY, daten TEXT NO
 CREATE TABLE IF NOT EXISTS spiel_einstellungen (
     game TEXT PRIMARY KEY, versteckt INTEGER NOT NULL DEFAULT 0, hervorgehoben INTEGER NOT NULL DEFAULT 0,
     season INTEGER);
+CREATE TABLE IF NOT EXISTS fehler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, meldung TEXT NOT NULL, quelle TEXT NOT NULL,
+    zeile INTEGER NOT NULL, spalte INTEGER NOT NULL DEFAULT 0, stack TEXT, browser TEXT,
+    anzahl INTEGER NOT NULL DEFAULT 1, erstes TEXT NOT NULL, letztes TEXT NOT NULL,
+    UNIQUE (game, meldung, quelle, zeile));
 CREATE TABLE IF NOT EXISTS antraege (
     id INTEGER PRIMARY KEY AUTOINCREMENT, player TEXT NOT NULL, art TEXT NOT NULL, spiel TEXT, text TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'offen', antwort TEXT, erstellt TEXT NOT NULL, geaendert TEXT NOT NULL);
@@ -291,6 +296,65 @@ class Datenbank:
     def score_loeschen(self, score_id: int) -> bool:
         with self.verbindung() as v:
             return v.execute("DELETE FROM scores WHERE id=?", (score_id,)).rowcount > 0
+
+    # --- Fehlerberichte (gebündelt, ohne Spielerdaten) ---
+
+    FEHLER_MAX_JE_SPIEL = 200
+
+    def fehler_melden(self, game: str, meldung: str, quelle: str, zeile: int, spalte: int, stack: str | None, browser: str) -> None:
+        zeit = jetzt()
+        with self.verbindung() as v:
+            v.execute(
+                """INSERT INTO fehler (game, meldung, quelle, zeile, spalte, stack, browser, erstes, letztes)
+                   VALUES (?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT (game, meldung, quelle, zeile) DO UPDATE SET
+                     anzahl = anzahl + 1, letztes = excluded.letztes, stack = excluded.stack, browser = excluded.browser""",
+                (game, meldung, quelle, zeile, spalte, stack, browser, zeit, zeit))
+            v.execute("""DELETE FROM fehler WHERE game=? AND id NOT IN (
+                             SELECT id FROM fehler WHERE game=? ORDER BY letztes DESC LIMIT ?)""",
+                      (game, game, self.FEHLER_MAX_JE_SPIEL))
+
+    def fehler_liste(self, spiele: list[str] | None = None) -> list[dict]:
+        with self.verbindung() as v:
+            if spiele is None:
+                zeilen = v.execute("SELECT * FROM fehler ORDER BY letztes DESC LIMIT 500").fetchall()
+            else:
+                if not spiele:
+                    return []
+                frage = ",".join("?" * len(spiele))
+                zeilen = v.execute(f"SELECT * FROM fehler WHERE game IN ({frage}) ORDER BY letztes DESC LIMIT 500", spiele).fetchall()
+        return [dict(z) for z in zeilen]
+
+    def fehler_zahlen(self) -> dict[str, dict]:
+        """Je Spiel: Fehlerarten, Vorkommen gesamt, Arten der letzten 24 h, zuletzt."""
+        grenze = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
+        with self.verbindung() as v:
+            return {z["game"]: {"arten": z["arten"], "anzahl": z["anzahl"], "arten24h": z["arten24h"], "zuletzt": z["zuletzt"]}
+                    for z in v.execute(
+                        """SELECT game, COUNT(*) AS arten, SUM(anzahl) AS anzahl, MAX(letztes) AS zuletzt,
+                                  SUM(CASE WHEN letztes > ? THEN 1 ELSE 0 END) AS arten24h
+                           FROM fehler GROUP BY game""", (grenze,))}
+
+    def fehler_eintrag(self, fehler_id: int) -> dict | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT * FROM fehler WHERE id=?", (fehler_id,)).fetchone()
+        return dict(z) if z else None
+
+    def fehler_loeschen(self, fehler_id: int) -> bool:
+        with self.verbindung() as v:
+            return v.execute("DELETE FROM fehler WHERE id=?", (fehler_id,)).rowcount > 0
+
+    # --- Spielstände in einen Entwurf kopieren ---
+
+    def spielstaende_kopieren(self, player: str, von: str, nach: str) -> int:
+        """Kopiert die Spielstände eines Spielers – nur wenn das Ziel für ihn noch leer ist."""
+        with self.verbindung() as v:
+            if v.execute("SELECT 1 FROM saves WHERE player=? AND game=? LIMIT 1", (player, nach)).fetchone():
+                return 0
+            return v.execute(
+                "INSERT INTO saves (player, game, key, data, save_version, updated_at) "
+                "SELECT player, ?, key, data, save_version, ? FROM saves WHERE player=? AND game=?",
+                (nach, jetzt(), player, von)).rowcount
 
     # --- Anträge ---
 

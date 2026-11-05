@@ -34,8 +34,10 @@
         Mac: Rechtsklick → „Komprimieren“. Windows: Rechtsklick → „Senden an“ → „ZIP-komprimierter Ordner“.</li>
       <li><strong>Hochladen</strong> – <a href="https://upload.cuby0401.uk" target="_blank" rel="noopener">upload.cuby0401.uk</a> öffnen,
         mit dem E-Mail-Code anmelden, dann mit deinem <strong>Upload-Passwort</strong> (bitte nicht im Browser speichern).
-        ZIP auswählen, Ordnernamen prüfen, „Hochladen“.</li>
-      <li><strong>Spielen</strong> – hier die Seite neu laden, dein Spiel ist da.</li>
+        ZIP auswählen, Ordnernamen prüfen, <strong>„Als Entwurf“</strong> lassen, „Hochladen“.</li>
+      <li><strong>Entwurf testen</strong> – auf der Upload-Seite „Testen“ (oder Menü → Meine Spiele → „Entwurf testen“).
+        Nur du siehst den Entwurf; er startet mit einer <em>Kopie</em> deines Spielstands, Bestenlisten-Einträge zählen noch nicht.</li>
+      <li><strong>Veröffentlichen</strong> – auf der Upload-Seite. Jetzt sehen es alle; die bisherige Version wird aufgehoben.</li>
     </ol>
     <p class="hinweis">Hochladen können nur Entwickler mit Upload-Konto. Wenn du auch Spiele bauen willst, melde dich bei Seb.</p>
     </div>
@@ -53,7 +55,8 @@
     <div data-rolle="entwickler">
     <p><strong>Zusätzlich für Entwickler:</strong></p>
     <ul>
-      <li><strong>Meine Spiele:</strong> deine Spiele mit Statistik – wie viele Spieler, wann zuletzt gespielt, Bestenlisten-Einträge.
+      <li><strong>Meine Spiele:</strong> deine Spiele mit Statistik – wie viele Spieler, wann zuletzt gespielt, Bestenlisten-Einträge,
+        Fehlerberichte und „Entwurf testen“.
         Mit <strong>„Neue Season“</strong> startest du eine leere Bestenliste (die alte bleibt abrufbar) – ohne neue <code>game.json</code>.</li>
       <li><strong>Anträge</strong> zusätzlich für deine Spiele: Bestenliste zurücksetzen, Spiel löschen oder umbenennen.</li>
     </ul>
@@ -118,6 +121,18 @@ const ich = await GameSave.player();             // "paul"
 GameSave.available                               // false beim lokalen Testen</code></pre>
     <p>Alle Aufrufe können fehlschlagen (z. B. offline) – Fehler mit <code>try/catch</code> abfangen.
       Keys: Buchstaben, Ziffern, <code>. _ : -</code>, max. 100 Zeichen. Ein Spielstand darf höchstens 256 KB groß sein.</p>
+
+    <h2 id="versionen">Entwürfe, Versionen und Fehlerberichte</h2>
+    <ul>
+      <li><strong>Entwurf:</strong> Jeder Upload kann erst als Entwurf landen. Testen in der Bibliothek, dann veröffentlichen oder verwerfen.
+        Ideal für Updates: Mit der Kopie deines Spielstands siehst du sofort, ob deine Migration funktioniert – ohne den echten Stand zu gefährden.</li>
+      <li><strong>Versionen:</strong> Beim Veröffentlichen (oder „Sofort veröffentlichen“) wird die bisherige Version aufgehoben – die letzten 5.
+        Auf der Upload-Seite unter „Ältere Versionen“ → „Zurücksetzen“ ist ein kaputtes Update in Sekunden rückgängig gemacht.
+        Spielstände und Bestenliste bleiben davon unberührt.</li>
+      <li><strong>Fehlerberichte:</strong> JavaScript-Fehler, die beim Spielen auftreten, werden automatisch gemeldet – gleiche Fehler zusammengefasst,
+        ohne Spielernamen, nur mit Browser und Gerätetyp. Du findest sie unter Menü → Meine Spiele → „Fehlerberichte“ mit Datei, Zeile und Stacktrace.
+        Fehler aus dem Entwurf sind extra gekennzeichnet.</li>
+    </ul>
 
     <h2 id="updates">Updates: was mit Spielständen passiert</h2>
     <ul>
@@ -228,6 +243,10 @@ const top = await GameSave.leaderboard();
       <dt>Mein Bestenlisten-Eintrag wird abgelehnt.</dt>
       <dd>Steht jeder Schlüssel aus <code>submitScore({...})</code> in <code>leaderboard.spalten</code>? Ist der Wert aus <code>rangiertNach</code> dabei und eine Zahl?
         Die Fehlermeldung von <code>submitScore</code> nennt den Grund.</dd>
+      <dt>Mein Update ist kaputt.</dt>
+      <dd>Upload-Seite → beim Spiel „Ältere Versionen“ → „Zurücksetzen“. Nächstes Mal erst als Entwurf hochladen und testen.</dd>
+      <dt>Woher weiß ich, ob mein Spiel bei anderen Fehler wirft?</dt>
+      <dd>Menü → Meine Spiele → „Fehlerberichte“ – dort landet jeder JavaScript-Fehler automatisch.</dd>
       <dt>Ich habe ein Update gemacht, das Spiel ist jetzt viel leichter.</dt>
       <dd>Menü → Meine Spiele → „Neue Season“ – dann vergleichen sich alle wieder fair.</dd>
       </div>

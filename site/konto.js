@@ -70,26 +70,49 @@ SEITEN_REG["spielstaende"] = async (c) => {
 // ---------- Meine Spiele (Entwickler) ----------
 SEITEN_REG["meine-spiele"] = async (c) => {
 	c.append(h("h1", { text: "Meine Spiele" }),
-		h("p", {}, "Hochladen und aktualisieren: ", h("a", { href: "https://upload.cuby0401.uk", target: "_blank", rel: "noopener", text: "upload.cuby0401.uk" }),
+		h("p", {}, "Hochladen, Entwürfe veröffentlichen, alte Versionen zurückholen: ",
+			h("a", { href: "https://upload.cuby0401.uk", target: "_blank", rel: "noopener", text: "upload.cuby0401.uk" }),
 			" · Anleitung: ", h("a", { href: "/hilfe/", text: "Hilfe" })));
-	const liste = await Bridge.json("GET", "/api/entwickler/spiele");
+	const [liste, fehler] = await Promise.all([Bridge.json("GET", "/api/entwickler/spiele"), Bridge.json("GET", "/api/entwickler/fehler")]);
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
+	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Zuletzt gespielt", "Bestenliste", ""].map((t) => h("th", { text: t })))),
-		h("tbody", {}, liste.map((s) => h("tr", {},
-			h("td", {}, h("strong", { text: s.title }), h("div", { class: "leise", text: "Ordner " + s.id.split("/")[1] + (s.versteckt ? " · von Seb ausgeblendet" : "") }),
-				s.warning ? h("div", { class: "warnung", text: "⚠ " + s.warning }) : null),
-			h("td", { text: String(s.spieler) }),
-			h("td", { text: datumZeit(s.zuletzt) }),
-			h("td", { text: s.leaderboard.enabled ? `Season ${s.leaderboardSeason} · ${s.scores} Einträge` : "aus" }),
-			h("td", {}, s.leaderboard.enabled ? h("button", { type: "button", class: "knopf klein leise", text: "Neue Season",
-				title: "Neue, leere Bestenliste beginnen – die alte bleibt abrufbar",
-				onclick: async () => {
-					if (!confirm(`Neue Season für „${s.title}“ beginnen? Die Bestenliste startet leer, die alte bleibt über die Season-Auswahl abrufbar.`)) return;
-					const r = await Bridge.json("POST", "/api/entwickler/season/" + s.id.split("/").map(encodeURIComponent).join("/"));
-					meldung(`„${s.title}“: Season ${r.season} hat begonnen.`);
-					c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
-				} }) : null)))))));
+		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
+		h("tbody", {}, liste.map((s) => {
+			const [user, ordner] = s.id.split("/");
+			return h("tr", {},
+				h("td", {}, h("strong", { text: s.title }),
+					h("div", { class: "leise", text: "Ordner " + ordner + (s.live ? "" : " · noch nicht veröffentlicht") + (s.versteckt ? " · von Seb ausgeblendet" : "") }),
+					s.entwurf ? h("div", {}, h("span", { class: "status offen", text: "Entwurf" }), " vom " + datumZeit(s.entwurf.geaendert) + " · ",
+						h("a", { href: `#/entwurf/${user}/${ordner}`, text: "Entwurf testen" })) : null,
+					s.warning ? h("div", { class: "warnung", text: "⚠ " + s.warning }) : null),
+				h("td", { text: String(s.spieler) }),
+				h("td", { text: datumZeit(s.zuletzt) }),
+				h("td", { text: s.leaderboard.enabled ? `Season ${s.leaderboardSeason} · ${s.scores} Einträge` : "aus" }),
+				h("td", {}, fehlerText(s.fehler), s.fehlerEntwurf && s.fehlerEntwurf.arten ? h("div", { class: "leise", text: "Entwurf: " + fehlerText(s.fehlerEntwurf) }) : null),
+				h("td", {}, s.live && s.leaderboard.enabled ? h("button", { type: "button", class: "knopf klein leise", text: "Neue Season",
+					title: "Neue, leere Bestenliste beginnen – die alte bleibt abrufbar",
+					onclick: async () => {
+						if (!confirm(`Neue Season für „${s.title}“ beginnen? Die Bestenliste startet leer, die alte bleibt über die Season-Auswahl abrufbar.`)) return;
+						const r = await Bridge.json("POST", "/api/entwickler/season/" + s.id.split("/").map(encodeURIComponent).join("/"));
+						meldung(`„${s.title}“: Season ${r.season} hat begonnen.`);
+						c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
+					} }) : null));
+		})))));
+
+	c.append(h("h2", { text: "Fehlerberichte" }),
+		h("p", { class: "leise", text: "JavaScript-Fehler, die beim Spielen in deinen Spielen auftreten – automatisch gemeldet, gleiche Fehler zusammengefasst, ohne Spielernamen. „Erledigt“ entfernt einen Eintrag; tritt der Fehler wieder auf, erscheint er neu." }));
+	if (!fehler.length) return c.append(h("p", { class: "leise", text: "Keine Fehler gemeldet. 🎉" }));
+	c.append(...fehler.map((f) => h("div", { class: "karte fehler-zeile" },
+		h("div", {}, h("strong", { text: f.title }), f.entwurf ? h("span", { class: "status offen", text: " Entwurf " }) : null,
+			h("span", { class: "leise", text: ` · ${f.anzahl}× · zuletzt ${datumZeit(f.letztes)} · ${f.browser || ""}` })),
+		h("div", {}, h("code", { text: f.meldung })),
+		f.quelle || f.zeile ? h("div", { class: "leise" }, "in ", h("code", { text: (f.quelle || "(Inline-Script)") + (f.zeile ? `:${f.zeile}` + (f.spalte ? `:${f.spalte}` : "") : "") })) : null,
+		f.stack ? h("details", {}, h("summary", { text: "Stacktrace" }), h("pre", { text: f.stack })) : null,
+		h("div", {}, h("button", { type: "button", class: "knopf klein leise", text: "Erledigt", onclick: async () => {
+			await Bridge.json("DELETE", "/api/entwickler/fehler/" + f.id);
+			c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
+		} })))));
 };
 
 // ---------- Anträge (Entwickler) ----------

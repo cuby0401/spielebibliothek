@@ -40,6 +40,20 @@ function zeige(bereich) {
 	$("abmelden").hidden = bereich !== "bereich";
 }
 
+const GAMES = "https://games.cuby0401.uk";
+const knopfK = (text, onclick, art = "leise") => {
+	const k = document.createElement("button");
+	k.type = "button"; k.className = "knopf klein " + art; k.textContent = text; k.onclick = onclick; return k;
+};
+const div = (klasse, ...kinder) => { const d = document.createElement("div"); if (klasse) d.className = klasse; d.append(...kinder); return d; };
+const span = (text, klasse) => { const s = document.createElement("span"); s.textContent = text; if (klasse) s.className = klasse; return s; };
+
+async function aktion(fn, erfolg) {
+	try { await fn(); if (erfolg) meldung(erfolg, "ok"); }
+	catch (e) { if (e.status === 401) return start(); meldung(e.message, "fehler"); }
+	liste();
+}
+
 async function liste() {
 	let spiele;
 	try {
@@ -48,42 +62,57 @@ async function liste() {
 		if (e.status === 401) return start();
 		return meldung(e.message, "fehler");
 	}
-	if (!spiele.length) {
-		const p = document.createElement("p");
-		p.className = "leise";
-		p.textContent = "Noch keine Spiele hochgeladen.";
-		return $("liste").replaceChildren(p);
-	}
+	if (!spiele.length) return $("liste").replaceChildren(span("Noch keine Spiele hochgeladen.", "leise"));
 	$("liste").replaceChildren(...spiele.map((s) => {
-		const zeile = document.createElement("div");
-		zeile.className = "eintrag";
-		const links = document.createElement("div");
-		const titel = document.createElement("div"); titel.className = "titel"; titel.textContent = s.title;
-		const info = document.createElement("div"); info.className = "info";
-		info.textContent = `Ordner ${s.ordner} · ${s.dateien} Dateien · ${groesse(s.bytes)} · geändert ${datum(s.geaendert)}`;
-		links.append(titel, info);
-		if (s.warning || !s.complete) {
-			const w = document.createElement("div"); w.className = "warnung";
-			w.textContent = "⚠ " + (s.warning || "index.html fehlt");
-			links.append(w);
+		const pfad = "/spiele/" + encodeURIComponent(s.ordner);
+		const bereich = div("bereich",
+			div("titel", s.title),
+			div("info", s.live ? `Live · Ordner ${s.ordner} · ${s.live.dateien} Dateien · ${groesse(s.live.bytes)} · geändert ${datum(s.live.geaendert)}`
+				: `Ordner ${s.ordner} · noch nicht veröffentlicht`));
+		if (s.warning || (s.live && !s.complete)) bereich.append(div("warnung", "⚠ " + (s.warning || "index.html fehlt")));
+
+		if (s.entwurf) {
+			const testen = document.createElement("a");
+			testen.href = `${GAMES}/#/entwurf/${encodeURIComponent($("benutzer").textContent)}/${encodeURIComponent(s.ordner)}`;
+			testen.target = "_blank"; testen.rel = "noopener"; testen.className = "knopf klein leise"; testen.textContent = "Testen";
+			bereich.append(div("entwurf-box",
+				span(`Entwurf vom ${datum(s.entwurf.geaendert)} · ${s.entwurf.dateien} Dateien`),
+				div("zeile-klein", testen,
+					knopfK("Veröffentlichen", () => {
+						if (!confirm(`Entwurf von „${s.title}“ veröffentlichen? Er ist dann für alle sichtbar; die bisherige Version wird aufgehoben.`)) return;
+						aktion(() => api("POST", pfad + "/veroeffentlichen"), `${s.ordner}: Entwurf veröffentlicht.`);
+					}, ""),
+					knopfK("Verwerfen", () => {
+						if (!confirm("Entwurf verwerfen?")) return;
+						aktion(() => api("DELETE", pfad + "/entwurf"), `${s.ordner}: Entwurf verworfen.`);
+					}, "gefahr"))));
 		}
-		const weg = document.createElement("button");
-		weg.type = "button"; weg.className = "knopf gefahr"; weg.textContent = "Löschen";
-		weg.onclick = async () => {
-			if (!confirm(`„${s.title}“ (${s.ordner}) wirklich löschen? Spielstände und Bestenliste bleiben erhalten.`)) return;
-			try { await api("DELETE", "/spiele/" + encodeURIComponent(s.ordner)); meldung(`${s.ordner} gelöscht.`, "ok"); }
-			catch (e) { meldung(e.message, "fehler"); }
-			liste();
-		};
-		zeile.append(links, weg);
-		return zeile;
+		if (s.versionen.length) {
+			const wahl = document.createElement("select");
+			for (const v of s.versionen) {
+				const o = document.createElement("option");
+				o.value = v.id; o.textContent = `Version bis ${datum(v.archiviert)} (${v.dateien} Dateien)`;
+				wahl.append(o);
+			}
+			bereich.append(div("zeile-klein", span("Ältere Versionen:", "leise"), wahl,
+				knopfK("Zurücksetzen", () => {
+					if (!confirm(`„${s.title}“ auf die gewählte Version zurücksetzen? Die aktuelle Version wird dabei aufgehoben.`)) return;
+					aktion(() => api("POST", pfad + "/zuruecksetzen", { version: wahl.value }), `${s.ordner}: zurückgesetzt.`);
+				})));
+		}
+		const weg = knopfK("Löschen", () => {
+			if (!confirm(`„${s.title}“ (${s.ordner}) komplett löschen – inklusive Entwurf und älterer Versionen? Spielstände und Bestenliste bleiben erhalten.`)) return;
+			aktion(() => api("DELETE", pfad), `${s.ordner} gelöscht.`);
+		}, "gefahr");
+		return div("eintrag", bereich, weg);
 	}));
 }
 
 function hochladen(datei, ordner) {
 	return new Promise((ja, nein) => {
 		const x = new XMLHttpRequest();
-		x.open("POST", API + "/spiele/" + encodeURIComponent(ordner));
+		const entwurf = document.querySelector('input[name="art"]:checked').value === "entwurf";
+		x.open("POST", API + "/spiele/" + encodeURIComponent(ordner) + (entwurf ? "?entwurf=true" : ""));
 		x.setRequestHeader("X-Upload", "1");
 		x.upload.onprogress = (e) => { if (e.lengthComputable) $("fortschritt").value = (e.loaded / e.total) * 100; };
 		x.onload = () => {
@@ -116,9 +145,9 @@ $("uploadform").addEventListener("submit", async (ev) => {
 	meldung("Lade hoch …");
 	try {
 		const d = await hochladen(datei, ordner);
-		let text = `✓ ${d.ordner}: ${d.dateien} Dateien installiert.`;
-		if (d.uebersprungen && d.uebersprungen.length) text += ` Übersprungen (nicht erlaubt): ${d.uebersprungen.join(", ")}`;
-		meldung(text + " In der Bibliothek neu laden, dann ist es da.", "ok");
+		let text = `✓ ${d.ordner}: ${d.dateien} Dateien ${d.entwurf ? "als Entwurf" : "veröffentlicht"}.`;
+		if (d.uebersprungen && d.uebersprungen.length) text += ` Übersprungen (nicht erlaubt): ${d.uebersprungen.join(", ")}.`;
+		meldung(text + (d.entwurf ? " Unten auf „Testen“ klicken, dann veröffentlichen." : " In der Bibliothek neu laden, dann ist es da."), "ok");
 		$("uploadform").reset();
 	} catch (e) {
 		if (e.status === 401) { meldung("Sitzung abgelaufen – bitte neu anmelden.", "fehler"); return start(); }

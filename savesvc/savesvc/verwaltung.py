@@ -14,7 +14,7 @@ from typing import Any
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 
-from . import games, rollen
+from . import games, rollen, versionen
 from .auth import BENUTZER_MUSTER, Benutzerliste
 
 log = logging.getLogger("savesvc.verwaltung")
@@ -60,6 +60,15 @@ class UploadDienst:
             raise HTTPException(502, f"Upload-Dienst nicht erreichbar: {f}") from None
 
 
+def browser_von(ua: str) -> str:
+    """Nur Browser und Gerätetyp – keine weiteren Daten."""
+    b = ("Edge" if "Edg/" in ua else "Firefox" if "Firefox/" in ua else "Chrome" if "Chrome/" in ua
+         else "Safari" if "Safari/" in ua else "anderer")
+    g = ("iPad" if "iPad" in ua else "iPhone" if "iPhone" in ua else "Android" if "Android" in ua
+         else "Windows" if "Windows" in ua else "Mac" if "Macintosh" in ua else "Linux" if "Linux" in ua else "")
+    return f"{b} ({g})" if g else b
+
+
 def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, aktuelle_season, upload: UploadDienst | None = None):
     upload = upload or UploadDienst(e.upload_url, e.intern_token)
 
@@ -86,9 +95,12 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def titel_von(spiel: str) -> str:
         try:
             b, o = spiel.split("/", 1)
-            return games.beschreibung(e.spiele_dir, b, o)["title"] if games.spielordner(e.spiele_dir, b, o) else spiel
-        except ValueError:
-            return spiel
+            for name in (o, o + versionen.ENTWURF):    # Spiele, die es bisher nur als Entwurf gibt
+                if games.gueltige_id(b, o) and (e.spiele_dir / b / name).is_dir():
+                    return games.beschreibung(e.spiele_dir, b, name)["title"]
+        except (ValueError, OSError):
+            pass
+        return spiel
 
     # ---------- Einstellungen (alle) ----------
 
@@ -144,19 +156,103 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     # ---------- Entwickler ----------
 
+    def eigene_spiele(player: str) -> list[str]:
+        """Ordnernamen der Spiele eines Entwicklers – live oder nur als Entwurf."""
+        basis = e.spiele_dir / player
+        namen = set()
+        if basis.is_dir():
+            for p in basis.iterdir():
+                name = p.name[: -len(versionen.ENTWURF)] if p.name.endswith(versionen.ENTWURF) else p.name
+                if p.is_dir() and games.ORDNER_MUSTER.match(name):
+                    namen.add(name)
+        return sorted(namen)
+
     @app.get("/api/entwickler/spiele")
     def entwickler_spiele(player: str = Depends(entwickler)):
         statistik = db.spiel_statistik()
         einst = db.spiel_einstellungen()
+        fehler = db.fehler_zahlen()
+        basis = e.spiele_dir / player
         ergebnis = []
-        for s in games.alle(e.spiele_dir):
-            if s["author"] != player:
+        for name in eigene_spiele(player):
+            sid = f"{player}/{name}"
+            live = (basis / name).is_dir()
+            try:
+                s = games.beschreibung(e.spiele_dir, player, name if live else name + versionen.ENTWURF)
+                entw = versionen.entwurf_info(basis, name)
+            except OSError as fehler:   # unlesbarer Ordner: überspringen statt alles abbrechen
+                log.warning("Spiel %s nicht lesbar: %s", sid, fehler)
                 continue
-            st = statistik.get(s["id"], {})
-            ergebnis.append({**s, "leaderboardSeason": aktuelle_season(s["id"]),
+            s["id"] = sid
+            st = statistik.get(sid, {})
+            f_live = fehler.get(sid, {})
+            f_entw = fehler.get(sid + versionen.ENTWURF, {})
+            ergebnis.append({**s, "live": live, "leaderboardSeason": aktuelle_season(sid),
                              "spieler": st.get("spieler", 0), "zuletzt": st.get("zuletzt"), "scores": st.get("scores", 0),
-                             "versteckt": einst.get(s["id"], {}).get("versteckt", False)})
+                             "versteckt": einst.get(sid, {}).get("versteckt", False),
+                             "entwurf": entw, "fehler": f_live, "fehlerEntwurf": f_entw})
         return ergebnis
+
+    @app.post("/api/entwickler/entwurf/{user}/{game}")
+    def entwurf_starten(request: Request, player: str = Depends(spieler), user: str = P(...), game: str = P(...)):
+        """Entwurf zum Testen öffnen: Beschreibung liefern und beim ersten Mal den eigenen Spielstand hineinkopieren."""
+        if user != player and not rollen.rolle(e, request, player)["echterAdmin"]:
+            raise HTTPException(404, "Entwurf nicht gefunden")
+        ordner = e.spiele_dir / user / (game + versionen.ENTWURF)
+        if not (games.gueltige_id(user, game) and ordner.is_dir()):
+            raise HTTPException(404, "Entwurf nicht gefunden")
+        try:
+            b = games.beschreibung(e.spiele_dir, user, game + versionen.ENTWURF)
+        except OSError:
+            raise HTTPException(503, "Entwurf ist gerade nicht lesbar – Rechte auf der NAS prüfen") from None
+        kopiert = db.spielstaende_kopieren(rollen.daten_id(e, request, player), f"{user}/{game}", f"{user}/{game}{versionen.ENTWURF}")
+        return {**b, "id": f"{user}/{game}{versionen.ENTWURF}", "entwurfVon": f"{user}/{game}", "spielstaendeKopiert": kopiert}
+
+    # ---------- Fehlerberichte (Idee „Automatische Fehlerberichte“) ----------
+    fehler_takt: dict[tuple[str, str], list[float]] = {}
+
+    @app.post("/api/fehler/{user}/{game}", status_code=204)
+    def fehler_melden(request: Request, player: str = Depends(spieler), user: str = P(...), game: str = P(...),
+                      body: dict[str, Any] = Body(...)):
+        sid = f"{user}/{game}"
+        basis = game[: -len(versionen.ENTWURF)] if game.endswith(versionen.ENTWURF) else game
+        if not (games.gueltige_id(user, basis) and (e.spiele_dir / user / game).is_dir()):
+            raise HTTPException(404, "Spiel nicht gefunden")
+        # höchstens 20 Meldungen pro Minute je Spieler und Spiel
+        import time as _t
+        jetzt = _t.monotonic()
+        liste = [x for x in fehler_takt.get((player, sid), []) if jetzt - x < 60]
+        if len(liste) >= 20:
+            fehler_takt[(player, sid)] = liste
+            return
+        fehler_takt[(player, sid)] = liste + [jetzt]
+        def text(k, n):
+            x = body.get(k)
+            return x[:n] if isinstance(x, str) else ""
+        def zahl(k):
+            x = body.get(k)
+            return int(x) if isinstance(x, (int, float)) and not isinstance(x, bool) and 0 <= x < 10_000_000 else 0
+        meldung = text("meldung", 300).strip() or "(ohne Meldung)"
+        db.fehler_melden(sid, meldung, text("quelle", 200), zahl("zeile"), zahl("spalte"),
+                         text("stack", 1500) or None, browser_von(request.headers.get("user-agent", "")))
+
+    @app.get("/api/entwickler/fehler")
+    def fehler_ansehen(request: Request, player: str = Depends(entwickler), alle: bool = Query(False)):
+        if alle and rollen.rolle(e, request, player)["admin"]:
+            liste = db.fehler_liste(None)
+        else:
+            ids = []
+            for name in eigene_spiele(player):
+                ids += [f"{player}/{name}", f"{player}/{name}{versionen.ENTWURF}"]
+            liste = db.fehler_liste(ids)
+        return [{**f, "entwurf": f["game"].endswith(versionen.ENTWURF), "title": titel_von(f["game"].removesuffix(versionen.ENTWURF))} for f in liste]
+
+    @app.delete("/api/entwickler/fehler/{fehler_id}", status_code=204)
+    def fehler_erledigt(request: Request, player: str = Depends(entwickler), fehler_id: int = P(...)):
+        f = db.fehler_eintrag(fehler_id)
+        if not f or (f["game"].split("/")[0] != player and not rollen.rolle(e, request, player)["admin"]):
+            raise HTTPException(404, "Fehlerbericht nicht gefunden")
+        db.fehler_loeschen(fehler_id)
 
     @app.post("/api/entwickler/season/{user}/{game}")
     def neue_season(player: str = Depends(entwickler), user: str = P(...), game: str = P(...)):
@@ -228,8 +324,10 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def admin_spiele(_: str = Depends(admin)):
         statistik = db.spiel_statistik()
         einst = db.spiel_einstellungen()
+        fehler = db.fehler_zahlen()
         return [{**s, **{"versteckt": False, "hervorgehoben": False}, **{k: v for k, v in einst.get(s["id"], {}).items() if k != "season"},
-                 "leaderboardSeason": aktuelle_season(s["id"]), **statistik.get(s["id"], {"spieler": 0, "zuletzt": None, "scores": 0})}
+                 "leaderboardSeason": aktuelle_season(s["id"]), **statistik.get(s["id"], {"spieler": 0, "zuletzt": None, "scores": 0}),
+                 "fehler": fehler.get(s["id"], {})}
                 for s in games.alle(e.spiele_dir)]
 
     @app.patch("/api/admin/spiele/{user}/{game}")

@@ -32,6 +32,7 @@ docs/          Betriebsnotizen
 | 7 | Härtung: Dateityp-Whitelist, CSP, SVG, Test-Spiel `boese` | deployt 05.11.2026 |
 | 6b | Eigener ZIP-Upload ersetzt File Browser (archiviert) | ✓ 05.11.2026 |
 | 8 | Backup über borgmatic, Wiederherstellung getestet | ✓ 05.11.2026 |
+| 10 | GameSave-Migration, Bestenliste mit Spalten, Kontextmenü, Anträge, Admin-Panel, Ansicht als …, Entwürfe, Versionen, Fehlerberichte | ✓ 05.11.2026 |
 | 9 | Anleitung, erster Kollege | offen |
 
 ## Deploy

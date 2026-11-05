@@ -21,10 +21,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, File, HTTPException, Path as P, Request, Response, UploadFile
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Path as P, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 
-from . import games, zipinstall
+from . import games, versionen, zipinstall
 from .auth import BENUTZER_MUSTER, Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 
@@ -223,45 +223,87 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     def abmelden(response: Response):
         response.delete_cookie(COOKIE, path=COOKIE_PFAD, httponly=True, secure=sicher, samesite="strict")
 
+    def spiel_namen(basis: Path) -> list[str]:
+        """Alle Spiele eines Entwicklers – auch solche, die bisher nur als Entwurf existieren."""
+        namen = set()
+        if basis.is_dir():
+            for p in basis.iterdir():
+                name = p.name[:-len(versionen.ENTWURF)] if p.name.endswith(versionen.ENTWURF) else p.name
+                if p.is_dir() and games.ORDNER_MUSTER.match(name):
+                    namen.add(name)
+        return sorted(namen)
+
     @app.get("/api/upload/spiele")
     def meine_spiele(player: str = Depends(angemeldet)):
         basis = e.spiele_dir / player
         ergebnis = []
-        if basis.is_dir():
-            for ordner in sorted(p for p in basis.iterdir() if p.is_dir() and games.ORDNER_MUSTER.match(p.name)):
-                dateien = [f for f in ordner.rglob("*") if f.is_file()]
-                b = games.beschreibung(e.spiele_dir, player, ordner.name)
-                ergebnis.append({
-                    "ordner": ordner.name,
-                    "title": b["title"],
-                    "complete": b["complete"],
-                    "warning": b["warning"],
-                    "dateien": len(dateien),
-                    "bytes": sum(f.stat().st_size for f in dateien),
-                    "geaendert": datetime.fromtimestamp(max((f.stat().st_mtime for f in dateien), default=ordner.stat().st_mtime),
-                                                        timezone.utc).isoformat(timespec="seconds"),
-                })
+        for name in spiel_namen(basis):
+            live = basis / name
+            entw = versionen.entwurf_info(basis, name)
+            b = games.beschreibung(e.spiele_dir, player, name if live.is_dir() else name + versionen.ENTWURF)
+            ergebnis.append({
+                "ordner": name,
+                "title": b["title"],
+                "complete": b["complete"],
+                "warning": b["warning"],
+                "live": versionen._info(live) if live.is_dir() else None,
+                "entwurf": entw,
+                "versionen": versionen.versionen(basis, name),
+            })
         return ergebnis
 
     @app.post("/api/upload/spiele/{ordner}")
-    def hochladen(player: str = Depends(angemeldet), ordner: str = P(...), datei: UploadFile = File(...)):
+    def hochladen(player: str = Depends(angemeldet), ordner: str = P(...), datei: UploadFile = File(...),
+                  entwurf: bool = Query(False)):
         ziel = ordnerpfad(player, ordner)
+        basis = ziel.parent
         try:
-            ergebnis = zipinstall.installieren(datei.file, ziel)
+            if entwurf:
+                ergebnis = zipinstall.installieren(datei.file, versionen.entwurf(basis, ordner))
+            else:
+                ergebnis = zipinstall.installieren(datei.file, ziel, wegraeumen=lambda: versionen.archivieren(basis, ordner))
         except zipinstall.UngueltigesZip as fehler:
             raise HTTPException(422, str(fehler)) from None
-        log.info("%s hat %s hochgeladen (%d Dateien)", player, ordner, ergebnis.dateien)
-        store.ereignis(player, "hochgeladen", ordner, ergebnis.dateien)
-        return {"ordner": ordner, "dateien": ergebnis.dateien, "bytes": ergebnis.bytes,
+        art = "als Entwurf hochgeladen" if entwurf else "hochgeladen"
+        log.info("%s hat %s %s (%d Dateien)", player, ordner, art, ergebnis.dateien)
+        store.ereignis(player, art, ordner, ergebnis.dateien)
+        return {"ordner": ordner, "entwurf": entwurf, "dateien": ergebnis.dateien, "bytes": ergebnis.bytes,
                 "uebersprungen": ergebnis.uebersprungen[:50]}
+
+    @app.post("/api/upload/spiele/{ordner}/veroeffentlichen")
+    def veroeffentlichen(player: str = Depends(angemeldet), ordner: str = P(...)):
+        basis = ordnerpfad(player, ordner).parent
+        try:
+            versionen.veroeffentlichen(basis, ordner)
+        except FileNotFoundError as f:
+            raise HTTPException(404, str(f)) from None
+        store.ereignis(player, "Entwurf veröffentlicht", ordner)
+        return {"ok": True}
+
+    @app.delete("/api/upload/spiele/{ordner}/entwurf", status_code=204)
+    def entwurf_verwerfen(player: str = Depends(angemeldet), ordner: str = P(...)):
+        e_pfad = versionen.entwurf(ordnerpfad(player, ordner).parent, ordner)
+        if not e_pfad.is_dir():
+            raise HTTPException(404, "kein Entwurf vorhanden")
+        shutil.rmtree(e_pfad)
+        store.ereignis(player, "Entwurf verworfen", ordner)
+
+    @app.post("/api/upload/spiele/{ordner}/zuruecksetzen")
+    def zuruecksetzen(player: str = Depends(angemeldet), ordner: str = P(...), body: dict[str, Any] = Body(...)):
+        basis = ordnerpfad(player, ordner).parent
+        try:
+            versionen.zuruecksetzen(basis, ordner, str(body.get("version", "")))
+        except FileNotFoundError as f:
+            raise HTTPException(404, str(f)) from None
+        store.ereignis(player, f"auf Version {body.get('version')} zurückgesetzt", ordner)
+        return {"ok": True}
 
     @app.delete("/api/upload/spiele/{ordner}", status_code=204)
     def loeschen(player: str = Depends(angemeldet), ordner: str = P(...)):
         ziel = ordnerpfad(player, ordner)
-        if not ziel.is_dir():
+        if not versionen.alles_loeschen(ziel.parent, ordner):
             raise HTTPException(404, "Spiel nicht gefunden")
-        shutil.rmtree(ziel)
-        log.info("%s hat %s gelöscht", player, ordner)
+        log.info("%s hat %s gelöscht (inkl. Entwurf und Versionen)", player, ordner)
         store.ereignis(player, "gelöscht", ordner)
 
     # ---------- interne Schnittstelle für den Speicher-Dienst (Admin-Panel) ----------
@@ -308,9 +350,8 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     def i_spiel_loeschen(user: str = P(...), ordner: str = P(...)):
         name_ok(user)
         ziel = ordnerpfad(user, ordner)
-        if not ziel.is_dir():
+        if not versionen.alles_loeschen(ziel.parent, ordner):
             raise HTTPException(404, "Spiel nicht gefunden")
-        shutil.rmtree(ziel)
         store.ereignis(user, "gelöscht (Admin)", ordner)
 
     @app.get("/intern/ereignisse", dependencies=[Depends(intern)])

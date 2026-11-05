@@ -192,3 +192,68 @@ def test_simulation_hat_eigenes_leeres_konto(client, monkeypatch):
     assert client.post("/api/score/seb/zaehler", json={"score": 5}, headers=sim).status_code == 409
     assert client.post("/api/antraege", json={"art": "fehler", "text": "Test aus der Simulation"}, headers=sim).status_code == 409
     assert client.get("/api/antraege", headers=sim).json() == []
+
+
+# ---------- Entwürfe (Bibliothek) und Fehlerberichte ----------
+
+def entwurf_anlegen(umgebung, inhalt='{"title": "Snake 2.0", "saveVersion": 2}'):
+    e = umgebung.spiele / "paul" / "snake~entwurf"
+    e.mkdir()
+    (e / "index.html").write_text("<!doctype html>")
+    (e / "game.json").write_text(inhalt)
+
+
+def test_entwurf_nur_fuer_besitzer_und_admin(client, umgebung):
+    entwurf_anlegen(umgebung)
+    mia = "mia@example.com"
+    umgebung.users.write_text("seb@example.com: seb\npaul@example.com: paul\nmia@example.com: mia\n")
+    assert client.get("/api/save/paul/snake~entwurf/x", headers=client.als(PAUL)).status_code == 404   # kein Stand, aber erlaubt
+    assert client.put("/api/save/paul/snake~entwurf/x", json={"data": 1}, headers=client.als(PAUL)).status_code == 200
+    assert client.put("/api/save/paul/snake~entwurf/x", json={"data": 1}, headers=client.als(mia)).status_code == 404
+    assert client.put("/api/save/paul/snake~entwurf/x", json={"data": 1}, headers=client.als()).status_code == 200   # Admin
+    assert "paul/snake~entwurf" not in {s["id"] for s in client.get("/api/games", headers=client.als()).json()}
+    assert client.post("/api/score/paul/snake~entwurf", json={"score": 1}, headers=client.als(PAUL)).status_code in (409,)
+
+
+def test_entwurf_starten_kopiert_spielstand_einmal(client, umgebung):
+    entwurf_anlegen(umgebung)
+    h = client.als(PAUL)
+    client.put("/api/save/paul/snake/stand", json={"data": {"level": 4}}, headers=h)
+    r = client.post("/api/entwickler/entwurf/paul/snake", headers=h).json()
+    assert r["id"] == "paul/snake~entwurf" and r["title"] == "Snake 2.0" and r["saveVersion"] == 2 and r["spielstaendeKopiert"] == 1
+    client.put("/api/save/paul/snake~entwurf/stand", json={"data": {"level": 9}}, headers=h)
+    assert client.post("/api/entwickler/entwurf/paul/snake", headers=h).json()["spielstaendeKopiert"] == 0   # nicht überschrieben
+    assert client.get("/api/save/paul/snake/stand", headers=h).json()["data"] == {"level": 4}   # echter Stand unberührt
+    assert client.post("/api/entwickler/entwurf/paul/snake", headers=client.als("mia@example.com")).status_code in (403, 404)
+
+
+def test_entwickler_spiele_mit_entwurf_und_fehlern(client, umgebung):
+    entwurf_anlegen(umgebung)
+    h = client.als(PAUL)
+    ua = {"User-Agent": "Mozilla/5.0 (Macintosh) AppleWebKit Version/26 Safari/605"}
+    for _ in range(3):
+        client.post("/api/fehler/paul/snake", json={"meldung": "TypeError: x is undefined", "quelle": "spiel.js", "zeile": 112, "spalte": 5}, headers={**h, **ua})
+    client.post("/api/fehler/paul/snake~entwurf", json={"meldung": "ReferenceError: y", "quelle": "neu.js", "zeile": 3}, headers=h)
+    spiele = {s["id"]: s for s in client.get("/api/entwickler/spiele", headers=h).json()}
+    assert spiele["paul/snake"]["entwurf"]["dateien"] == 2
+    assert spiele["paul/snake"]["fehler"]["anzahl"] == 3 and spiele["paul/snake"]["fehler"]["arten"] == 1
+    assert spiele["paul/snake"]["fehlerEntwurf"]["arten"] == 1
+    liste = client.get("/api/entwickler/fehler", headers=h).json()
+    eintrag = next(f for f in liste if f["quelle"] == "spiel.js")
+    assert eintrag["anzahl"] == 3 and eintrag["browser"] == "Safari (Mac)" and eintrag["title"] == "snake"
+    # andere Entwickler sehen fremde Fehler nicht und dürfen sie nicht löschen
+    assert client.get("/api/entwickler/fehler", headers=client.als()).json() == [] or all(
+        f["game"].startswith("seb/") for f in client.get("/api/entwickler/fehler", headers=client.als()).json())
+    assert len(client.get("/api/entwickler/fehler?alle=true", headers=client.als()).json()) == 2   # Admin: alle
+    assert client.delete(f"/api/entwickler/fehler/{eintrag['id']}", headers=h).status_code == 204
+    assert all(f["id"] != eintrag["id"] for f in client.get("/api/entwickler/fehler", headers=h).json())
+
+
+def test_fehlerbericht_ratelimit_und_kuerzen(client):
+    h = client.als(PAUL)
+    for i in range(30):
+        client.post("/api/fehler/seb/zaehler", json={"meldung": f"Fehler {i}", "zeile": i}, headers=h)
+    alle = client.get("/api/entwickler/fehler", headers=client.als()).json()
+    assert len(alle) == 20                                           # höchstens 20 pro Minute
+    client.post("/api/fehler/seb/zaehler", json={"meldung": "x" * 5000}, headers=client.als())
+    assert max(len(f["meldung"]) for f in client.get("/api/entwickler/fehler", headers=client.als()).json()) <= 300
