@@ -13,6 +13,8 @@ class Einstellungen:
     spiele_dir: Path          # /spiele (nur lesend)
     db_path: Path             # /data/saves.db
     dev_user: str | None      # NUR lokal: Anmeldung überspringen
+    backup_ziel: Path | None = None   # nächtliche Kopie für borgmatic (None = aus)
+    backup_uhrzeit: str = "01:45"     # Europe/Berlin, vor borgmatic um 02:00
 
     @property
     def jwks_url(self) -> str:
@@ -35,4 +37,6 @@ def laden() -> Einstellungen:
         spiele_dir=Path(os.environ.get("SPIELE_DIR", "/spiele")),
         db_path=Path(os.environ.get("DB_PATH", "/data/saves.db")),
         dev_user=dev_user,
+        backup_ziel=Path(os.environ["BACKUP_ZIEL"]) if os.environ.get("BACKUP_ZIEL") else None,
+        backup_uhrzeit=os.environ.get("BACKUP_UHRZEIT", "01:45"),
     )

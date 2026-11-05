@@ -31,6 +31,9 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         logging.getLogger("savesvc").warning("DEV_USER=%s – Anmeldung wird übersprungen (nur lokal!)", e.dev_user)
 
     db = Datenbank(e.db_path)
+    if e.backup_ziel:
+        from . import sicherung
+        sicherung.starten(db, e.backup_ziel, e.backup_uhrzeit)
     spieler = Pruefer(e, Benutzerliste(e.users_file), schluessel_quelle)
     app = FastAPI(title="Spielebibliothek – Speicher-Dienst", docs_url=None, redoc_url=None, openapi_url=None)
 

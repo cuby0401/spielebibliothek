@@ -52,6 +52,9 @@ services:
       # nicht geheim: Team-Domain und AUD-Tag der Access-Anwendung "games"
       ACCESS_TEAM_DOMAIN: cold-glitter-fc3b.cloudflareaccess.com
       ACCESS_AUD: 16a18e7f5f0f0cf8060c0c274276a4f5f895aa0a38abdb90c6c75575d902a2b1
+      # Konsistente DB-Kopie für borgmatic (sichert um 02:00 data/backup/, nicht die laufende saves.db)
+      BACKUP_ZIEL: /data/backup/saves-latest.db
+      BACKUP_UHRZEIT: "01:45"
       # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
     volumes:
       - /volume1/games/data:/data
