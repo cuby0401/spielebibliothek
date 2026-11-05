@@ -20,11 +20,11 @@
 	mit("A Abschottung", "echtes localStorage gesperrt", !!shim.originalBlocked, shim.originalBlocked);
 
 	// --- B: Dateien des Spiels laden (Frage 1) ---
-	const B = "B Laden";
-	mit(B, "klassisches <script src>", window.__classic === true, "");
+	// B1: Laden ohne Netzwerk-API – der Browser schickt keinen Origin-Check
+	const B1 = "B1 Laden ohne CORS-Prüfung";
+	mit(B1, "klassisches <script src>", window.__classic === true, "");
 	const css = getComputedStyle(document.getElementById("css-probe")).outlineStyle;
-	mit(B, "Stylesheet <link>", css === "dotted", css);
-
+	mit(B1, "Stylesheet <link>", css === "dotted", css);
 	const bild = await new Promise((r) => {
 		const img = new Image();
 		img.onload = () => r([true, img.naturalWidth + "×" + img.naturalHeight]);
@@ -32,37 +32,60 @@
 		img.src = "./pixel.png";
 		setTimeout(() => r([false, "Zeitlimit"]), 6000);
 	});
-	mit(B, "Bild <img>", ...bild);
+	mit(B1, "Bild <img>", ...bild);
 
-	async function abruf(name, url, opt) {
+	async function abruf(gruppe, name, url, opt) {
 		try {
 			const r = await zeitlimit(fetch(url, opt));
 			const j = r.ok ? await r.json() : null;
-			mit(B, name, !!(j && j.ok), r.status + " " + r.type);
-		} catch (e) { mit(B, name, false, fehler(e)); }
+			mit(gruppe, name, !!(j && j.ok), r.status + " " + r.type);
+		} catch (e) { mit(gruppe, name, false, fehler(e)); }
 	}
-	await abruf("fetch() ohne Optionen", "./data.json");
-	await abruf("fetch() mit CORS-Header + Cookie", "./data.json?cors=1", { credentials: "include" });
-
-	const xhr = await new Promise((r) => {
-		try {
-			const x = new XMLHttpRequest();
-			x.open("GET", "./data.json");
-			x.onload = () => r([x.status === 200, "Status " + x.status]);
-			x.onerror = () => r([false, "onerror"]);
-			x.send();
-			setTimeout(() => r([false, "Zeitlimit"]), 6000);
-		} catch (e) { r([false, fehler(e)]); }
-	});
-	mit(B, "XMLHttpRequest (z. B. Phaser-Loader)", ...xhr);
-
+	function xhr(gruppe, name, url, mitCookie) {
+		return new Promise((r) => {
+			try {
+				const x = new XMLHttpRequest();
+				x.open("GET", url);
+				x.withCredentials = !!mitCookie;
+				x.onload = () => r([x.status === 200, "Status " + x.status]);
+				x.onerror = () => r([false, "onerror"]);
+				x.send();
+				setTimeout(() => r([false, "Zeitlimit"]), 6000);
+			} catch (e) { r([false, fehler(e)]); }
+		}).then((e) => mit(gruppe, name, ...e));
+	}
 	await warte(1500); // Module laden asynchron
-	mit(B, "<script type=module>", !!window.__mods["?art=modul"], "");
-	mit(B, "<script type=module crossorigin> (Vite)", !!window.__mods["?art=modul-crossorigin"], "");
-	mit(B, "Modul use-credentials + CORS-Header", !!window.__mods["?art=modul-credentials&cors=1"], "");
-	try { await zeitlimit(import("./mod.js?art=dynamisch")); mit(B, "dynamisches import()", !!window.__mods["?art=dynamisch"], ""); }
-	catch (e) { mit(B, "dynamisches import()", false, fehler(e)); }
+	const modul = (gruppe, name, art) => mit(gruppe, name, !!window.__mods["?art=" + art], "");
+	const absolut = (pfad) => new URL(pfad, location.href).href;
 
+	// B2: so wie heute – Caddy schickt keine CORS-Header
+	const B2 = "B2 ohne CORS-Header (Stand heute)";
+	await abruf(B2, "fetch()", "./data.json");
+	await xhr(B2, "XMLHttpRequest (Phaser-Loader)", "./data.json");
+	modul(B2, "<script type=module>", "modul");
+	modul(B2, "<script type=module crossorigin> (Vite)", "modul-crossorigin");
+
+	// B3: Caddy schickt CORS-Header, das Spiel bleibt unverändert (Browser schickt dann KEIN Cookie)
+	const B3 = "B3 mit CORS-Header, ohne Cookie (Spiel unverändert)";
+	await abruf(B3, "fetch()", "./data.json?cors=1");
+	await xhr(B3, "XMLHttpRequest (Phaser-Loader)", "./data.json?cors=1");
+	modul(B3, "<script type=module>", "modul-cors&cors=1");
+	modul(B3, "<script type=module crossorigin> (Vite)", "modul-crossorigin-cors&cors=1");
+	try { await zeitlimit(import(absolut("./mod.js?art=dynamisch&cors=1"))); modul(B3, "dynamisches import()", "dynamisch&cors=1"); }
+	catch (e) { mit(B3, "dynamisches import()", false, fehler(e)); }
+
+	// B4: CORS-Header UND Cookie ausdrücklich mitschicken (müsste das Spiel selbst so machen)
+	const B4 = "B4 mit CORS-Header und Cookie";
+	await abruf(B4, "fetch(…, {credentials:'include'})", "./data.json?cors=1&c=1", { credentials: "include" });
+	await xhr(B4, "XMLHttpRequest withCredentials", "./data.json?cors=1&c=1", true);
+	modul(B4, "<script type=module crossorigin=use-credentials>", "modul-credentials&cors=1");
+	try {
+		const r = await zeitlimit(fetch("./tiny.wasm?cors=1", { credentials: "include" }));
+		await WebAssembly.compile(await r.arrayBuffer());
+		mit(B4, "WebAssembly über fetch", true, "");
+	} catch (e) { mit(B4, "WebAssembly über fetch", false, fehler(e)); }
+
+	// B5: Worker brauchen einen echten Origin
 	const worker = await new Promise((r) => {
 		try {
 			const w = new Worker("./worker.js");
@@ -72,13 +95,7 @@
 			setTimeout(() => r([false, "Zeitlimit"]), 6000);
 		} catch (e) { r([false, fehler(e)]); }
 	});
-	mit(B, "Web Worker", ...worker);
-
-	try {
-		const r = await zeitlimit(fetch("./tiny.wasm?cors=1", { credentials: "include" }));
-		await WebAssembly.compile(await r.arrayBuffer());
-		mit(B, "WebAssembly (über fetch + CORS)", true, "");
-	} catch (e) { mit(B, "WebAssembly (über fetch + CORS)", false, fehler(e)); }
+	mit("B5 Sonstiges", "Web Worker", ...worker);
 
 	// --- C: localStorage-Ersatz (Frage 2) ---
 	const C = "C localStorage-Ersatz";
