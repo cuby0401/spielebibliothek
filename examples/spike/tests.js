@@ -11,13 +11,34 @@
 	const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 	// --- A: Abschottung ---
-	mit("A Abschottung", "Origin ist opak (null)", self.origin === "null", self.origin);
-	try { void document.cookie; mit("A Abschottung", "document.cookie gesperrt", false, "lesbar"); }
-	catch (e) { mit("A Abschottung", "document.cookie gesperrt", true, e.name); }
-	try { void parent.document.title; mit("A Abschottung", "parent.document gesperrt", false, "lesbar"); }
-	catch (e) { mit("A Abschottung", "parent.document gesperrt", true, e.name); }
+	const A = "A Abschottung";
 	const shim = window.__lsShim || {};
-	mit("A Abschottung", "echtes localStorage gesperrt", !!shim.originalBlocked, shim.originalBlocked);
+	const opak = self.origin === "null";
+	if (opak) {
+		mit(A, "Origin ist opak (null) – Modus A", true, self.origin);
+		try { void document.cookie; mit(A, "document.cookie gesperrt", false, "lesbar"); }
+		catch (e) { mit(A, "document.cookie gesperrt", true, e.name); }
+		mit(A, "echtes localStorage gesperrt", !!shim.originalBlocked, shim.originalBlocked);
+	} else {
+		mit(A, "eigener Origin, nicht die Bibliothek – Modus B", self.origin !== "https://games.cuby0401.uk", self.origin);
+		let keks = "";
+		try { keks = document.cookie; } catch (e) { keks = e.name; }
+		mit(A, "Login-Cookie nicht lesbar (HttpOnly)", !/CF_Authorization/.test(keks), keks ? "sichtbar: " + keks.replace(/=[^;]*/g, "=…") : "keine Cookies sichtbar");
+		mit(A, "echtes localStorage (nur Info)", null, shim.originalBlocked ? "gesperrt: " + shim.originalBlocked : "vorhanden, wird ersetzt");
+	}
+	try { void parent.document.title; mit(A, "parent.document gesperrt", false, "lesbar"); }
+	catch (e) { mit(A, "parent.document gesperrt", true, e.name); }
+	try { void parent.localStorage.length; mit(A, "localStorage der Bibliothek gesperrt", false, "lesbar"); }
+	catch (e) { mit(A, "localStorage der Bibliothek gesperrt", true, e.name); }
+	try {
+		const r = await zeitlimit(fetch("https://games.cuby0401.uk/games.json", { credentials: "include" }));
+		mit(A, "Bibliothek per fetch gesperrt", false, "lesbar: " + r.status);
+	} catch (e) { mit(A, "Bibliothek per fetch gesperrt", true, fehler(e)); }
+	try {
+		window.open("about:blank", "_top");
+		await warte(300);
+		mit(A, "Seite umleiten (_top) gesperrt", true, "kein Wechsel");
+	} catch (e) { mit(A, "Seite umleiten (_top) gesperrt", true, fehler(e)); }
 
 	// --- B: Dateien des Spiels laden (Frage 1) ---
 	// B1: Laden ohne Netzwerk-API – der Browser schickt keinen Origin-Check

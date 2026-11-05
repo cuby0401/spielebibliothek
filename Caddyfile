@@ -2,8 +2,9 @@
 # Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
 #
 # Caddy lauscht im Container auf :8080 (läuft als Nicht-root ohne Capabilities).
-# TLS macht Cloudflare, deshalb nur HTTP.
-
+# TLS macht Cloudflare, deshalb nur HTTP. Beide Hostnamen kommen über denselben Tunnel:
+#   games.cuby0401.uk → Bibliotheksseite, /lib, später /api
+#   play.cuby0401.uk  → nur Spieldateien (/play) und /lib – eigener Origin für die Spiele (Spike B)
 {
 	admin off
 	auto_https off
@@ -19,14 +20,50 @@
 		-Server
 	}
 
+	# ---------- play.cuby0401.uk: nur Spiele ----------
+	@play host play.cuby0401.uk
+	handle @play {
+		# Spiele dürfen nur von der Bibliothek eingebettet werden
+		header Content-Security-Policy "frame-ancestors https://games.cuby0401.uk"
+
+		# Anmelde-Sprung: Die Bibliothek schickt den Browser einmal hierher (Access meldet ihn
+		# für play an) und bekommt ihn sofort zurück. Ziel bleibt immer auf games.cuby0401.uk.
+		handle /__anmelden {
+			redir https://games.cuby0401.uk/{query.ziel} 302
+		}
+
+		# Die Bibliothek prüft hiermit, ob der Browser für play angemeldet ist
+		handle /__status {
+			header Access-Control-Allow-Origin "https://games.cuby0401.uk"
+			header Access-Control-Allow-Credentials "true"
+			respond 204
+		}
+
+		handle_path /lib/* {
+			root * /srv/lib
+			file_server
+		}
+
+		# Dateityp-Whitelist und CSP für Spiele folgen in Phase 7
+		handle_path /play/* {
+			root * /srv/spiele
+			file_server
+		}
+
+		handle {
+			respond 404
+		}
+	}
+
+	# ---------- games.cuby0401.uk: Bibliothek ----------
+
 	# GameSave-Bibliothek und Bridge
 	handle_path /lib/* {
 		root * /srv/lib
 		file_server
 	}
 
-	# Hochgeladene Spiele, nur lesend, ohne Verzeichnis-Listing.
-	# Dateityp-Whitelist und CSP folgen in Phase 7.
+	# Spiele unter games: nur noch für Spike-Modus A und die Bibliothek bis zur Umstellung
 	handle_path /play/* {
 		# SPIKE Phase 3: mit ?cors=1 testweise CORS-Header für den opaken Origin des Sandbox-iframes
 		@cors query cors=1

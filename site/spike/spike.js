@@ -5,8 +5,13 @@
 "use strict";
 
 const SPIELE = { spike: "seb/spike", "legacy-localstorage": "seb/legacy-localstorage" };
-const param = new URLSearchParams(location.search).get("spiel");
+const PLAY = "https://play.cuby0401.uk";
+const params = new URLSearchParams(location.search);
+const param = params.get("spiel");
 const spielName = SPIELE[param] ? param : "spike";
+// Modus A: abgeschottetes iframe ohne Origin, Spiel unter games.cuby0401.uk/play (Stand Phase 1)
+// Modus B: Spiel unter play.cuby0401.uk, iframe MIT allow-same-origin (eigener, fremder Origin)
+const modus = params.get("modus") === "a" ? "a" : "b";
 const spielId = SPIELE[spielName];
 const ablage = "spike-saves:" + spielId;
 const $ = (id) => document.getElementById(id);
@@ -32,10 +37,10 @@ function starten() {
 	$("tabelle").replaceChildren();
 	iframe = document.createElement("iframe");
 	// gleiche Sandbox wie in der Bibliothek
-	iframe.setAttribute("sandbox", "allow-scripts allow-pointer-lock allow-popups-to-escape-sandbox");
+	iframe.setAttribute("sandbox", "allow-scripts allow-pointer-lock allow-popups-to-escape-sandbox" + (modus === "b" ? " allow-same-origin" : ""));
 	iframe.setAttribute("allow", "fullscreen; gamepad; autoplay");
 	iframe.name = "gamesave:" + JSON.stringify(lesen()); // Vorladen ohne Warten
-	iframe.src = "/play/" + spielId + "/index.html";
+	iframe.src = (modus === "b" ? PLAY : "") + "/play/" + spielId + "/index.html";
 	$("rahmen").className = "rahmen " + (spielName === "spike" ? "klein" : "spiel");
 	$("rahmen").replaceChildren(iframe);
 	eigeneFenster.add(iframe.contentWindow);
@@ -73,9 +78,46 @@ async function sitzungPruefen() {
 	} catch (e) { return [false, String(e)]; }
 }
 
+// Ist der Browser auch für play.cuby0401.uk angemeldet? (true / false)
+async function playAngemeldet() {
+	try {
+		const r = await fetch(PLAY + "/__status", { credentials: "include", redirect: "manual", cache: "no-store" });
+		return r.type !== "opaqueredirect" && r.status === 204;
+	} catch { return false; }
+}
+
+let sprungInfo = "";
+
+// Einmaliger Sprung über play.cuby0401.uk: Access meldet den Browser dort an (bei gültiger
+// Team-Sitzung ohne neuen Code) und schickt ihn zurück. Gegen Endlosschleifen: höchstens alle 60 s.
+async function sicherstellenPlay() {
+	if (modus !== "b") return true;
+	const t0 = performance.now();
+	if (await playAngemeldet()) {
+		let sprung = null;
+		try { sprung = sessionStorage.getItem("spike-sprung"); sessionStorage.removeItem("spike-sprung"); } catch { /* egal */ }
+		sprungInfo = sprung ? "ja, nach Anmelde-Sprung (" + Math.round((Date.now() - +sprung) / 1000) + " s)" : "ja, schon angemeldet (" + Math.round(performance.now() - t0) + " ms)";
+		return true;
+	}
+	let letzter = 0;
+	try { letzter = +sessionStorage.getItem("spike-sprung") || 0; } catch { /* egal */ }
+	if (Date.now() - letzter < 60000) {
+		$("summe").textContent = "✗ Anmeldung für play.cuby0401.uk hat nach dem Sprung nicht geklappt.";
+		return false;
+	}
+	try { sessionStorage.setItem("spike-sprung", String(Date.now())); } catch { /* egal */ }
+	$("summe").textContent = "Melde bei play.cuby0401.uk an …";
+	const ziel = location.pathname.replace(/^\//, "") + location.search;
+	location.href = PLAY + "/__anmelden?ziel=" + encodeURIComponent(ziel);
+	return false;
+}
+
 async function zeigeErgebnisse(liste) {
 	const sitz = await sitzungPruefen();
 	liste.unshift({ gruppe: "0 Bibliotheksseite", name: "Cloudflare-Sitzung gültig", ok: sitz[0], detail: sitz[1] });
+	if (modus === "b") {
+		liste.splice(1, 0, { gruppe: "0 Bibliotheksseite", name: "angemeldet für play.cuby0401.uk", ok: true, detail: sprungInfo });
+	}
 
 	const tab = document.createElement("table");
 	let gruppe = null;
@@ -99,9 +141,17 @@ async function zeigeErgebnisse(liste) {
 	$("summe").textContent = `${ok} ✓ · ${nein} ✗ · ${new Date().toLocaleString("de-DE")}`;
 }
 
-$("ua").textContent = navigator.userAgent;
+$("ua").textContent = "Modus " + modus.toUpperCase() + " · " + navigator.userAgent;
 $(spielName === "spike" ? "k-test" : "k-keks").classList.add("an");
+for (const [id, wert] of [["k-test", null], ["k-keks", "legacy-localstorage"]]) {
+	const q = new URLSearchParams();
+	if (wert) q.set("spiel", wert);
+	if (modus === "a") q.set("modus", "a");
+	$(id).href = "?" + q;
+}
+$("k-modus").href = "?" + new URLSearchParams({ ...(param ? { spiel: param } : {}), ...(modus === "b" ? { modus: "a" } : {}) });
+$("k-modus").textContent = modus === "b" ? "Zu Modus A (abgeschottet, alt)" : "Zu Modus B (play.cuby0401.uk)";
 $("neu").onclick = starten;
 $("loeschen").onclick = () => { try { localStorage.removeItem(ablage); } catch { /* egal */ } zeigeGespeichert(); starten(); };
 zeigeGespeichert();
-starten();
+sicherstellenPlay().then((ok) => { if (ok) starten(); });
