@@ -12,6 +12,7 @@ Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 - **Neu:** „Update hochladen“ an jedem Spiel auf der Upload-Seite legt den Ordner fest. Ein neuer Ordnername wird vorher nachgefragt.
 - **Neu:** Hilfe-Center mit den Reitern „Spielen“ und „Spiele entwickeln“, Fußzeile mit Hilfe, Handbuch, Fehler melden und Version. Das Handbuch ist nicht mehr im Kontextmenü.
 - **Behoben:** Das Admin-Panel zählte Testspiele als Spiele (7 statt 4).
+- **Behoben:** Das Testspiel „Sandbox-Spike“ zeigt seine Ergebnisse jetzt selbst an. Bisher tat das nur die Testseite `/spike/`, in der Bibliothek blieb „läuft …“ stehen. Wird mit `--examples` ausgeliefert.
 
 ## 1.0.0 – 05.11.2026
 

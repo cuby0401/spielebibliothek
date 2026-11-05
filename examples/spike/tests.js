@@ -154,4 +154,27 @@
 		lauf > 1 ? "Lauf Nr. " + lauf : "1. Lauf – „Neu laden“ drücken");
 
 	parent.postMessage({ spike: 1, ergebnisse }, "*");
+
+	// Eigene Anzeige: Wird der Spike direkt in der Bibliothek geöffnet (Testspiel), gibt es keine Testseite,
+	// die die Ergebnisse darstellt – sonst bliebe „Sandbox-Spike läuft …“ stehen (05.11.2026).
+	const gut = ergebnisse.filter((e) => e.ok === true).length;
+	const schlecht = ergebnisse.filter((e) => e.ok === false).length;
+	const kopf = document.getElementById("css-probe");
+	kopf.textContent = schlecht
+		? `Sandbox-Spike: ${schlecht} von ${ergebnisse.length} Prüfungen fehlgeschlagen`
+		: `Sandbox-Spike: alle ${gut} Prüfungen bestanden (${ergebnisse.length - gut} nur zur Info)`;
+	const tabelle = document.createElement("table");
+	tabelle.style.cssText = "border-collapse:collapse;font:13px/1.4 system-ui,sans-serif;margin-top:8px";
+	for (const e of ergebnisse) {
+		const tr = tabelle.insertRow();
+		for (const [i, text] of [e.ok === true ? "✓" : e.ok === false ? "✗" : "ℹ", e.gruppe, e.name, e.detail].entries()) {
+			const td = tr.insertCell();
+			td.textContent = text;
+			td.style.cssText = "padding:2px 8px;border-bottom:1px solid #ddd" + (i === 0 ? ";color:" + (e.ok === false ? "#c0392b" : e.ok ? "#1e8449" : "#777") : "");
+		}
+	}
+	const info = document.createElement("p");
+	info.style.cssText = "font:12px system-ui,sans-serif;color:#777";
+	info.textContent = "Ausführliche Testseite mit Modus A/B und Neuladen-Test: games.cuby0401.uk/spike/";
+	document.body.append(tabelle, info);
 })();
