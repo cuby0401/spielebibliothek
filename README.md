@@ -1,7 +1,7 @@
 # Spielebibliothek
 
 Bibliothek für kleine Browser-Spiele der Kollegen auf Sebs NAS.
-Spielen unter `games.cuby0401.uk`, Hochladen unter `upload.cuby0401.uk`.
+Spielen unter `games.cuby0401.uk`, Spieldateien unter `play.cuby0401.uk` (eigener Origin), Hochladen unter `upload.cuby0401.uk`.
 
 Die **Spezifikation** steht im Obsidian-Vault `seb-brain` unter `Projekte/Spielebibliothek.md`
 (Ziel, Entscheidungen, Architektur, Sicherheit, Betrieb, Umsetzungsplan). Dieses Repo enthält nur den Code.
@@ -25,7 +25,8 @@ docs/          Betriebsnotizen
 | 0 | Ordner, Repo, Cloudflare prüfen | ✓ abgenommen 03.11.2026 |
 | 1 | Statische Bibliothek im LAN | ✓ abgenommen 03.11.2026 |
 | 2 | Tunnel und Access | ✓ abgenommen 05.11.2026 |
-| 3–9 | Sandbox-Spike, savesvc, Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
+| 3 | Sandbox-Spike → Spiele auf `play.cuby0401.uk`, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (Mac/Safari; iPad/Windows offen) |
+| 4–9 | savesvc, Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
 
 ## Deploy
 
