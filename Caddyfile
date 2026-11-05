@@ -1,10 +1,10 @@
 # Spielebibliothek – Caddy
-# Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
+# Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose, Sicherheit/Schutz-vor-Schadcode
 #
 # Caddy lauscht im Container auf :8080 (läuft als Nicht-root ohne Capabilities).
-# TLS macht Cloudflare, deshalb nur HTTP. Beide Hostnamen kommen über denselben Tunnel:
-#   games.cuby0401.uk → Bibliotheksseite, /lib, später /api
-#   play.cuby0401.uk  → nur Spieldateien (/play) und /lib – eigener Origin für die Spiele (Spike B)
+# TLS macht Cloudflare, deshalb nur HTTP. Alle Hostnamen kommen über denselben Tunnel:
+#   games.cuby0401.uk → Bibliotheksseite, /lib, /api
+#   play.cuby0401.uk  → nur Spieldateien (/play) und /lib – eigener Origin für die Spiele (E14)
 {
 	admin off
 	auto_https off
@@ -23,9 +23,6 @@
 	# ---------- play.cuby0401.uk: nur Spiele ----------
 	@play host play.cuby0401.uk
 	handle @play {
-		# Spiele dürfen nur von der Bibliothek eingebettet werden
-		header Content-Security-Policy "frame-ancestors https://games.cuby0401.uk"
-
 		# Anmelde-Sprung: Die Bibliothek schickt den Browser einmal hierher (Access meldet ihn
 		# für play an) und bekommt ihn sofort zurück. Ziel bleibt immer auf games.cuby0401.uk.
 		handle /__anmelden {
@@ -40,13 +37,33 @@
 		}
 
 		handle_path /lib/* {
+			header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 			root * /srv/lib
 			file_server
 		}
 
-		# Dateityp-Whitelist und CSP für Spiele folgen in Phase 7
+		# Hochgeladene Spiele – nur lesend, nur erlaubte Dateitypen (Phase 7)
 		handle_path /play/* {
 			root * /srv/spiele
+
+			# Versteckte Dateien und Ordner (.env, .git, …) nie ausliefern
+			@versteckt path_regexp (^|/)\.
+			respond @versteckt 404
+
+			# Nur Endungen aus der Whitelist – oder ein Ordner (liefert dessen index.html).
+			# Alles andere (.exe .bat .sh .zip .msi .dmg .jar .apk …) gibt es nicht.
+			@verboten not path_regexp (?i)(/|\.(html?|m?js|css|json|png|jpe?g|gif|webp|svg|ico|mp3|ogg|wav|m4a|mp4|webm|woff2?|ttf|otf|wasm|txt|glb|gltf|bin))$
+			respond @verboten 404
+
+			# Spiele: nur eigene Dateien, keine externen Server (E20), einbettbar nur von der Bibliothek.
+			# 'unsafe-inline'/'unsafe-eval': KI-Spiele nutzen fast immer Inline-Scripts, Engines teils eval.
+			@kein_svg not path_regexp (?i)\.svg$
+			header @kein_svg Content-Security-Policy "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors https://games.cuby0401.uk"
+
+			# SVG kann Skripte enthalten – die laufen hier nie
+			@svg path_regexp (?i)\.svg$
+			header @svg Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors https://games.cuby0401.uk; sandbox"
+
 			file_server
 		}
 
@@ -56,6 +73,10 @@
 	}
 
 	# ---------- games.cuby0401.uk: Bibliothek ----------
+
+	# Die Bibliothek spricht nur mit sich selbst und mit play; sie lässt sich nirgends einbetten.
+	@games not host play.cuby0401.uk
+	header @games Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://play.cuby0401.uk; frame-src https://play.cuby0401.uk; connect-src 'self' https://play.cuby0401.uk; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 	# GameSave-Bibliothek und Bridge
 	handle_path /lib/* {

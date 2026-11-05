@@ -13,7 +13,7 @@ compose.yaml  Caddyfile  .env.example
 site/          Bibliotheksseite (statisch, ohne Build-Schritt)
 lib/           gamesave.js (für Spiele, inkl. localStorage-Ersatz), bridge.js (Bibliothek)
 savesvc/       Speicher-Dienst (FastAPI + SQLite); Tests: docker build --target test savesvc
-examples/      Testspiele: zaehler (ab Phase 1), legacy-localstorage, boese (später)
+examples/      Testspiele: zaehler, legacy-localstorage (localStorage-Ersatz), boese (Sicherheitstest: alles muss ✓ zeigen), spike
 scripts/       nas-setup.sh (Ordner + ACLs), deploy.sh (rsync vom Mac)
 docs/          Betriebsnotizen
 ```
@@ -29,7 +29,9 @@ docs/          Betriebsnotizen
 | 4 | Speicher-Dienst, GameSave, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (zweites Gerät/Konto offen) |
 | 5 | Bestenliste mit Seasons | deployt 05.11.2026, Abnahme mit zweitem Konto offen |
 | 6 | Upload (File Browser) | deployt 05.11.2026, Abnahme offen |
-| 7–9 | Härtung, Backup, Anleitung | offen |
+| 7 | Härtung: Dateityp-Whitelist, CSP, SVG, Test-Spiel `boese` | deployt 05.11.2026 |
+| 6b | Eigener ZIP-Upload ersetzt File Browser (archiviert) | geplant |
+| 8–9 | Backup, Anleitung | offen |
 
 ## Deploy
 
