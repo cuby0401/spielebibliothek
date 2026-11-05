@@ -57,8 +57,9 @@ services:
     volumes:
       - /volume1/games/data:/data
       - /volume1/games/spiele:/spiele:ro
-      # E-Mail → Benutzername; liegt nur auf der NAS, nicht im Git (Vorlage: users.example.yaml)
-      - ./users.yaml:/config/users.yaml:ro
+      # config/users.yaml: E-Mail → Benutzername; nur auf der NAS, nicht im Git (Vorlage: users.example.yaml).
+      # Ordner statt Einzeldatei, damit Editoren, die die Datei ersetzen (sed -i, vim), sofort wirken.
+      - ./config:/config:ro
     networks: [intern]
 
   cloudflared:

@@ -7,7 +7,7 @@
 #
 # Übertragen werden alle von git verfolgten Dateien (Stand der Arbeitskopie) außer examples/.
 # Dateien, die im Repo gelöscht wurden, werden auf der NAS ebenfalls entfernt.
-# .env und users.yaml werden nie übertragen und nie überschrieben – sie werden auf der NAS gepflegt.
+# .env und config/users.yaml werden nie übertragen und nie überschrieben – sie werden auf der NAS gepflegt.
 #
 # Warum tar statt rsync: macOS liefert openrsync, das mit dem rsync der NAS nicht zusammenspielt.
 
@@ -33,7 +33,7 @@ export COPYFILE_DISABLE=1 # keine ._-Dateien von macOS
 # Versionskennung gegen Browser-/CDN-Cache: Commit plus Zeitstempel, ersetzt __VERSION__ in site/**/*.html
 VERSION="$(git rev-parse --short HEAD)-$(date +%s)"
 
-LISTE=$(git ls-files | grep -v '^examples/' | grep -vx -e '.env' -e 'users.yaml')
+LISTE=$(git ls-files | grep -v '^examples/' | grep -vx -e '.env' -e 'config/users.yaml')
 
 echo "→ Stack nach $NAS:$ZIEL"
 # shellcheck disable=SC2086
@@ -41,8 +41,8 @@ tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "
 	set -e
 	mkdir -p $ZIEL && cd $ZIEL
 	tar --no-same-owner -xf -
-	# Was nicht mehr im Repo ist, entfernen (nur Dateien, .env und users.yaml bleiben)
-	printf '%s\n' $(printf '%s ' $LISTE) .env users.yaml > .deploy-liste
+	# Was nicht mehr im Repo ist, entfernen (nur Dateien, .env und config/users.yaml bleiben)
+	printf '%s\n' $(printf '%s ' $LISTE) .env config/users.yaml users.yaml > .deploy-liste
 	find . -type f ! -name .deploy-liste | sed 's|^\./||' | grep -vxF -f .deploy-liste | while IFS= read -r f; do
 		echo \"  entfernt: \$f\"; rm -f -- \"\$f\"
 	done
@@ -50,15 +50,20 @@ tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "
 	rm -f .deploy-liste
 	find site -name '*.html' -exec sed -i 's/__VERSION__/$VERSION/g' {} +
 	[ -f .env ] || cp .env.example .env
-	[ -f users.yaml ] || cp users.example.yaml users.yaml
+	mkdir -p config
+	# Umzug aus der Zeit vor config/ (05.11.2026)
+	[ -f users.yaml ] && [ ! -f config/users.yaml ] && mv users.yaml config/users.yaml
+	rm -f users.yaml
+	[ -f config/users.yaml ] || cp users.example.yaml config/users.yaml
 	# /volume1/docker vererbt per Default-ACL 777 – hier zurücknehmen.
 	# Caddy (UID 10020) liest site/, lib/, Caddyfile über other=r. .env enthält den Tunnel-Token.
 	find . -type d -exec chmod 755 {} +
 	find . -type f -exec chmod 644 {} +
 	chmod 755 scripts/*.sh
 	chmod 600 .env
-	# users.yaml: savesvc (UID 10022) darf lesen, sonst niemand außer Sebi
-	chmod 640 users.yaml && setfacl -m u:10022:r users.yaml
+	# config/: savesvc (UID 10022) darf lesen, sonst niemand außer Sebi – auch für neu angelegte Dateien
+	chmod 750 config && chmod 640 config/users.yaml
+	setfacl -m u:10022:rx -d -m u:10022:r config && setfacl -m u:10022:r config/users.yaml
 "
 
 if [ "$BEISPIELE" = 1 ]; then
