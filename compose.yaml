@@ -2,7 +2,7 @@
 # Liegt auf der NAS unter /volume1/docker/spielebibliothek/compose.yaml
 # Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
 #
-# Stand: Phase 2 (caddy + cloudflared; LAN-Port noch aktiv bis zur Abnahme). Weitere Dienste:
+# Stand: Phase 2 (caddy + cloudflared, kein Port am Host). Weitere Dienste:
 #   Phase 4 savesvc · Phase 6 filebrowser
 
 name: spielebibliothek
@@ -32,10 +32,10 @@ services:
       - ./site:/srv/site:ro
       - ./lib:/srv/lib:ro
       - /volume1/games/spiele:/srv/spiele:ro
-    # PHASE 1: vorübergehend im LAN/Tailnet erreichbar. In Phase 2 ENTFERNEN –
-    # danach veröffentlicht kein Dienst mehr einen Port am Host.
-    ports:
-      - "${LAN_PORT:-8088}:8080"
+    # Kein Port am Host: erreichbar nur über cloudflared (seit Phase 2, 05.11.2026).
+    # Für Tests im LAN vorübergehend wieder einkommentieren:
+    # ports:
+    #   - "8088:8080"
     networks: [intern]
 
   cloudflared:

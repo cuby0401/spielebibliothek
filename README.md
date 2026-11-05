@@ -24,7 +24,8 @@ docs/          Betriebsnotizen
 |---|---|---|
 | 0 | Ordner, Repo, Cloudflare prüfen | ✓ abgenommen 03.11.2026 |
 | 1 | Statische Bibliothek im LAN | ✓ abgenommen 03.11.2026 |
-| 2–9 | Tunnel, Sandbox-Spike, savesvc, Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
+| 2 | Tunnel und Access | ✓ abgenommen 05.11.2026 |
+| 3–9 | Sandbox-Spike, savesvc, Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
 
 ## Deploy
 
@@ -33,5 +34,5 @@ scripts/deploy.sh             # Stack übertragen (git-verfolgte Dateien) und st
 scripts/deploy.sh --examples  # zusätzlich Testspiele nach spiele/seb/
 ```
 
-Phase 1: Die Bibliothek ist dann unter `http://<NAS>:8088` erreichbar (LAN oder Tailnet).
-Der Port wird in Phase 2 wieder entfernt.
+Erreichbar nur über `https://games.cuby0401.uk` (Cloudflare Tunnel + Access).
+Für LAN-Tests den Port in `compose.yaml` vorübergehend einkommentieren.
