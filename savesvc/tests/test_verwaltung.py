@@ -283,3 +283,18 @@ def test_gesehen_wird_zusammengefuehrt(client):
     d = client.put("/api/einstellungen", json={"gesehen": {"paul/snake": "2026-11-05T11:00:00+00:00"}}, headers=h).json()
     assert d["gesehen"] == {"seb/zaehler": "2026-11-05T10:00:00+00:00", "paul/snake": "2026-11-05T11:00:00+00:00"}
     assert client.put("/api/einstellungen", json={"gesehen": ["x"]}, headers=h).status_code == 422
+
+
+def test_simulation_zaehlt_nicht_in_statistiken(client):
+    # „Ansicht als …“ ist kein echter Spieler: weder in Meine Spiele noch im Admin-Panel mitzählen
+    sim = {**client.als(), "X-Ansicht": "spieler"}
+    client.put("/api/save/seb/zaehler/stand", json={"data": {"zahl": 1}}, headers=sim)
+    st = {s["id"]: s for s in client.get("/api/entwickler/spiele", headers=client.als()).json()}["seb/zaehler"]
+    assert st["spieler"] == 0 and st["zuletzt"] is None
+    assert {s["id"]: s for s in client.get("/api/admin/spiele", headers=client.als()).json()}["seb/zaehler"]["spieler"] == 0
+    u = client.get("/api/admin/uebersicht", headers=client.als()).json()
+    assert u["zaehler"]["saves"] == 0 and u["aktivitaet"] == []
+    assert client.get("/api/admin/spielstaende", headers=client.als()).json() == []
+    # echter Spieler zählt
+    client.put("/api/save/seb/zaehler/stand", json={"data": {"zahl": 2}}, headers=client.als(PAUL))
+    assert {s["id"]: s for s in client.get("/api/admin/spiele", headers=client.als()).json()}["seb/zaehler"]["spieler"] == 1

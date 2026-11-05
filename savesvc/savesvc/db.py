@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS daumen (
 """
 
 
+# Simulierte Rollen („Ansicht als …“, E27) speichern unter „seb~spieler“ bzw. „seb~entwickler“.
+# Echte Benutzernamen enthalten nie „~“. Diese Bedingung hält die Simulation aus allen Statistiken heraus.
+ECHT = "instr(player, '~') = 0"
+
+
 class ZuGross(Exception):
     pass
 
@@ -266,9 +271,9 @@ class Datenbank:
         with self.verbindung() as v:
             zeilen = v.execute(
                 """SELECT game, COUNT(DISTINCT player) AS spieler, MAX(zeit) AS zuletzt FROM (
-                       SELECT game, player, updated_at AS zeit FROM saves
-                       UNION ALL SELECT game, player, created_at FROM scores) GROUP BY game""").fetchall()
-            eintraege = dict(v.execute("SELECT game, COUNT(*) FROM scores GROUP BY game").fetchall())
+                       SELECT game, player, updated_at AS zeit FROM saves WHERE {ECHT}
+                       UNION ALL SELECT game, player, created_at FROM scores WHERE {ECHT}) GROUP BY game""".format(ECHT=ECHT)).fetchall()
+            eintraege = dict(v.execute(f"SELECT game, COUNT(*) FROM scores WHERE {ECHT} GROUP BY game").fetchall())
         return {z["game"]: {"spieler": z["spieler"], "zuletzt": z["zuletzt"], "scores": eintraege.get(z["game"], 0)}
                 for z in zeilen}
 
@@ -276,13 +281,13 @@ class Datenbank:
         with self.verbindung() as v:
             return [dict(z) for z in v.execute(
                 """SELECT player, game, MAX(zeit) AS zeit FROM (
-                       SELECT player, game, updated_at AS zeit FROM saves
-                       UNION ALL SELECT player, game, created_at FROM scores)
-                   GROUP BY player, game ORDER BY zeit DESC LIMIT ?""", (limit,))]
+                       SELECT player, game, updated_at AS zeit FROM saves WHERE {ECHT}
+                       UNION ALL SELECT player, game, created_at FROM scores WHERE {ECHT})
+                   GROUP BY player, game ORDER BY zeit DESC LIMIT ?""".format(ECHT=ECHT), (limit,))]
 
     def zaehlen(self) -> dict:
         with self.verbindung() as v:
-            return {t: v.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+            return {t: v.execute(f"SELECT COUNT(*) FROM {t} WHERE {ECHT}").fetchone()[0]
                     for t in ("saves", "save_history", "scores", "antraege")}
 
     # --- Spielstände (Admin) ---
@@ -293,6 +298,8 @@ class Datenbank:
             bedingung.append("player=?"); werte.append(player)
         if game:
             bedingung.append("game=?"); werte.append(game)
+        if not player:
+            bedingung.append(ECHT)   # Simulation nur, wenn ausdrücklich danach gefiltert wird
         wo = ("WHERE " + " AND ".join(bedingung)) if bedingung else ""
         with self.verbindung() as v:
             return [dict(z) for z in v.execute(
