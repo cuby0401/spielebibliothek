@@ -187,6 +187,8 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         ergebnis = []
         for name in eigene_spiele(player):
             sid = f"{player}/{name}"
+            if einst.get(sid, {}).get("testspiel"):
+                continue   # Testspiele (E38) sind keine Spiele – Verwaltung nur im Admin-Panel
             live = (basis / name).is_dir()
             try:
                 s = games.beschreibung(e.spiele_dir, player, name if live else name + versionen.ENTWURF)
@@ -367,6 +369,14 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             "sicherung": datetime.fromtimestamp(kopie.stat().st_mtime, timezone.utc).isoformat(timespec="seconds")
                          if kopie and kopie.exists() else None,
         }
+
+    @app.post("/api/admin/ansicht/{rolle}/zuruecksetzen")
+    def ansicht_zuruecksetzen(player: str = Depends(admin), rolle: str = P(...)):
+        """Vor jedem Start von „Ansicht als …“: das simulierte Konto (z. B. seb~spieler) leeren – die Simulation
+        beginnt immer wie ein neuer Kollege (Seb, 05.11.2026)."""
+        if rolle not in rollen.ANSICHTEN:
+            raise HTTPException(422, "rolle: spieler oder entwickler")
+        return {"geloescht": db.konto_leeren(f"{player}~{rolle}")}
 
     @app.get("/api/admin/spiele")
     def admin_spiele(_: str = Depends(admin)):

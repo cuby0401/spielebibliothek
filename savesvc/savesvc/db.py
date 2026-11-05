@@ -270,6 +270,18 @@ class Datenbank:
         with self.verbindung() as v:
             return v.execute("SELECT COALESCE(SUM(anzahl), 0) FROM fehler WHERE game=? AND letztes >= ?", (game, seit)).fetchone()[0]
 
+    # --- Simulation („Ansicht als …“) ---
+
+    def konto_leeren(self, player: str) -> int:
+        """Alle Daten eines simulierten Kontos löschen. Nur für IDs mit „~“ – echte Konten nie."""
+        if "~" not in player:
+            raise ValueError("nur simulierte Konten")
+        with self.verbindung() as v:
+            n = v.execute("DELETE FROM saves WHERE player=?", (player,)).rowcount
+            for tabelle in ("save_history", "save_vor_update", "einstellungen", "daumen", "entwurf_tests"):
+                v.execute(f"DELETE FROM {tabelle} WHERE player=?", (player,))
+        return n
+
     # --- Daumen hoch ---
 
     def daumen_setzen(self, player: str, game: str, an: bool) -> None:

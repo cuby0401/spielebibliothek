@@ -403,3 +403,23 @@ def test_entwickler_nimmt_spiel_offline(client):
     assert client.put("/api/entwickler/offline/seb/zaehler", json={"offline": True}, headers=p).status_code == 403
     assert client.put("/api/entwickler/offline/paul/snake", json={"offline": False}, headers=client.als()).json()["offline"] is False
     assert "paul/snake" in {s["id"] for s in client.get("/api/games", headers={**client.als(), "X-Ansicht": "spieler"}).json()}
+
+
+def test_testspiele_nicht_in_meine_spiele(client):
+    client.patch("/api/admin/spiele/seb/zaehler", json={"testspiel": True}, headers=client.als())
+    assert "seb/zaehler" not in {s["id"] for s in client.get("/api/entwickler/spiele", headers=client.als()).json()}
+
+
+def test_simulation_startet_leer(client):
+    sim = {**client.als(), "X-Ansicht": "spieler"}
+    client.put("/api/save/seb/zaehler/stand", json={"data": 1}, headers=sim)
+    client.put("/api/einstellungen", json={"sortierung": "neu"}, headers=sim)
+    echt = client.als()
+    client.put("/api/save/seb/zaehler/stand", json={"data": 42}, headers=echt)
+    assert client.post("/api/admin/ansicht/spieler/zuruecksetzen", headers=echt).json() == {"geloescht": 1}
+    assert client.get("/api/save/seb/zaehler/stand", headers=sim).status_code == 404
+    assert client.get("/api/einstellungen", headers=sim).json()["sortierung"] == "alphabetisch"
+    assert client.get("/api/save/seb/zaehler/stand", headers=echt).json()["data"] == 42     # echtes Konto unberührt
+    assert client.post("/api/admin/ansicht/admin/zuruecksetzen", headers=echt).status_code == 422
+    assert client.post("/api/admin/ansicht/spieler/zuruecksetzen", headers=client.als(PAUL)).status_code == 403
+    assert client.post("/api/admin/ansicht/spieler/zuruecksetzen", headers=sim).status_code == 403   # aus der Simulation heraus nicht

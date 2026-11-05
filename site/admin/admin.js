@@ -33,9 +33,15 @@ async function uebersicht(c) {
 	c.append(h("p", { class: "leise", text: "Backup: borgmatic sichert jede Nacht um 02:00 – den Erfolg zeigt das borgmatic-Log auf der NAS (docker logs borgmatic)." }));
 	await zentraleZeigen(c);
 	// „Ansicht als …“ (E26/E27): gilt für diesen Tab, beendet wird über das lila Band in der Bibliothek
-	const ansichtStarten = (rolle) => { Bridge.ansicht = rolle; location.href = "/#/"; };
+	// Jeder Start beginnt mit leerem simulierten Konto – auch der Zwischenspeicher dieses Browsers dafür wird geleert
+	const ansichtStarten = async (rolle) => {
+		await api("POST", `/ansicht/${rolle}/zuruecksetzen`);
+		try { for (const k of Object.keys(localStorage)) if (k.startsWith("sb-puffer:") && k.endsWith(":" + rolle)) localStorage.removeItem(k); } catch { /* egal */ }
+		Bridge.ansicht = rolle;
+		location.href = "/#/";
+	};
 	c.append(h("h2", { text: "Bibliothek als Rolle ansehen" }),
-		h("p", { class: "leise", text: "Zeigt die Bibliothek in diesem Tab so, wie Kollegen mit dieser Rolle sie sehen – mit einem eigenen, anfangs leeren Konto. Bestenliste und Anträge sind dabei gesperrt. Beenden über das lila Band oben in der Bibliothek." }),
+		h("p", { class: "leise", text: "Zeigt die Bibliothek in diesem Tab so, wie Kollegen mit dieser Rolle sie sehen – mit einem eigenen Konto, das bei jedem Start geleert wird. Bestenliste und Anträge sind dabei gesperrt. Beenden über das lila Band oben in der Bibliothek." }),
 		h("div", { class: "zeile" }, knopf("Ansicht als Spieler", () => ansichtStarten("spieler")), knopf("Ansicht als Entwickler", () => ansichtStarten("entwickler"))));
 	c.append(h("h2", { text: "Letzte Aktivität" }), tabelle(["Spieler", "Spiel", "Zeit"],
 		d.aktivitaet.map((a) => h("tr", {}, h("td", { text: a.player }), h("td", { text: a.title }), h("td", { text: datumZeit(a.zeit) })))));

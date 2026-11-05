@@ -5,6 +5,11 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.1.1 – 05.11.2026
+
+- **Behoben:** Testspiele (Spike, Böse, Bestenlisten-Vorlage …) erscheinen nicht mehr unter „Meine Spiele“ – verwaltet werden sie nur im Admin-Panel.
+- **Geändert:** „Ansicht als Spieler/Entwickler“ beginnt bei jedem Start mit leerem Konto (Spielstände, Einstellungen, Zwischenspeicher).
+
 ## 1.1.0 – 05.11.2026
 
 - **Neu:** Die Zentrale ist versioniert. Deploy nur mit neuer Nummer, Tests vorher, Datenbank-Sicherung und Archiv des alten Stands vorher, Rückweg mit `--zurueck`.
