@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sandbox-Spike</title>
+  <!-- localStorage-Ersatz muss als erstes Script laufen -->
+  <script src="/lib/localstorage-shim.js"></script>
+  <link rel="stylesheet" href="./style.css">
+  <script>window.__mods = {};</script>
+  <!-- Varianten von Modul-Scripts, wie sie Vite & Co. erzeugen -->
+  <script type="module" src="./mod.js?art=modul"></script>
+  <script type="module" crossorigin src="./mod.js?art=modul-crossorigin"></script>
+  <script type="module" crossorigin="use-credentials" src="./mod.js?art=modul-credentials&cors=1"></script>
+  <script src="./classic.js"></script>
+</head>
+<body>
+  <p id="css-probe">Sandbox-Spike läuft …</p>
+  <script src="./tests.js"></script>
+</body>
+</html>

@@ -28,6 +28,13 @@
 	# Hochgeladene Spiele, nur lesend, ohne Verzeichnis-Listing.
 	# Dateityp-Whitelist und CSP folgen in Phase 7.
 	handle_path /play/* {
+		# SPIKE Phase 3: mit ?cors=1 testweise CORS-Header für den opaken Origin des Sandbox-iframes
+		@cors query cors=1
+		header @cors {
+			Access-Control-Allow-Origin "null"
+			Access-Control-Allow-Credentials "true"
+			Vary "Origin"
+		}
 		root * /srv/spiele
 		file_server
 	}
