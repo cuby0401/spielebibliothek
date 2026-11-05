@@ -69,5 +69,7 @@ if [ "$BEISPIELE" = 1 ]; then
 fi
 
 if [ "$STARTEN" = 1 ]; then
-	ssh "$NAS" "cd $ZIEL && docker compose up -d --remove-orphans && docker compose ps"
+	# Caddyfile ist als Einzeldatei eingebunden: tar ersetzt sie, der laufende Container sähe
+	# weiter die alte. Deshalb caddy immer neu starten (admin ist aus, also kein reload).
+	ssh "$NAS" "cd $ZIEL && docker compose up -d --remove-orphans && docker compose restart caddy && docker compose ps"
 fi
