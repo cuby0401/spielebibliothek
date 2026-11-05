@@ -2,8 +2,8 @@
 # Liegt auf der NAS unter /volume1/docker/spielebibliothek/compose.yaml
 # Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
 #
-# Stand: Phase 1 (nur caddy, Port im LAN). Weitere Dienste kommen phasenweise dazu:
-#   Phase 2 cloudflared · Phase 4 savesvc · Phase 6 filebrowser
+# Stand: Phase 2 (caddy + cloudflared; LAN-Port noch aktiv bis zur Abnahme). Weitere Dienste:
+#   Phase 4 savesvc · Phase 6 filebrowser
 
 name: spielebibliothek
 
@@ -36,6 +36,22 @@ services:
     # danach veröffentlicht kein Dienst mehr einen Port am Host.
     ports:
       - "${LAN_PORT:-8088}:8080"
+    networks: [intern]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: spielebibliothek-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN fehlt in .env}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Public Hostnames im Cloudflare-Dashboard:
+    #   games.cuby0401.uk  → http://caddy:8080
+    #   upload.cuby0401.uk → http://filebrowser:80   (ab Phase 6)
+    depends_on: [caddy]
     networks: [intern]
 
 networks:
