@@ -116,7 +116,7 @@ if [ -n "$(git status --porcelain)" ]; then
 	echo "✗ Es gibt nicht committete Änderungen – erst committen, dann deployen (deployt wird immer ein Commit):" >&2
 	git status --short >&2; exit 1
 fi
-grep -q "^## $VERSION_ZENTRALE" CHANGELOG.md || { echo "✗ CHANGELOG.md hat keinen Abschnitt „## $VERSION_ZENTRALE“." >&2; exit 1; }
+grep -q "^## $VERSION_ZENTRALE" CHANGELOG.md || { echo "✗ CHANGELOG.md hat keinen Abschnitt „## ${VERSION_ZENTRALE}“." >&2; exit 1; }
 TAG="zentrale-v$VERSION_ZENTRALE"
 COMMIT="$(git rev-parse --short HEAD)"
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
@@ -152,7 +152,7 @@ tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "
 	mkdir -p $ZIEL && cd $ZIEL
 	tar --no-same-owner -xf -
 	# Was nicht mehr im Repo ist, entfernen (nur Dateien, .env und config/users.yaml bleiben)
-	printf '%s\n' $(printf '%s ' $LISTE) .env config/users.yaml users.yaml > .deploy-liste
+	printf '%s\n' $(printf '%s ' $LISTE) .env config/users.yaml users.yaml site/zentrale.json site/admin/CHANGELOG.md > .deploy-liste
 	find . -type f ! -name .deploy-liste | sed 's|^\./||' | grep -vxF -f .deploy-liste | while IFS= read -r f; do
 		echo \"  entfernt: \$f\"; rm -f -- \"\$f\"
 	done
