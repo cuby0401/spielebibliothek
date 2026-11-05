@@ -45,3 +45,37 @@ Prüfen, dass die Sandbox greift (Browser-Konsole, Kontext auf das iframe umscha
 
 Die Bibliothek liest in Phase 1 die Spiel-IDs aus `site/games.json`. Neue Spiele dort eintragen.
 Ab Phase 4 kommt die Liste automatisch aus `GET /api/games`.
+
+## Backup (Phase 8)
+
+Nächtlich über den bestehenden borgmatic-Container `borgmatic` (`/volume1/docker/borg-hetzner`, Ziel: Hetzner Storage Box, verschlüsselt).
+
+- **01:45** – savesvc legt `/volume1/games/data/backup/saves-latest.db` an (SQLite-Backup-API, konsistent). Zusätzlich bei jedem Start von savesvc.
+- **02:00** – borgmatic sichert `/volume1/games` (→ `/mnt/games`) und `/volume1/docker/spielebibliothek` (→ `/mnt/spielebibliothek`, inkl. `.env` und `config/users.yaml`).
+  Die laufende `saves.db` (+ `-wal`/`-shm`) ist per `exclude_patterns` ausgeschlossen.
+- borgmatic hat **keinen** Zugriff auf den Docker-Socket – deshalb macht savesvc die DB-Kopie selbst.
+
+## Wiederherstellen
+
+Immer zuerst in den Testordner, nie direkt über den Live-Stand:
+
+```sh
+ssh $NAS
+docker exec borgmatic borgmatic list --archive latest --path mnt/games          # was ist drin
+docker exec borgmatic borgmatic extract --archive latest \
+    --path mnt/games/spiele/<benutzer>/<spiel> --destination /mnt/restore-test
+# liegt dann unter /volume1/docker/borg-hetzner/restore-test/mnt/games/...
+```
+
+- **Ein Spielstand:** zuerst der Verlauf (die letzten 5 Stände) – kein Backup nötig:
+  `docker exec spielebibliothek-savesvc python -m savesvc history <spieler> <benutzer>/<spiel> <key>`, dann `… restore <id>`.
+- **Ein Spiel:** extrahieren (s. o.) und den Ordner nach `/volume1/games/spiele/<benutzer>/<spiel>/` zurückkopieren.
+- **Alles:**
+  1. `docker compose down` im Stack-Ordner
+  2. `mnt/games` und `mnt/spielebibliothek` extrahieren, zurückkopieren; `data/backup/saves-latest.db` als `data/saves.db` einsetzen (alte `saves.db-wal`/`-shm` vorher löschen)
+  3. `sudo sh scripts/nas-setup.sh` – setzt die ACLs neu (borg stellt Besitzer und Rechte her, die ACLs sicherheitshalber neu setzen)
+  4. `docker compose up -d`
+- Danach: `boese` in der Bibliothek öffnen (alles ✓) und Testordner leeren: `docker exec borgmatic rm -rf /mnt/restore-test/mnt`
+
+Getestet am 05.11.2026: ein Spiel (bit-genau), alles (identisch, DB `integrity_check: ok`), einzelner Spielstand per CLI.
+
