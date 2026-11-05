@@ -27,6 +27,46 @@
     </ol>
     <p class="hinweis">Hochladen können nur Entwickler mit Upload-Konto. Wenn du auch Spiele bauen willst, melde dich bei Seb.</p>
 
+    <h2 id="menue">Dein Menü (oben rechts auf deinen Namen klicken)</h2>
+    <ul>
+      <li><strong>Einstellungen:</strong> Sortierung der Übersicht (alphabetisch, zuletzt gespielt, neueste), Großansicht (Spiel füllt das Fenster),
+        Bestenliste neben dem Spiel ein/aus. Gilt auf allen deinen Geräten. Mit dem <strong>★</strong> auf einer Kachel heftest du Lieblingsspiele oben an.</li>
+      <li><strong>Meine Spielstände:</strong> alle deine Spielstände je Spiel – mit „Neu anfangen“ löschst du sie für ein Spiel
+        (Bestenlisten-Einträge bleiben; Seb kann die letzten 5 Stände wiederherstellen).</li>
+      <li><strong>Abmelden:</strong> z. B. an einem fremden Rechner. Danach ist ein neuer E-Mail-Code nötig.</li>
+    </ul>
+    <p><strong>Zusätzlich für Entwickler:</strong></p>
+    <ul>
+      <li><strong>Meine Spiele:</strong> deine Spiele mit Statistik – wie viele Spieler, wann zuletzt gespielt, Bestenlisten-Einträge.
+        Mit <strong>„Neue Season“</strong> startest du eine leere Bestenliste (die alte bleibt abrufbar) – ohne neue <code>game.json</code>.</li>
+      <li><strong>Anträge:</strong> für alles, was du nicht selbst kannst – Feature-Wunsch, Fehler melden, Bestenliste zurücksetzen,
+        Spiel löschen/umbenennen, Spielstand wiederherstellen. Seb bekommt den Antrag direkt in sein Admin-Panel; Status und Antwort siehst du unter „Anträge“.</li>
+    </ul>
+
+    <h2 id="selbst">Was du selbst einstellen kannst – und was nicht</h2>
+    <div class="tabelle-rahmen"><table class="tabelle">
+      <thead><tr><th>Selbst (im Spiel oder in der <code>game.json</code>)</th><th>Nur über Antrag an Seb</th></tr></thead>
+      <tbody><tr>
+        <td><ul>
+          <li>Titel, Beschreibung, Vorschaubild</li>
+          <li>Bestenliste an/aus, Rangwert, Reihenfolge, Spalten, Formate</li>
+          <li>Eigene Darstellung der Bestenliste im Spiel</li>
+          <li>Neue Season (Menü → Meine Spiele oder <code>leaderboardSeason</code>)</li>
+          <li>Speicherstruktur und Migrationen (<code>saveVersion</code>)</li>
+          <li>Update, neues Spiel, eigenes Spiel löschen (Upload-Seite)</li>
+        </ul></td>
+        <td><ul>
+          <li>Einzelne Bestenlisten-Einträge löschen</li>
+          <li>Spielstand eines Spielers wiederherstellen</li>
+          <li>Spiel umbenennen (Ordnername = Spiel-ID)</li>
+          <li>Neue Funktionen der Bibliothek</li>
+          <li>Neue Kollegen freischalten</li>
+        </ul></td>
+      </tr></tbody>
+    </table></div>
+    <p class="leise">Fest bleibt immer: Wer angemeldet ist, steht mit seinem Namen in der Bestenliste – einmal, mit seinem besten Eintrag.
+      Spiele können nicht auf andere Spiele, die Anmeldung oder fremde Server zugreifen.</p>
+
     <h2>Regeln</h2>
     <ol class="regeln">
       <li><strong>Ein Ordner pro Spiel</strong>, <code>index.html</code> direkt darin. Im ZIP darf der Ordner drumherum sein – das wird erkannt.</li>
@@ -164,6 +204,12 @@ const top = await GameSave.leaderboard();
       <dt>Mein Bestenlisten-Eintrag wird abgelehnt.</dt>
       <dd>Steht jeder Schlüssel aus <code>submitScore({...})</code> in <code>leaderboard.spalten</code>? Ist der Wert aus <code>rangiertNach</code> dabei und eine Zahl?
         Die Fehlermeldung von <code>submitScore</code> nennt den Grund.</dd>
+      <dt>Ich will in einem Spiel von vorn anfangen.</dt>
+      <dd>Menü → Meine Spielstände → „Neu anfangen“ beim Spiel.</dd>
+      <dt>Ich brauche etwas, das ich nicht selbst einstellen kann.</dt>
+      <dd>Menü → Anträge (nur für Entwickler). Spieler ohne Upload-Konto sagen Seb direkt Bescheid.</dd>
+      <dt>Ich habe ein Update gemacht, das Spiel ist jetzt viel leichter.</dt>
+      <dd>Menü → Meine Spiele → „Neue Season“ – dann vergleichen sich alle wieder fair.</dd>
       <dt>Die Seite sagt „Anmeldung abgelaufen“.</dt>
       <dd>Nach einer Woche ist ein neuer E-Mail-Code nötig – Seite neu laden.</dd>
     </dl>

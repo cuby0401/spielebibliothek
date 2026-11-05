@@ -9,3 +9,4 @@
 .prompt-kopf { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .hilfe dt { font-weight: 650; margin-top: 0.8rem; }
 .hilfe dd { margin: 0.2rem 0 0 1rem; }
+.hilfe .tabelle ul { margin: 0; padding-left: 1.1rem; }
