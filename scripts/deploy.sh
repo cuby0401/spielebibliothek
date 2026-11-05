@@ -57,13 +57,17 @@ tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "
 	[ -f config/users.yaml ] || cp users.example.yaml config/users.yaml
 	# /volume1/docker vererbt per Default-ACL 777 – hier zurücknehmen.
 	# Caddy (UID 10020) liest site/, lib/, Caddyfile über other=r. .env enthält den Tunnel-Token.
-	find . -type d -exec chmod 755 {} +
-	find . -type f -exec chmod 644 {} +
+	# config/ ausnehmen: users.yaml kann dem Speicher-Dienst gehören (Admin-Panel), chmod ginge dann schief
+	find . -path ./config -prune -o -type d -exec chmod 755 {} +
+	find . -path ./config -prune -o -type f -exec chmod 644 {} +
 	chmod 755 scripts/*.sh
 	chmod 600 .env
-	# config/: savesvc (UID 10022) darf lesen, sonst niemand außer Sebi – auch für neu angelegte Dateien
-	chmod 750 config && chmod 640 config/users.yaml
-	setfacl -m u:10022:rx,u:10021:rx -d -m u:10022:r,u:10021:r config && setfacl -m u:10022:r,u:10021:r config/users.yaml
+	# config/: savesvc (UID 10022) schreibt users.yaml (Admin-Panel), der Upload-Dienst (10021) liest, Sebi darf alles
+	chmod 770 config
+	setfacl -m u:10022:rwx,u:10021:rx -d -m u:1000:rw,u:10022:rw,u:10021:r config
+	if [ -O config/users.yaml ]; then chmod 660 config/users.yaml && setfacl -m u:10022:rw,u:10021:r config/users.yaml; fi
+	# Geheimes Token für die interne Schnittstelle Speicher-Dienst → Upload-Dienst
+	grep -q '^INTERN_TOKEN=' .env || printf 'INTERN_TOKEN=%s\n' \$(head -c 48 /dev/urandom | base64 | tr -dc A-Za-z0-9 | cut -c1-40) >> .env
 	# Datenordner des Upload-Dienstes (erbt rwX für UID 10021 von filebrowser/)
 	mkdir -p /volume1/games/filebrowser/upload
 "

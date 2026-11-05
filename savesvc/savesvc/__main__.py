@@ -67,7 +67,7 @@ def main(argv=None) -> int:
 def entwickler(aktion: str, name: str | None) -> int:
     import os
     from .auth import BENUTZER_MUSTER, Benutzerliste
-    from .upload import Entwickler, neues_passwort
+    from .upload import Entwickler, entwickler_anlegen
 
     e = laden()
     store = Entwickler(Path(os.environ.get("UPLOAD_DATA", "/data")) / "upload.db")
@@ -87,10 +87,7 @@ def entwickler(aktion: str, name: str | None) -> int:
     if name not in Benutzerliste(e.users_file).namen():
         print(f"Hinweis: {name} steht nicht in users.yaml – ohne Eintrag dort klappt die Anmeldung nicht.", file=sys.stderr)
     ordner = e.spiele_dir / name
-    if aktion == "anlegen":
-        ordner.mkdir(mode=0o770, exist_ok=True)   # erbt die Default-ACLs von spiele/
-    passwort = neues_passwort()
-    store.setzen(name, passwort)
+    passwort = entwickler_anlegen(store, e.spiele_dir, name, neu=(aktion == "anlegen"))
     print()
     print(f"Benutzer:  {name}")
     print(f"Passwort:  {passwort}")

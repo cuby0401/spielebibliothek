@@ -10,9 +10,22 @@
   <header class="kopf">
     <a class="marke" href="#/">Spielebibliothek</a>
     <nav>
-      <span id="benutzer" class="benutzer" hidden></span>
-      <a class="knopf leise" href="/hilfe/">Hilfe</a>
       <a class="knopf leise" id="upload-link" href="https://upload.cuby0401.uk" target="_blank" rel="noopener" hidden>Spiel hochladen</a>
+      <a class="knopf leise" href="/hilfe/">Hilfe</a>
+      <div class="menue">
+        <button id="menue-knopf" class="knopf leise benutzer-knopf" type="button" aria-haspopup="true" aria-expanded="false" hidden>
+          <span id="benutzer"></span> ▾
+        </button>
+        <div id="menue" class="menue-liste" hidden>
+          <a href="#/einstellungen">Einstellungen</a>
+          <a href="#/spielstaende">Meine Spielstände</a>
+          <a href="#/meine-spiele" data-rolle="entwickler" hidden>Meine Spiele</a>
+          <a href="#/antraege" data-rolle="entwickler" hidden>Anträge</a>
+          <a href="/admin/" data-rolle="admin" hidden>Admin-Panel</a>
+          <hr>
+          <a href="/cdn-cgi/access/logout">Abmelden</a>
+        </div>
+      </div>
     </nav>
   </header>
 
@@ -22,10 +35,22 @@
   </p>
 
   <main>
+    <p id="meldung" class="meldung" hidden></p>
+
     <section id="uebersicht">
-      <p id="meldung" class="meldung" hidden></p>
+      <div class="werkzeug">
+        <label class="leise">Sortieren
+          <select id="sortierung">
+            <option value="alphabetisch">alphabetisch</option>
+            <option value="zuletzt">zuletzt gespielt</option>
+            <option value="neu">neueste zuerst</option>
+          </select>
+        </label>
+      </div>
       <div id="kacheln" class="kacheln"></div>
     </section>
+
+    <section id="seite" class="seite" hidden></section>
 
     <section id="spielansicht" hidden>
       <div class="spielleiste">
@@ -49,5 +74,6 @@
 
   <script src="/lib/bridge.js?v=__VERSION__"></script>
   <script src="/app.js?v=__VERSION__"></script>
+  <script src="/konto.js?v=__VERSION__"></script>
 </body>
 </html>

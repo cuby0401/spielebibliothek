@@ -59,7 +59,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     if e.backup_ziel:
         from . import sicherung
         sicherung.starten(db, e.backup_ziel, e.backup_uhrzeit)
-    spieler = Pruefer(e, Benutzerliste(e.users_file), schluessel_quelle)
+    benutzerliste = Benutzerliste(e.users_file)
+    spieler = Pruefer(e, benutzerliste, schluessel_quelle)
     app = FastAPI(title="Spielebibliothek – Speicher-Dienst", docs_url=None, redoc_url=None, openapi_url=None)
 
     def spiel(user: str = P(...), game: str = P(...)):
@@ -74,20 +75,40 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         laenge = request.headers.get("content-length")
         if laenge and laenge.isdigit() and int(laenge) > BODY_MAX:
             return JSONResponse({"detail": "Anfrage zu groß"}, status_code=413)
+        # CSRF: Cloudflare hängt die Anmeldung an jede Anfrage an games – auch an eine, die eine fremde
+        # Seite auslöst. Ändernde Anfragen brauchen deshalb diesen Header (fremde Seiten können ihn nicht setzen).
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.headers.get("x-bibliothek") != "1":
+            return JSONResponse({"detail": "Header X-Bibliothek fehlt"}, status_code=403)
         return await weiter(request)
 
     @app.exception_handler(ZuGross)
     async def zu_gross(_, fehler: ZuGross):
         return JSONResponse({"detail": str(fehler)}, status_code=413)
 
+    def aktuelle_season(game_id: str, ordner=None) -> int:
+        # game.json oder – falls höher – per Knopf gesetzte Season (Entwickler/Admin)
+        ordner = ordner or e.spiele_dir / game_id
+        return max(games.season(ordner), db.season_override(game_id) or 0)
+
     @app.get("/api/me")
     def me(player: str = Depends(spieler)):
-        # Entwickler = hat einen eigenen Spielordner (wird mit scripts/filebrowser.sh anlegen erzeugt)
-        return {"player": player, "uploader": (e.spiele_dir / player).is_dir()}
+        # Entwickler = hat einen eigenen Spielordner (wird beim Anlegen des Upload-Kontos erzeugt)
+        return {"player": player, "uploader": (e.spiele_dir / player).is_dir(), "admin": player in e.admins}
 
     @app.get("/api/games")
     def spiele(player: str = Depends(spieler)):
-        return games.alle(e.spiele_dir)
+        einst = db.spiel_einstellungen()
+        zuletzt = db.zuletzt_gespielt(player)
+        ist_admin = player in e.admins
+        ergebnis = []
+        for s in games.alle(e.spiele_dir):
+            ein = einst.get(s["id"], {})
+            if ein.get("versteckt") and not ist_admin:
+                continue   # ausgeblendet (nur Anzeige – die Dateien bleiben unter play erreichbar)
+            ergebnis.append({**s, "leaderboardSeason": aktuelle_season(s["id"]),
+                             "versteckt": bool(ein.get("versteckt")), "hervorgehoben": bool(ein.get("hervorgehoben")),
+                             "zuletztGespielt": zuletzt.get(s["id"])})
+        return ergebnis
 
     @app.get("/api/save/{user}/{game}")
     def alle_keys(player: str = Depends(spieler), sp=Depends(spiel)):
@@ -138,7 +159,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
             if jetzt - letzter_score.get((player, sp[0]), -SCORE_ABSTAND) < SCORE_ABSTAND:
                 raise HTTPException(429, "höchstens ein Score pro Sekunde")
             letzter_score[(player, sp[0])] = jetzt
-        season = games.season(sp[1])
+        season = aktuelle_season(sp[0], sp[1])
         db.score_eintragen(player, sp[0], season, float(wert), werte)
         return {"season": season}
 
@@ -150,7 +171,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         limit: int = Query(10, ge=1, le=100),
     ):
         lb = games.bestenliste_einstellungen(sp[1])
-        aktuell = games.season(sp[1])
+        aktuell = aktuelle_season(sp[0], sp[1])
         gewaehlt = season or aktuell
         eintraege = db.bestenliste(sp[0], gewaehlt, lb["order"] == "asc", limit) if lb["enabled"] else []
         return {
@@ -160,6 +181,9 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
             "seasons": sorted(set(db.seasons(sp[0])) | {aktuell}),
             "entries": eintraege,
         }
+
+    from . import verwaltung
+    verwaltung.registrieren(app, e, db, spieler, benutzerliste, aktuelle_season)
 
     return app
 

@@ -74,7 +74,8 @@ def test_spiel_ohne_bestenliste_409(client):
 
 
 def test_ohne_login_401(client):
-    assert client.post(SC, json={"score": 1}).status_code == 401
+    assert client.post(SC, json={"score": 1}, headers={"X-Bibliothek": "1"}).status_code == 401
+    assert client.post(SC, json={"score": 1}).status_code == 403          # ohne CSRF-Header schon vorher abgelehnt
     assert client.get(LB).status_code == 401
 
 

@@ -12,6 +12,15 @@ const el = (id) => document.getElementById(id);
 let spiele = [];
 let aktuellesSpiel = null;
 let ichSelbst = null;
+let ich = { player: null, uploader: false, admin: false };
+let einstellungen = { sortierung: "alphabetisch", favoriten: [], grossansicht: false, bestenliste: true };
+const seiten = {};   // Unterseiten aus dem Benutzermenü (konto.js): name → async (container) => {}
+
+async function einstellungenSpeichern(aenderung) {
+	Object.assign(einstellungen, aenderung);
+	try { einstellungen = await Bridge.json("PUT", "/api/einstellungen", aenderung); }
+	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Einstellung nicht gespeichert: " + e.message); }
+}
 
 const zahl = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 3 });
 const dezimal = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -101,6 +110,22 @@ function meldung(text) {
 	el("meldung").hidden = !text;
 }
 
+// Reihenfolge: Favoriten, dann empfohlene Spiele, dann nach gewählter Sortierung
+function sortiert(liste) {
+	const fav = new Set(einstellungen.favoriten);
+	const nach = {
+		alphabetisch: (a, b) => a.title.localeCompare(b.title, "de"),
+		zuletzt: (a, b) => (b.zuletztGespielt || "").localeCompare(a.zuletztGespielt || "") || a.title.localeCompare(b.title, "de"),
+		neu: (a, b) => (b.geaendert || "").localeCompare(a.geaendert || ""),
+	}[einstellungen.sortierung] || ((a, b) => a.title.localeCompare(b.title, "de"));
+	return liste.slice().sort((a, b) => (fav.has(b.id) - fav.has(a.id)) || (b.hervorgehoben - a.hervorgehoben) || nach(a, b));
+}
+
+function kachelnZeigen() {
+	el("sortierung").value = einstellungen.sortierung;
+	el("kacheln").replaceChildren(...sortiert(spiele).map(kachel));
+}
+
 function spielPfad(id) {
 	return Bridge.PLAY + "/play/" + id.split("/").map(encodeURIComponent).join("/") + "/";
 }
@@ -120,6 +145,26 @@ function kachel(spiel) {
 		bild.append(img);
 	} else {
 		bild.textContent = "🎮";
+	}
+
+	const stern = document.createElement("button");
+	const istFav = einstellungen.favoriten.includes(spiel.id);
+	stern.type = "button";
+	stern.className = "stern" + (istFav ? " an" : "");
+	stern.textContent = istFav ? "★" : "☆";
+	stern.title = istFav ? "Aus den Favoriten entfernen" : "Als Favorit oben anheften";
+	stern.onclick = async () => {
+		const fav = new Set(einstellungen.favoriten);
+		fav.has(spiel.id) ? fav.delete(spiel.id) : fav.add(spiel.id);
+		await einstellungenSpeichern({ favoriten: [...fav] });
+		kachelnZeigen();
+	};
+	bild.append(stern);
+	if (spiel.hervorgehoben || spiel.versteckt) {
+		const marke = document.createElement("span");
+		marke.className = "marke-klein" + (spiel.versteckt ? " versteckt" : "");
+		marke.textContent = spiel.versteckt ? "ausgeblendet" : "Empfohlen";
+		bild.append(marke);
 	}
 
 	const inhalt = document.createElement("div");
@@ -157,13 +202,31 @@ function kachel(spiel) {
 	return k;
 }
 
-function zeigeUebersicht() {
+function spielBeenden() {
+	if (aktuellesSpiel === null) return;
 	aktuellesSpiel = null;
 	Bridge.beenden();
 	el("rahmen").replaceChildren(); // laufendes Spiel beenden
+}
+
+function zeigeUebersicht() {
+	spielBeenden();
 	el("spielansicht").hidden = true;
+	el("seite").hidden = true;
 	el("uebersicht").hidden = false;
 	document.title = "Spielebibliothek";
+	kachelnZeigen();
+}
+
+async function zeigeSeite(name) {
+	spielBeenden();
+	el("uebersicht").hidden = true;
+	el("spielansicht").hidden = true;
+	el("seite").hidden = false;
+	el("seite").replaceChildren();
+	meldung("");
+	try { await seiten[name](el("seite")); }
+	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message); }
 }
 
 async function zeigeSpiel(id) {
@@ -176,7 +239,10 @@ async function zeigeSpiel(id) {
 	bestenlisteZeigen(spiel);
 	el("spieltitel").textContent = spiel.title;
 	el("uebersicht").hidden = true;
+	el("seite").hidden = true;
 	el("spielansicht").hidden = false;
+	el("spielansicht").classList.toggle("gross", einstellungen.grossansicht);
+	el("spielansicht").classList.toggle("ohne-bestenliste", !einstellungen.bestenliste);
 	document.title = spiel.title + " – Spielebibliothek";
 	try {
 		const iframe = await Bridge.starten(spiel, el("rahmen"));
@@ -191,9 +257,23 @@ async function zeigeSpiel(id) {
 }
 
 function route() {
+	el("menue").hidden = true;
 	const m = location.hash.match(/^#\/spiel\/(.+)$/);
-	if (m && ID_MUSTER.test(m[1])) zeigeSpiel(m[1]);
-	else zeigeUebersicht();
+	if (m && ID_MUSTER.test(m[1])) return zeigeSpiel(m[1]);
+	const s = location.hash.match(/^#\/([a-z-]+)$/);
+	if (s && seiten[s[1]]) return zeigeSeite(s[1]);
+	zeigeUebersicht();
+}
+
+function menueEinrichten() {
+	const knopf = el("menue-knopf"), menue = el("menue");
+	knopf.hidden = false;
+	knopf.onclick = (e) => { e.stopPropagation(); menue.hidden = !menue.hidden; knopf.setAttribute("aria-expanded", String(!menue.hidden)); };
+	document.addEventListener("click", (e) => { if (!menue.contains(e.target)) { menue.hidden = true; knopf.setAttribute("aria-expanded", "false"); } });
+	document.addEventListener("keydown", (e) => { if (e.key === "Escape") menue.hidden = true; });
+	for (const a of menue.querySelectorAll("[data-rolle]")) {
+		a.hidden = !(a.dataset.rolle === "admin" ? ich.admin : (ich.uploader || ich.admin));
+	}
 }
 
 async function start() {
@@ -218,12 +298,15 @@ async function start() {
 	}
 
 	try {
-		const [ich, liste] = await Promise.all([Bridge.json("GET", "/api/me"), Bridge.json("GET", "/api/games")]);
+		const [wer, liste, einst] = await Promise.all([
+			Bridge.json("GET", "/api/me"), Bridge.json("GET", "/api/games"), Bridge.json("GET", "/api/einstellungen")]);
+		ich = wer;
+		einstellungen = einst;
 		Bridge.spieler = ich.player;
 		ichSelbst = ich.player;
 		el("benutzer").textContent = ich.player;
-		el("benutzer").hidden = false;
 		el("upload-link").hidden = !ich.uploader;
+		menueEinrichten();
 		spiele = liste.filter((s) => typeof s.id === "string" && ID_MUSTER.test(s.id));
 	} catch (e) {
 		if (!(e instanceof Bridge.SitzungAbgelaufen)) {
@@ -234,7 +317,10 @@ async function start() {
 		return;
 	}
 
-	el("kacheln").replaceChildren(...spiele.map(kachel));
+	el("sortierung").addEventListener("change", async (e) => {
+		await einstellungenSpeichern({ sortierung: e.target.value });
+		kachelnZeigen();
+	});
 	if (!spiele.length) meldung("Noch keine Spiele.");
 
 	window.addEventListener("hashchange", route);

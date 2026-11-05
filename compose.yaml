@@ -54,6 +54,10 @@ services:
       ACCESS_AUD: 16a18e7f5f0f0cf8060c0c274276a4f5f895aa0a38abdb90c6c75575d902a2b1
       # Konsistente DB-Kopie für borgmatic (sichert um 02:00 data/backup/, nicht die laufende saves.db)
       BACKUP_ZIEL: /data/backup/saves-latest.db
+      # Admin-Panel (games.cuby0401.uk/admin) und interne Schnittstelle zum Upload-Dienst
+      ADMINS: seb
+      INTERN_TOKEN: ${INTERN_TOKEN:?INTERN_TOKEN fehlt in .env – deploy.sh legt es an}
+      UPLOAD_URL: http://upload:8000
       BACKUP_UHRZEIT: "01:45"
       # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
     volumes:
@@ -61,7 +65,8 @@ services:
       - /volume1/games/spiele:/spiele:ro
       # config/users.yaml: E-Mail → Benutzername; nur auf der NAS, nicht im Git (Vorlage: users.example.yaml).
       # Ordner statt Einzeldatei, damit Editoren, die die Datei ersetzen (sed -i, vim), sofort wirken.
-      - ./config:/config:ro
+      # Schreibbar: das Admin-Panel legt hier Benutzer an.
+      - ./config:/config
     networks: [intern]
 
   upload:
@@ -84,6 +89,7 @@ services:
       # AUD der Access-Anwendung "upload" (Richtlinie Entwickler, 15 min)
       ACCESS_AUD: 1437ffb5ec6d16a425902f5569fea23258ab8ff2cafdfc0d52c1b968b9657351
       UPLOAD_DATA: /data
+      INTERN_TOKEN: ${INTERN_TOKEN:?INTERN_TOKEN fehlt in .env – deploy.sh legt es an}
     volumes:
       - /volume1/games/spiele:/spiele
       # Passwort-Hashes und Sitzungs-Schlüssel (Ordner liegt unter filebrowser/, dort hat UID 10021 schon Rechte)

@@ -28,6 +28,14 @@ CREATE TABLE IF NOT EXISTS scores (
     score REAL NOT NULL, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS scores_liste ON scores (game, season, player, score);
+-- Phase 10: Einstellungen je Spieler, Einstellungen je Spiel, Anträge
+CREATE TABLE IF NOT EXISTS einstellungen (player TEXT PRIMARY KEY, daten TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS spiel_einstellungen (
+    game TEXT PRIMARY KEY, versteckt INTEGER NOT NULL DEFAULT 0, hervorgehoben INTEGER NOT NULL DEFAULT 0,
+    season INTEGER);
+CREATE TABLE IF NOT EXISTS antraege (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, player TEXT NOT NULL, art TEXT NOT NULL, spiel TEXT, text TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'offen', antwort TEXT, erstellt TEXT NOT NULL, geaendert TEXT NOT NULL);
 """
 
 
@@ -171,6 +179,137 @@ class Datenbank:
             if season is None:
                 return v.execute("DELETE FROM scores WHERE game=?", (game,)).rowcount
             return v.execute("DELETE FROM scores WHERE game=? AND season=?", (game, season)).rowcount
+
+    # --- Einstellungen je Spieler ---
+
+    def einstellungen(self, player: str) -> dict:
+        with self.verbindung() as v:
+            z = v.execute("SELECT daten FROM einstellungen WHERE player=?", (player,)).fetchone()
+        return json.loads(z["daten"]) if z else {}
+
+    def einstellungen_setzen(self, player: str, daten: dict) -> None:
+        with self.verbindung() as v:
+            v.execute("INSERT INTO einstellungen (player, daten) VALUES (?,?) ON CONFLICT (player) DO UPDATE SET daten=excluded.daten",
+                      (player, json.dumps(daten, ensure_ascii=False, separators=(",", ":"))))
+
+    # --- Einstellungen je Spiel (Sichtbarkeit, Season) ---
+
+    def spiel_einstellungen(self) -> dict[str, dict]:
+        with self.verbindung() as v:
+            return {z["game"]: {"versteckt": bool(z["versteckt"]), "hervorgehoben": bool(z["hervorgehoben"]), "season": z["season"]}
+                    for z in v.execute("SELECT * FROM spiel_einstellungen")}
+
+    def spiel_setzen(self, game: str, **felder) -> None:
+        erlaubt = {"versteckt", "hervorgehoben", "season"}
+        felder = {k: v for k, v in felder.items() if k in erlaubt}
+        if not felder:
+            return
+        with self.verbindung() as v:
+            v.execute("INSERT OR IGNORE INTO spiel_einstellungen (game) VALUES (?)", (game,))
+            for k, wert in felder.items():
+                v.execute(f"UPDATE spiel_einstellungen SET {k}=? WHERE game=?", (wert, game))
+
+    def season_override(self, game: str) -> int | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT season FROM spiel_einstellungen WHERE game=?", (game,)).fetchone()
+        return z["season"] if z else None
+
+    # --- Auswertungen ---
+
+    def meine_spielstaende(self, player: str) -> list[dict]:
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute(
+                "SELECT game, key, length(data) AS bytes, save_version AS version, updated_at AS updatedAt "
+                "FROM saves WHERE player=? ORDER BY game, key", (player,))]
+
+    def spielstaende_loeschen(self, player: str, game: str) -> int:
+        """Alle Spielstände eines Spielers für ein Spiel – jeder alte Stand landet im Verlauf."""
+        n = 0
+        for key in self.keys(player, game):
+            n += self.loeschen(player, game, key)
+        return n
+
+    def zuletzt_gespielt(self, player: str) -> dict[str, str]:
+        with self.verbindung() as v:
+            return {z["game"]: z["zeit"] for z in v.execute(
+                """SELECT game, MAX(zeit) AS zeit FROM (
+                       SELECT game, updated_at AS zeit FROM saves WHERE player=?
+                       UNION ALL SELECT game, created_at FROM scores WHERE player=?) GROUP BY game""", (player, player))}
+
+    def spiel_statistik(self) -> dict[str, dict]:
+        """Je Spiel: Anzahl Spieler, zuletzt gespielt, Bestenlisten-Einträge (alle Seasons)."""
+        with self.verbindung() as v:
+            zeilen = v.execute(
+                """SELECT game, COUNT(DISTINCT player) AS spieler, MAX(zeit) AS zuletzt FROM (
+                       SELECT game, player, updated_at AS zeit FROM saves
+                       UNION ALL SELECT game, player, created_at FROM scores) GROUP BY game""").fetchall()
+            eintraege = dict(v.execute("SELECT game, COUNT(*) FROM scores GROUP BY game").fetchall())
+        return {z["game"]: {"spieler": z["spieler"], "zuletzt": z["zuletzt"], "scores": eintraege.get(z["game"], 0)}
+                for z in zeilen}
+
+    def letzte_aktivitaet(self, limit: int = 25) -> list[dict]:
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute(
+                """SELECT player, game, MAX(zeit) AS zeit FROM (
+                       SELECT player, game, updated_at AS zeit FROM saves
+                       UNION ALL SELECT player, game, created_at FROM scores)
+                   GROUP BY player, game ORDER BY zeit DESC LIMIT ?""", (limit,))]
+
+    def zaehlen(self) -> dict:
+        with self.verbindung() as v:
+            return {t: v.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                    for t in ("saves", "save_history", "scores", "antraege")}
+
+    # --- Spielstände (Admin) ---
+
+    def spielstaende(self, player: str | None, game: str | None) -> list[dict]:
+        bedingung, werte = [], []
+        if player:
+            bedingung.append("player=?"); werte.append(player)
+        if game:
+            bedingung.append("game=?"); werte.append(game)
+        wo = ("WHERE " + " AND ".join(bedingung)) if bedingung else ""
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute(
+                f"SELECT player, game, key, length(data) AS bytes, save_version AS version, updated_at AS updatedAt "
+                f"FROM saves {wo} ORDER BY updated_at DESC LIMIT 500", werte)]
+
+    def verlauf_mit_daten(self, player: str, game: str, key: str) -> list[dict]:
+        with self.verbindung() as v:
+            return [{**dict(z), "data": json.loads(z["data"])} for z in v.execute(
+                "SELECT id, data, save_version AS version, saved_at AS savedAt FROM save_history "
+                "WHERE player=? AND game=? AND key=? ORDER BY id DESC", (player, game, key))]
+
+    def scores_liste(self, game: str, season: int | None) -> list[dict]:
+        with self.verbindung() as v:
+            zeilen = v.execute(
+                "SELECT id, player, season, score, werte, created_at AS zeit FROM scores WHERE game=? "
+                + ("AND season=? " if season else "") + "ORDER BY created_at DESC LIMIT 500",
+                (game, season) if season else (game,)).fetchall()
+        return [{**dict(z), "werte": json.loads(z["werte"]) if z["werte"] else {}} for z in zeilen]
+
+    def score_loeschen(self, score_id: int) -> bool:
+        with self.verbindung() as v:
+            return v.execute("DELETE FROM scores WHERE id=?", (score_id,)).rowcount > 0
+
+    # --- Anträge ---
+
+    def antrag_anlegen(self, player: str, art: str, spiel: str | None, text: str) -> int:
+        with self.verbindung() as v:
+            return v.execute("INSERT INTO antraege (player, art, spiel, text, erstellt, geaendert) VALUES (?,?,?,?,?,?)",
+                             (player, art, spiel, text, jetzt(), jetzt())).lastrowid
+
+    def antraege(self, player: str | None = None) -> list[dict]:
+        with self.verbindung() as v:
+            if player:
+                return [dict(z) for z in v.execute("SELECT * FROM antraege WHERE player=? ORDER BY id DESC", (player,))]
+            return [dict(z) for z in v.execute(
+                "SELECT * FROM antraege ORDER BY CASE status WHEN 'offen' THEN 0 ELSE 1 END, id DESC")]
+
+    def antrag_bearbeiten(self, antrag_id: int, status: str, antwort: str | None) -> bool:
+        with self.verbindung() as v:
+            return v.execute("UPDATE antraege SET status=?, antwort=?, geaendert=? WHERE id=?",
+                             (status, antwort, jetzt(), antrag_id)).rowcount > 0
 
     # --- Admin ---
 

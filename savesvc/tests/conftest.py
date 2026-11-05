@@ -69,6 +69,6 @@ def client(umgebung, rsa_schluessel, token):
     c = TestClient(app)
 
     def als(email="seb@example.com", **kw):
-        return {"Cf-Access-Jwt-Assertion": token(email=email, **kw)}
+        return {"Cf-Access-Jwt-Assertion": token(email=email, **kw), "X-Bibliothek": "1"}
     c.als = als
     return c

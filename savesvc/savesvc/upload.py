@@ -25,7 +25,7 @@ from fastapi import Body, Depends, FastAPI, File, HTTPException, Path as P, Requ
 from fastapi.responses import JSONResponse
 
 from . import games, zipinstall
-from .auth import Benutzerliste, Pruefer
+from .auth import BENUTZER_MUSTER, Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 
 log = logging.getLogger("savesvc.upload")
@@ -55,6 +55,9 @@ class Entwickler:
                 CREATE TABLE IF NOT EXISTS entwickler (
                     player TEXT PRIMARY KEY, salt BLOB NOT NULL, hash BLOB NOT NULL, angelegt TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS fehlversuche (player TEXT NOT NULL, zeit REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS ereignisse (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, zeit TEXT NOT NULL, player TEXT NOT NULL,
+                    aktion TEXT NOT NULL, ordner TEXT, dateien INTEGER);
             """)
 
     @contextmanager
@@ -109,6 +112,26 @@ class Entwickler:
         with self._v() as v:
             return list(v.execute("SELECT player, angelegt FROM entwickler ORDER BY player"))
 
+    def ereignis(self, player: str, aktion: str, ordner: str | None = None, dateien: int | None = None) -> None:
+        with self._v() as v:
+            v.execute("INSERT INTO ereignisse (zeit, player, aktion, ordner, dateien) VALUES (?,?,?,?,?)",
+                      (datetime.now(timezone.utc).isoformat(timespec="seconds"), player, aktion, ordner, dateien))
+            v.execute("DELETE FROM ereignisse WHERE id NOT IN (SELECT id FROM ereignisse ORDER BY id DESC LIMIT 500)")
+
+    def ereignisse(self, limit: int = 25) -> list[dict]:
+        with self._v() as v:
+            v.row_factory = sqlite3.Row
+            return [dict(z) for z in v.execute("SELECT zeit, player, aktion, ordner, dateien FROM ereignisse ORDER BY id DESC LIMIT ?", (limit,))]
+
+
+def entwickler_anlegen(store: "Entwickler", spiele_dir: Path, name: str, neu: bool = True) -> str:
+    """Upload-Konto anlegen (neu=True, inkl. Spielordner) oder neues Passwort setzen. Liefert das Passwort."""
+    if neu:
+        (spiele_dir / name).mkdir(mode=0o770, exist_ok=True)   # erbt die Default-ACLs von spiele/
+    passwort = neues_passwort()
+    store.setzen(name, passwort)
+    return passwort
+
 
 def geheimnis(pfad: Path) -> bytes:
     """Schlüssel für die Sitzungs-Cookies; wird beim ersten Start erzeugt."""
@@ -153,6 +176,9 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         if laenge and laenge.isdigit() and int(laenge) > UPLOAD_MAX:
             return JSONResponse({"detail": "Datei zu groß (max. 100 MB)"}, status_code=413)
         # CSRF: Fremde Seiten können diesen Header nicht ohne CORS-Freigabe setzen
+        # (/intern ist nur im Docker-Netz erreichbar und hat ein eigenes Token)
+        if request.url.path.startswith("/intern/"):
+            return await weiter(request)
         if request.method in ("POST", "PUT", "DELETE") and request.headers.get("x-upload") != "1":
             return JSONResponse({"detail": "Header X-Upload fehlt"}, status_code=403)
         return await weiter(request)
@@ -225,6 +251,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         except zipinstall.UngueltigesZip as fehler:
             raise HTTPException(422, str(fehler)) from None
         log.info("%s hat %s hochgeladen (%d Dateien)", player, ordner, ergebnis.dateien)
+        store.ereignis(player, "hochgeladen", ordner, ergebnis.dateien)
         return {"ordner": ordner, "dateien": ergebnis.dateien, "bytes": ergebnis.bytes,
                 "uebersprungen": ergebnis.uebersprungen[:50]}
 
@@ -235,6 +262,60 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
             raise HTTPException(404, "Spiel nicht gefunden")
         shutil.rmtree(ziel)
         log.info("%s hat %s gelöscht", player, ordner)
+        store.ereignis(player, "gelöscht", ordner)
+
+    # ---------- interne Schnittstelle für den Speicher-Dienst (Admin-Panel) ----------
+    # Caddy leitet /intern nie nach außen; zusätzlich ist ein geheimes Token nötig.
+    token = os.environ.get("INTERN_TOKEN", "")
+
+    def intern(request: Request) -> None:
+        if not token or not hmac.compare_digest(request.headers.get("x-intern-token", ""), token):
+            raise HTTPException(403, "kein Zugriff")
+
+    def name_ok(name: str) -> str:
+        if not BENUTZER_MUSTER.match(name or ""):
+            raise HTTPException(422, "Benutzername ungültig")
+        return name
+
+    @app.get("/intern/entwickler", dependencies=[Depends(intern)])
+    def i_liste():
+        return [{"player": p, "angelegt": a} for p, a in store.liste()]
+
+    @app.post("/intern/entwickler", status_code=201, dependencies=[Depends(intern)])
+    def i_anlegen(body: dict[str, Any] = Body(...)):
+        name = name_ok(body.get("name"))
+        if store.vorhanden(name):
+            raise HTTPException(409, f"{name} hat schon ein Upload-Konto")
+        passwort = entwickler_anlegen(store, e.spiele_dir, name)
+        store.ereignis(name, "Upload-Konto angelegt")
+        return {"name": name, "passwort": passwort}
+
+    @app.post("/intern/entwickler/{name}/passwort", dependencies=[Depends(intern)])
+    def i_passwort(name: str = P(...)):
+        name_ok(name)
+        if not store.vorhanden(name):
+            raise HTTPException(404, f"{name} hat kein Upload-Konto")
+        passwort = entwickler_anlegen(store, e.spiele_dir, name, neu=False)
+        store.ereignis(name, "neues Passwort")
+        return {"name": name, "passwort": passwort}
+
+    @app.delete("/intern/entwickler/{name}", status_code=204, dependencies=[Depends(intern)])
+    def i_sperren(name: str = P(...)):
+        if store.loeschen(name_ok(name)):
+            store.ereignis(name, "Upload-Konto gelöscht")
+
+    @app.delete("/intern/spiele/{user}/{ordner}", status_code=204, dependencies=[Depends(intern)])
+    def i_spiel_loeschen(user: str = P(...), ordner: str = P(...)):
+        name_ok(user)
+        ziel = ordnerpfad(user, ordner)
+        if not ziel.is_dir():
+            raise HTTPException(404, "Spiel nicht gefunden")
+        shutil.rmtree(ziel)
+        store.ereignis(user, "gelöscht (Admin)", ordner)
+
+    @app.get("/intern/ereignisse", dependencies=[Depends(intern)])
+    def i_ereignisse():
+        return store.ereignisse()
 
     return app
 

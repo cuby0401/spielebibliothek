@@ -1,0 +1,15 @@
+.admin { max-width: 1150px; }
+.reiter { display: flex; gap: 0.3rem; flex-wrap: wrap; border-bottom: 1px solid var(--linie); margin-bottom: 1rem; }
+.reiter a { padding: 0.5rem 0.9rem; text-decoration: none; border-radius: 6px 6px 0 0; color: var(--leise); }
+.reiter a.aktiv { color: var(--text); background: var(--flaeche); border: 1px solid var(--linie); border-bottom-color: var(--flaeche); margin-bottom: -1px; font-weight: 600; }
+.zahl-marke { background: #e9b949; color: #2b1d00; border-radius: 999px; padding: 0 0.45rem; font-size: 0.75rem; font-weight: 700; }
+.kacheln-klein { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom: 1rem; }
+.kennzahl { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 0.7rem 0.9rem; }
+.kennzahl .wert { font-size: 1.5rem; font-weight: 700; }
+.kennzahl .text { color: var(--leise); font-size: 0.85rem; }
+.admin .zeile { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.admin pre { background: var(--grund); border: 1px solid var(--linie); border-radius: 6px; padding: 0.5rem; max-height: 14rem; overflow: auto; font-size: 0.8rem; white-space: pre-wrap; }
+.admin .filter { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: end; margin-bottom: 0.8rem; }
+.admin .filter label { display: grid; gap: 0.2rem; font-size: 0.85rem; }
+.admin input, .admin select, .admin textarea { font: inherit; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); }
+.hinweis-box { background: var(--flaeche); border-left: 3px solid #e9b949; padding: 0.5rem 0.8rem; border-radius: 4px; margin: 0.6rem 0; }

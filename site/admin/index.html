@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin – Spielebibliothek</title>
+  <link rel="stylesheet" href="/style.css?v=__VERSION__">
+  <link rel="stylesheet" href="/admin/admin.css?v=__VERSION__">
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="/">Spielebibliothek · Admin</a>
+    <nav><a class="knopf leise" href="/">← Zur Bibliothek</a></nav>
+  </header>
+  <p id="abgelaufen" class="abgelaufen" hidden>Deine Anmeldung ist abgelaufen. <a href="">Seite neu laden</a></p>
+  <main class="admin">
+    <nav class="reiter" id="reiter">
+      <a href="#uebersicht">Übersicht</a>
+      <a href="#spiele">Spiele</a>
+      <a href="#benutzer">Benutzer</a>
+      <a href="#spielstaende">Spielstände</a>
+      <a href="#antraege">Anträge <span id="offen-zahl" class="zahl-marke" hidden></span></a>
+    </nav>
+    <p id="meldung" class="meldung" hidden></p>
+    <section id="inhalt"></section>
+  </main>
+  <script src="/lib/bridge.js?v=__VERSION__"></script>
+  <script src="/konto.js?v=__VERSION__"></script>
+  <script src="/admin/admin.js?v=__VERSION__"></script>
+</body>
+</html>

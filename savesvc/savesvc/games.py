@@ -1,10 +1,13 @@
 """Spiele finden: Ordner-Scan unter /spiele/<benutzer>/<spiel>/ plus game.json."""
 
 import json
+import logging
 import re
 from pathlib import Path
 
 from .auth import BENUTZER_MUSTER
+
+log = logging.getLogger("savesvc.games")
 
 ORDNER_MUSTER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 DATEI_MUSTER = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._/-]{0,199}$")
@@ -86,6 +89,16 @@ def _text(wert, laenge: int) -> str | None:
     return wert.strip()[:laenge] if isinstance(wert, str) and wert.strip() else None
 
 
+def _geaendert(ordner: Path) -> str | None:
+    from datetime import datetime, timezone
+    try:
+        datei = ordner / "index.html"
+        zeit = (datei if datei.is_file() else ordner).stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(zeit, timezone.utc).isoformat(timespec="seconds")
+
+
 def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
     ordner = spiele_dir / benutzer / ordner_name
     daten, warnung = meta(ordner)
@@ -102,6 +115,7 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         "leaderboard": bestenliste_einstellungen(ordner),
         "leaderboardSeason": season(ordner),
         "complete": (ordner / "index.html").is_file(),
+        "geaendert": _geaendert(ordner),
         "warning": warnung,
     }
 
@@ -113,8 +127,16 @@ def alle(spiele_dir: Path) -> list[dict]:
     for benutzer in sorted(p for p in spiele_dir.iterdir() if p.is_dir() and not p.is_symlink()):
         if not BENUTZER_MUSTER.match(benutzer.name):
             continue  # z. B. #recycle
-        for ordner in sorted(p for p in benutzer.iterdir() if p.is_dir() and not p.is_symlink()):
+        try:
+            ordner_liste = sorted(p for p in benutzer.iterdir() if p.is_dir() and not p.is_symlink())
+        except OSError as fehler:   # ein unlesbarer Ordner darf nicht die ganze Liste kippen
+            log.warning("Spielordner %s nicht lesbar: %s", benutzer.name, fehler)
+            continue
+        for ordner in ordner_liste:
             if ORDNER_MUSTER.match(ordner.name):
-                ergebnis.append(beschreibung(spiele_dir, benutzer.name, ordner.name))
+                try:
+                    ergebnis.append(beschreibung(spiele_dir, benutzer.name, ordner.name))
+                except OSError as fehler:
+                    log.warning("Spiel %s/%s nicht lesbar: %s", benutzer.name, ordner.name, fehler)
     ergebnis.sort(key=lambda s: s["title"].lower())
     return ergebnis

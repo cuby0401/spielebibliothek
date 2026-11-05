@@ -1,6 +1,7 @@
 """Anmeldung: Cloudflare-Access-JWT prüfen und E-Mail auf Benutzernamen abbilden."""
 
 import logging
+import os
 import re
 import threading
 from pathlib import Path
@@ -43,6 +44,23 @@ class Benutzerliste:
             neu[str(email).strip().lower()] = name
         self._zuordnung, self._stand = neu, stand
         log.info("users.yaml geladen: %d Benutzer", len(neu))
+
+    def alle(self) -> dict[str, str]:
+        with self._sperre:
+            self._neu_laden()
+            return dict(self._zuordnung)
+
+    def speichern(self, zuordnung: dict[str, str]) -> None:
+        """users.yaml neu schreiben (atomar). Kommentare der alten Datei gehen dabei verloren."""
+        kopf = ("# Login-E-Mail (Cloudflare Access) → Benutzername. Verwaltet über das Admin-Panel\n"
+                "# (games.cuby0401.uk/admin) – Änderungen per Hand sind ebenfalls möglich und wirken sofort.\n\n")
+        zeilen = "".join(f"{yaml.safe_dump({e: n}, allow_unicode=True).strip()}\n" for e, n in sorted(zuordnung.items(), key=lambda x: x[1]))
+        tmp = self.pfad.with_name(f".{self.pfad.name}.neu")
+        tmp.write_text(kopf + zeilen, encoding="utf-8")
+        os.chmod(tmp, 0o660)   # Gruppenbits = ACL-Maske: Sebi und der Upload-Dienst behalten ihre Rechte
+        tmp.replace(self.pfad)
+        with self._sperre:
+            self._stand = None
 
     def namen(self) -> set[str]:
         with self._sperre:

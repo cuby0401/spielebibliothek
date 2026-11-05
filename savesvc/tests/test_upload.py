@@ -192,3 +192,25 @@ def test_cli_entwickler_anlegen(umgebung, tmp_path, monkeypatch, capsys):
     assert up.Entwickler(tmp_path / "ud" / "upload.db").pruefen("paul", pw)
     assert main(["entwickler", "sperren", "paul"]) == 0
     assert not up.Entwickler(tmp_path / "ud" / "upload.db").vorhanden("paul")
+
+
+def test_intern_nur_mit_token(uclient, monkeypatch, umgebung):
+    assert uclient.get("/intern/entwickler").status_code == 403          # kein Token gesetzt → immer gesperrt
+
+
+def test_intern_mit_token(umgebung, rsa_schluessel, token, tmp_path, monkeypatch):
+    monkeypatch.setenv("INTERN_TOKEN", "geheim-123")
+    e = Einstellungen(team_domain=TEAM, audience=AUD_UPLOAD, users_file=umgebung.users,
+                      spiele_dir=umgebung.spiele, db_path=tmp_path / "x.db", dev_user=None)
+    (tmp_path / "ud").mkdir()
+    c = TestClient(up.erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key()), daten=tmp_path / "ud"))
+    t = {"X-Intern-Token": "geheim-123"}
+    assert c.get("/intern/entwickler", headers={"X-Intern-Token": "falsch"}).status_code == 403
+    r = c.post("/intern/entwickler", json={"name": "emil"}, headers=t)
+    assert r.status_code == 201 and len(r.json()["passwort"]) == 20 and (umgebung.spiele / "emil").is_dir()
+    assert c.post("/intern/entwickler", json={"name": "emil"}, headers=t).status_code == 409
+    assert len(c.post("/intern/entwickler/emil/passwort", headers=t).json()["passwort"]) == 20
+    assert [x["player"] for x in c.get("/intern/entwickler", headers=t).json()] == ["emil"]
+    assert c.delete("/intern/spiele/paul/snake", headers=t).status_code == 204 and not (umgebung.spiele / "paul" / "snake").exists()
+    assert c.delete("/intern/entwickler/emil", headers=t).status_code == 204
+    assert {x["aktion"] for x in c.get("/intern/ereignisse", headers=t).json()} >= {"Upload-Konto angelegt", "gelöscht (Admin)"}

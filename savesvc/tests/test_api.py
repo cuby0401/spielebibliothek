@@ -34,7 +34,7 @@ def test_unbekannte_email_403(client):
 
 
 def test_me_und_grossschreibung(client):
-    assert client.get("/api/me", headers=client.als()).json() == {"player": "seb", "uploader": True}
+    assert client.get("/api/me", headers=client.als()).json() == {"player": "seb", "uploader": True, "admin": True}
     assert client.get("/api/me", headers=client.als("PAUL@example.COM")).json()["player"] == "paul"
 
 
@@ -44,7 +44,7 @@ def test_users_yaml_wird_neu_gelesen(client, umgebung):
     umgebung.users.write_text("seb@example.com: seb\nneu@example.com: neu\n")
     os.utime(umgebung.users, (time.time() + 5, time.time() + 5))
     # nur spielen: kein eigener Spielordner → kein Upload-Link
-    assert client.get("/api/me", headers=client.als("neu@example.com")).json() == {"player": "neu", "uploader": False}
+    assert client.get("/api/me", headers=client.als("neu@example.com")).json() == {"player": "neu", "uploader": False, "admin": False}
 
 
 def test_ohne_login_kein_404_leck(client):
@@ -147,3 +147,15 @@ def test_dev_user_ohne_freigabe_verweigert(monkeypatch):
     monkeypatch.delenv("DEV_ALLOW", raising=False)
     with pytest.raises(SystemExit):
         laden()
+
+
+def test_unlesbarer_ordner_kippt_liste_nicht(client, umgebung, monkeypatch):
+    from pathlib import Path
+    echt = Path.iterdir
+    def iterdir(self):
+        if self.name == "paul":
+            raise PermissionError("kein Zugriff")
+        return echt(self)
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    ids = {s["id"] for s in client.get("/api/games", headers=client.als()).json()}
+    assert ids == {"seb/zaehler"}
