@@ -411,3 +411,14 @@ def test_loeschen_raeumt_alles_weg(uclient, umgebung):
     hoch(c, "weg"); veroeff(c, "weg"); hoch(c, "weg"); veroeff(c, "weg"); hoch(c, "weg")
     assert c.delete("/api/upload/spiele/weg", headers=c.als()).status_code == 204
     assert not [p for p in (umgebung.spiele / "paul").iterdir() if "weg" in p.name]
+
+
+def test_speicher_kontingent(uclient, umgebung, monkeypatch):
+    c = angemeldeter(uclient)
+    monkeypatch.setenv("UPLOAD_KONTINGENT_MB", "10")
+    assert c.get("/api/upload/status", headers=c.als()).json()["speicher"]["grenze"] == 10 * 1024 * 1024
+    gross = zip_bytes({"index.html": GS, "daten.bin": b"x" * (11 * 1024 * 1024)})
+    r = c.post("/api/upload/spiele/riesig", files={"datei": ("s.zip", gross, "application/zip")}, headers=c.als())
+    assert r.status_code == 413 and "Speicher ist voll" in r.json()["detail"]
+    assert not (umgebung.spiele / "paul" / "riesig~entwurf").exists()
+    assert hoch(c, "klein").status_code == 200

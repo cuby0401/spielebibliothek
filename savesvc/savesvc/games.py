@@ -85,6 +85,42 @@ def bestenliste_einstellungen(ordner: Path) -> dict:
     }
 
 
+TAGS_MAX = 5
+ERFOLG_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
+ERFOLGE_MAX = 50
+
+
+def tags(daten: dict) -> list[str]:
+    """Kategorien aus der game.json ("tags": ["Puzzle", "Wörter"]) – höchstens 5, je 20 Zeichen."""
+    roh = daten.get("tags") if isinstance(daten.get("tags"), list) else []
+    ergebnis, gesehen = [], set()
+    for t in roh:
+        t = _text(t, 20)
+        if t and t.lower() not in gesehen:
+            gesehen.add(t.lower()); ergebnis.append(t)
+        if len(ergebnis) == TAGS_MAX:
+            break
+    return ergebnis
+
+
+def erfolge(ordner: Path) -> list[dict]:
+    """Erfolge aus der game.json: [{ "id", "titel", "beschreibung", "bild", "geheim" }] (Zentrale 1.2.0)."""
+    roh = meta(ordner)[0].get("erfolge")
+    ergebnis, ids = [], set()
+    for e in roh if isinstance(roh, list) else []:
+        if not isinstance(e, dict) or not isinstance(e.get("id"), str) or not ERFOLG_ID.match(e["id"]) or e["id"] in ids:
+            continue
+        bild = e.get("bild")
+        if not (isinstance(bild, str) and DATEI_MUSTER.match(bild) and ".." not in bild and (ordner / bild).is_file()):
+            bild = None
+        ids.add(e["id"])
+        ergebnis.append({"id": e["id"], "titel": _text(e.get("titel"), 60) or e["id"],
+                         "beschreibung": _text(e.get("beschreibung"), 200) or "", "bild": bild, "geheim": e.get("geheim") is True})
+        if len(ergebnis) == ERFOLGE_MAX:
+            break
+    return ergebnis
+
+
 def _text(wert, laenge: int) -> str | None:
     return wert.strip()[:laenge] if isinstance(wert, str) and wert.strip() else None
 
@@ -144,6 +180,8 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         "geaendert": _geaendert(ordner),
         **_version_und_neu(spiele_dir / benutzer, ordner_name, ordner),
         "warning": warnung,
+        "tags": tags(daten),
+        "erfolgeAnzahl": len(erfolge(ordner)),
     }
 
 

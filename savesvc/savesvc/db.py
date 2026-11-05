@@ -50,6 +50,18 @@ CREATE TABLE IF NOT EXISTS entwurf_tests (
     id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, player TEXT NOT NULL, art TEXT NOT NULL,
     ok INTEGER NOT NULL DEFAULT 1, text TEXT, zeit TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS entwurf_tests_spiel ON entwurf_tests (game, zeit);
+-- Zentrale 1.2.0: Spielzeit, Meldungen (Glocke), Erfolge, Spiel der Woche
+CREATE TABLE IF NOT EXISTS spielzeit (
+    player TEXT NOT NULL, game TEXT NOT NULL, sekunden INTEGER NOT NULL DEFAULT 0, sitzungen INTEGER NOT NULL DEFAULT 0,
+    zuletzt TEXT, PRIMARY KEY (player, game));
+CREATE TABLE IF NOT EXISTS meldungen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, an TEXT NOT NULL, text TEXT NOT NULL, link TEXT, zeit TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS meldungen_an ON meldungen (an, id);
+CREATE TABLE IF NOT EXISTS meldungen_gelesen (player TEXT PRIMARY KEY, bis_id INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS erfolge (
+    player TEXT NOT NULL, game TEXT NOT NULL, erfolg TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game, erfolg));
+CREATE TABLE IF NOT EXISTS spiel_der_woche (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, start TEXT NOT NULL, ende TEXT NOT NULL);
 -- Daumen hoch je Spieler und Spiel (Idee „Bewertung“, 05.11.2026)
 CREATE TABLE IF NOT EXISTS daumen (
     player TEXT NOT NULL, game TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game));
@@ -265,10 +277,105 @@ class Datenbank:
             v.execute("DELETE FROM save_history WHERE game=?", (game,))
             v.execute("DELETE FROM entwurf_tests WHERE game=?", (game,))
             v.execute("DELETE FROM save_vor_update WHERE game=?", (game,))
+            v.execute("DELETE FROM erfolge WHERE game=?", (game,))
 
     def fehler_seit(self, game: str, seit: str) -> int:
         with self.verbindung() as v:
             return v.execute("SELECT COALESCE(SUM(anzahl), 0) FROM fehler WHERE game=? AND letztes >= ?", (game, seit)).fetchone()[0]
+
+    # --- Spielzeit (Zentrale 1.2.0) ---
+
+    def spielzeit_dazu(self, player: str, game: str, sekunden: int, neue_sitzung: bool) -> None:
+        with self.verbindung() as v:
+            v.execute("""INSERT INTO spielzeit (player, game, sekunden, sitzungen, zuletzt) VALUES (?,?,?,?,?)
+                         ON CONFLICT (player, game) DO UPDATE SET sekunden=sekunden+excluded.sekunden,
+                           sitzungen=sitzungen+excluded.sitzungen, zuletzt=excluded.zuletzt""",
+                      (player, game, sekunden, int(neue_sitzung), jetzt()))
+
+    def spielzeit_je_spiel(self) -> dict[str, dict]:
+        with self.verbindung() as v:
+            return {z["game"]: {"sekunden": z["s"], "spieler": z["n"], "sitzungen": z["t"]} for z in v.execute(
+                f"SELECT game, SUM(sekunden) AS s, COUNT(*) AS n, SUM(sitzungen) AS t FROM spielzeit WHERE {ECHT} GROUP BY game")}
+
+    def spielzeit_von(self, player: str) -> dict[str, dict]:
+        with self.verbindung() as v:
+            return {z["game"]: {"sekunden": z["sekunden"], "sitzungen": z["sitzungen"], "zuletzt": z["zuletzt"]}
+                    for z in v.execute("SELECT * FROM spielzeit WHERE player=?", (player,))}
+
+    # --- Meldungen / Glocke (Zentrale 1.2.0) ---
+
+    def melden(self, an: str, text: str, link: str | None = None) -> None:
+        """an = Spielername oder "*" (alle)."""
+        with self.verbindung() as v:
+            v.execute("INSERT INTO meldungen (an, text, link, zeit) VALUES (?,?,?,?)", (an, text[:300], link, jetzt()))
+            v.execute("DELETE FROM meldungen WHERE id NOT IN (SELECT id FROM meldungen ORDER BY id DESC LIMIT 5000)")
+
+    def meldungen(self, player: str, limit: int = 30) -> dict:
+        with self.verbindung() as v:
+            z = v.execute("SELECT bis_id FROM meldungen_gelesen WHERE player=?", (player,)).fetchone()
+            bis = z["bis_id"] if z else 0
+            liste = [dict(r) for r in v.execute(
+                "SELECT id, text, link, zeit FROM meldungen WHERE an IN (?, '*') ORDER BY id DESC LIMIT ?", (player, limit))]
+            neu = v.execute("SELECT COUNT(*) FROM meldungen WHERE an IN (?, '*') AND id > ?", (player, bis)).fetchone()[0]
+        for m in liste:
+            m["neu"] = m["id"] > bis
+        return {"ungelesen": neu, "liste": liste}
+
+    def meldungen_gelesen(self, player: str) -> None:
+        with self.verbindung() as v:
+            hoechste = v.execute("SELECT COALESCE(MAX(id), 0) FROM meldungen").fetchone()[0]
+            v.execute("INSERT INTO meldungen_gelesen (player, bis_id) VALUES (?,?) ON CONFLICT (player) DO UPDATE SET bis_id=excluded.bis_id",
+                      (player, hoechste))
+
+    # --- Erfolge (Zentrale 1.2.0) ---
+
+    def erfolg_freischalten(self, player: str, game: str, erfolg: str) -> bool:
+        with self.verbindung() as v:
+            return v.execute("INSERT OR IGNORE INTO erfolge (player, game, erfolg, zeit) VALUES (?,?,?,?)",
+                             (player, game, erfolg, jetzt())).rowcount > 0
+
+    def erfolge_von(self, player: str, game: str | None = None) -> list[dict]:
+        with self.verbindung() as v:
+            sql, werte = "SELECT game, erfolg, zeit FROM erfolge WHERE player=?", [player]
+            if game:
+                sql += " AND game=?"; werte.append(game)
+            return [dict(z) for z in v.execute(sql + " ORDER BY zeit", werte)]
+
+    # --- Spiel der Woche (Zentrale 1.2.0) ---
+
+    def sdw_setzen(self, game: str, start: str, ende: str) -> None:
+        with self.verbindung() as v:
+            v.execute("UPDATE spiel_der_woche SET ende=? WHERE ende > ?", (start, start))   # laufendes beenden
+            v.execute("INSERT INTO spiel_der_woche (game, start, ende) VALUES (?,?,?)", (game, start, ende))
+
+    def sdw_beenden(self) -> None:
+        with self.verbindung() as v:
+            v.execute("UPDATE spiel_der_woche SET ende=? WHERE ende > ?", (jetzt(), jetzt()))
+
+    def sdw_aktuell(self) -> dict | None:
+        t = jetzt()
+        with self.verbindung() as v:
+            z = v.execute("SELECT * FROM spiel_der_woche WHERE start <= ? AND ende > ? ORDER BY id DESC LIMIT 1", (t, t)).fetchone()
+        return dict(z) if z else None
+
+    def bestenliste_zeitraum(self, game: str, von: str, bis: str, aufsteigend: bool, limit: int) -> list[dict]:
+        """Bester Eintrag je Spieler in einem Zeitraum (Spiel der Woche) – unabhängig von Seasons."""
+        richtung = "ASC" if aufsteigend else "DESC"
+        with self.verbindung() as v:
+            zeilen = v.execute(
+                f"""SELECT player, score, created_at AS erreicht, werte FROM (
+                        SELECT player, score, created_at, werte,
+                               ROW_NUMBER() OVER (PARTITION BY player ORDER BY score {richtung}, created_at ASC, id ASC) AS nr
+                        FROM scores WHERE game=? AND created_at >= ? AND created_at < ?)
+                    WHERE nr = 1 ORDER BY score {richtung}, erreicht ASC LIMIT ?""",
+                (game, von, bis, limit)).fetchall()
+        return [{"rank": i + 1, "player": z["player"], "score": z["score"], "at": z["erreicht"],
+                 "werte": json.loads(z["werte"]) if z["werte"] else {}} for i, z in enumerate(zeilen)]
+
+    def antrag(self, antrag_id: int) -> dict | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT * FROM antraege WHERE id=?", (antrag_id,)).fetchone()
+        return dict(z) if z else None
 
     # --- Simulation („Ansicht als …“) ---
 
@@ -278,8 +385,10 @@ class Datenbank:
             raise ValueError("nur simulierte Konten")
         with self.verbindung() as v:
             n = v.execute("DELETE FROM saves WHERE player=?", (player,)).rowcount
-            for tabelle in ("save_history", "save_vor_update", "einstellungen", "daumen", "entwurf_tests"):
+            for tabelle in ("save_history", "save_vor_update", "einstellungen", "daumen", "entwurf_tests",
+                            "spielzeit", "erfolge", "meldungen_gelesen"):
                 v.execute(f"DELETE FROM {tabelle} WHERE player=?", (player,))
+            v.execute("DELETE FROM meldungen WHERE an=?", (player,))
         return n
 
     # --- Daumen hoch ---

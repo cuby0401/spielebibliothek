@@ -25,8 +25,14 @@ BESTENLISTE (optional)
 - Einfach: await GameSave.submitScore(zahl). Mit mehreren Werten: await GameSave.submitScore({ level, zeit }) und in der game.json unter "leaderboard": "rangiertNach" (der Zahlenwert, der den Platz bestimmt) und "spalten": [{ "key": "level", "label": "Level", "format": "zahl" }] (format: zahl | dezimal | zeit (Millisekunden) | text).
 - Ändere rangiertNach, order oder die Spalten später nur, wenn es nötig ist – dann wird eine neue Season empfohlen.
 
+ERFOLGE UND KATEGORIEN (optional, empfohlen)
+- Kategorien in der game.json: "tags": ["Puzzle", "Wörter"] (höchstens 5, je 20 Zeichen) – damit wird das Spiel in der Suche gefunden.
+- Erfolge in der game.json: "erfolge": [{ "id": "erster-sieg", "titel": "Erster Sieg", "beschreibung": "Gewinne eine Runde", "geheim": false }]
+  (id nur a–z, 0–9, _ und -, max. 40 Zeichen, nie umbenennen). Im Spiel freischalten: await GameSave.erfolg("erster-sieg") (mit try/catch).
+  Die Bibliothek zeigt selbst eine Meldung, das Spiel muss nichts anzeigen.
+
 GAME.JSON (Pflicht)
-{ "title": "...", "description": "ein Satz", "thumbnail": "thumb.svg", "saveVersion": 1,
+{ "title": "...", "description": "ein Satz", "thumbnail": "thumb.svg", "saveVersion": 1, "tags": ["..."],
   "leaderboard": { "enabled": true, "order": "desc", "label": "Punkte" } }
 Dazu ein Vorschaubild thumb.svg oder thumb.png im Format 16:9.
 

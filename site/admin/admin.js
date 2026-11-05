@@ -29,7 +29,9 @@ async function uebersicht(c) {
 		kz(d.spiele, "Spiele" + (d.testspiele ? ` (+${d.testspiele} Testspiele)` : "") + (d.offline ? ` · ${d.offline} offline` : "")),
 		kz(d.zaehler.saves, "Spielstände"),
 		kz(d.zaehler.scores, "Bestenlisten-Einträge"), kz(d.offeneAntraege, "offene Anträge"),
-		kz(groesse(d.datenbank), "Datenbank"), kz(d.sicherung ? datumZeit(d.sicherung) : "–", "letzte DB-Kopie fürs Backup")));
+		kz(groesse(d.datenbank), "Datenbank"),
+		d.platte && d.platte.gesamt ? kz(groesse(d.platte.frei), "frei auf der NAS" + (d.platte.knapp ? " ⚠" : "")) : null, kz(d.sicherung ? datumZeit(d.sicherung) : "–", "letzte DB-Kopie fürs Backup")));
+	if (d.platte && d.platte.knapp) c.append(h("p", { class: "meldung fehler", text: `⚠ Speicher auf der NAS wird knapp: nur noch ${groesse(d.platte.frei)} von ${groesse(d.platte.gesamt)} frei. Alte Versionen löschen oder Kontingente (UPLOAD_KONTINGENT_MB) senken.` }));
 	c.append(h("p", { class: "leise", text: "Backup: borgmatic sichert jede Nacht um 02:00 – den Erfolg zeigt das borgmatic-Log auf der NAS (docker logs borgmatic)." }));
 	await zentraleZeigen(c);
 	// „Ansicht als …“ (E26/E27): gilt für diesen Tab, beendet wird über das lila Band in der Bibliothek
@@ -48,8 +50,8 @@ async function uebersicht(c) {
 	c.append(h("h2", { text: "Letzte Uploads und Konto-Änderungen" }), tabelle(["Zeit", "Wer", "Was", "Ordner"],
 		d.uploads.map((u) => u.fehler ? h("tr", {}, h("td", { colspan: "4", text: u.fehler }))
 			: h("tr", {}, h("td", { text: datumZeit(u.zeit) }), h("td", { text: u.player }), h("td", { text: u.aktion + (u.dateien ? ` (${u.dateien} Dateien)` : "") }), h("td", { text: u.ordner || "" })))));
-	c.append(h("h2", { text: "Speicher je Entwickler" }), tabelle(["Entwickler", "Spieldateien"],
-		Object.entries(d.speicher).map(([n, b]) => h("tr", {}, h("td", { text: n }), h("td", { text: groesse(b) })))));
+	c.append(h("h2", { text: "Speicher je Entwickler" }), tabelle(["Entwickler", "Live-Spiele", "Kontingent (inkl. Entwürfe und Versionen)"],
+		Object.entries(d.speicher).map(([n, b]) => h("tr", {}, h("td", { text: n }), h("td", { text: groesse(b) }), h("td", { text: groesse(d.kontingent) })))));
 }
 
 // Version der Zentrale (E39): site/zentrale.json und CHANGELOG.md schreibt scripts/deploy.sh
@@ -66,6 +68,9 @@ async function zentraleZeigen(c) {
 // ---------- Spiele ----------
 async function spieleSeite(c) {
 	spieleCache = await api("GET", "/spiele");
+	const sdw = await Bridge.json("GET", "/api/spiel-der-woche").catch(() => null);
+	if (sdw) c.append(h("p", { class: "hinweis-box" }, `⭐ Spiel der Woche: „${sdw.title}“ bis ${datumZeit(sdw.ende)} `,
+		knopf("Beenden", async () => { await Bridge.json("DELETE", "/api/admin/spiel-der-woche"); meldung("Spiel der Woche beendet."); zeigen(); })));
 	const zeilen = spieleCache.map((s) => {
 		const schalter = (feld, text) => h("label", { class: "haken" }, h("input", { type: "checkbox", checked: !!s[feld],
 			onchange: (e) => sicher(async () => { await api("PATCH", "/spiele/" + idPfad(s.id), { [feld]: e.target.checked }); meldung(`${s.title}: ${text} ${e.target.checked ? "an" : "aus"}`); }) }), text);
@@ -73,7 +78,7 @@ async function spieleSeite(c) {
 			h("td", {}, h("strong", { text: s.title }),
 				h("div", { class: "leise", text: s.id + (s.version ? " · v" + s.version : "") + (s.complete ? "" : " · unvollständig") }),
 				s.complete ? h("a", { href: "/#/spiel/" + s.id, text: "Öffnen" }) : null),
-			h("td", { text: String(s.spieler) }), h("td", { text: String(s.daumen || 0) }), h("td", { text: datumZeit(s.zuletzt) }),
+			h("td", { text: String(s.spieler) }), h("td", { text: String(s.daumen || 0) }), h("td", { text: dauer(s.spielzeit) }), h("td", { text: datumZeit(s.zuletzt) }),
 			h("td", { text: s.leaderboard.enabled ? `S${s.leaderboardSeason} · ${s.scores}` : "aus" }),
 			h("td", { text: s.fehler && s.fehler.arten ? `${s.fehler.arten24h || 0} neu · ${s.fehler.anzahl}×` : "–" }),
 			h("td", {}, h("div", { class: "zeile" }, schalter("versteckt", "ausblenden"), schalter("hervorgehoben", "empfehlen"), schalter("testspiel", "Testspiel"),
@@ -84,6 +89,11 @@ async function spieleSeite(c) {
 					}) }), "offline" + (s.offline && s.offlineGrund ? ` (${s.offlineGrund})` : "")))),
 			h("td", {}, h("div", { class: "zeile" },
 				s.leaderboard.enabled ? knopf("Bestenliste", () => bestenlisteDetail(c, s)) : null,
+				s.leaderboard.enabled && !s.testspiel ? knopf(sdw && sdw.id === s.id ? "⭐ Spiel der Woche" : "Spiel der Woche", async () => {
+					if (sdw && sdw.id === s.id) return;
+					if (!confirm(`„${s.title}“ für 7 Tage zum Spiel der Woche machen? Alle bekommen eine Meldung, es gibt eine eigene Wochen-Bestenliste.` + (sdw ? `\nDas laufende („${sdw.title}“) endet dann.` : ""))) return;
+					await Bridge.json("PUT", "/api/admin/spiel-der-woche/" + idPfad(s.id)); meldung(`„${s.title}“ ist Spiel der Woche.`); zeigen();
+				}, sdw && sdw.id === s.id ? "" : "leise") : null,
 				s.leaderboard.enabled ? knopf("Neue Season", async () => {
 					if (!confirm(`Neue Season für „${s.title}“?`)) return;
 					const r = await Bridge.json("POST", "/api/entwickler/season/" + idPfad(s.id)); meldung(`Season ${r.season} begonnen.`); zeigen();
@@ -95,7 +105,7 @@ async function spieleSeite(c) {
 				}, "gefahr"))));
 	});
 	c.append(h("p", { class: "leise", text: "„Ausblenden“ versteckt ein Spiel in der Übersicht für alle außer dir (die Dateien bleiben unter play erreichbar). „Empfehlen“ heftet es mit Marke nach den Favoriten oben an. „Testspiel“ nimmt es für alle aus der Übersicht – auch für dich; öffnen über „Öffnen“ hier. Für Tutorials und Testwerkzeuge wie Spike, Böse oder die Bestenlisten-Vorlage." }),
-		tabelle(["Spiel", "Spieler", "👍", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
+		tabelle(["Spiel", "Spieler", "👍", "Spielzeit", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
 	const fehler = await Bridge.json("GET", "/api/entwickler/fehler?alle=true");
 	c.append(h("h2", { text: "Fehlerberichte aller Spiele" }),
 		fehler.length ? tabelle(["Spiel", "Fehler", "Ort", "Anzahl", "Zuletzt", "Browser", ""], fehler.map((f) => h("tr", {},

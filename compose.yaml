@@ -59,6 +59,8 @@ services:
       INTERN_TOKEN: ${INTERN_TOKEN:?INTERN_TOKEN fehlt in .env – deploy.sh legt es an}
       UPLOAD_URL: http://upload:8000
       BACKUP_UHRZEIT: "01:45"
+      # Speicher je Entwickler in MB (Anzeige im Admin-Panel; muss zum Upload-Dienst passen), in .env änderbar
+      UPLOAD_KONTINGENT_MB: ${UPLOAD_KONTINGENT_MB:-1024}
       # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
     volumes:
       - /volume1/games/data:/data
@@ -90,6 +92,8 @@ services:
       ACCESS_AUD: 1437ffb5ec6d16a425902f5569fea23258ab8ff2cafdfc0d52c1b968b9657351
       UPLOAD_DATA: /data
       INTERN_TOKEN: ${INTERN_TOKEN:?INTERN_TOKEN fehlt in .env – deploy.sh legt es an}
+      # Speicher je Entwickler in MB (Spiele + Entwürfe + aufgehobene Versionen), in .env änderbar
+      UPLOAD_KONTINGENT_MB: ${UPLOAD_KONTINGENT_MB:-1024}
     volumes:
       - /volume1/games/spiele:/spiele
       # Passwort-Hashes und Sitzungs-Schlüssel (Ordner liegt unter filebrowser/, dort hat UID 10021 schon Rechte)

@@ -55,6 +55,9 @@
       stand.rekord = Math.max(stand.rekord, stand.punkte);
       zeigen();
       speichern();                 // 5) sofort speichern, nicht erst beim Beenden
+      // 7) Erfolge: in der game.json unter "erfolge" festgelegt. Die Bibliothek zeigt selbst eine Meldung.
+      if (stand.punkte === 10) GameSave.erfolg("zehn").catch(() => {});
+      if (stand.punkte === 100) GameSave.erfolg("hundert").catch(() => {});
     };
 
     $("einreichen").onclick = async () => {

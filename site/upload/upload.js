@@ -292,6 +292,13 @@ async function start() {
 	if (s.gesperrt) meldung("Zu viele falsche Passwörter – bitte 15 Minuten warten.", "fehler");
 	if (!s.angemeldet) { zeige("anmeldung"); $("passwort").focus(); return; }
 	zeige("bereich");
+	if (s.speicher) {   // Kontingent je Entwickler (Zentrale 1.2.0)
+		const anteil = s.speicher.belegt / s.speicher.grenze;
+		$("speicher").textContent = `Dein Speicher: ${groesse(s.speicher.belegt)} von ${groesse(s.speicher.grenze)} belegt` +
+			(anteil > 0.8 ? " – fast voll. Alte Versionen oder Spiele löschen, oder Seb um mehr Platz bitten." : " (Spiele, Entwürfe und aufgehobene Versionen).");
+		$("speicher").className = "klein " + (anteil > 0.8 ? "warnung" : "leise");
+		$("speicher").hidden = false;
+	}
 	liste();
 }
 

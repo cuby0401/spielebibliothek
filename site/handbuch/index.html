@@ -37,6 +37,7 @@
         <li><a href="#rollback">Zurücksetzen auf eine ältere Version</a></li>
         <li><a href="#bestenliste">Bestenliste gestalten</a></li>
         <li><a href="#gamejson"><code>game.json</code></a></li>
+        <li><a href="#erfolge">Erfolge, Kategorien, Spiel der Woche</a></li>
         <li><a href="#selbst">Was du selbst einstellen kannst – und was nicht</a></li>
         <li><a href="#werkzeuge">Fehler suchen</a></li>
         <li><a href="#checkliste">Checkliste vor jedem Update</a></li>
@@ -103,6 +104,8 @@ await GameSave.submitScore(1250);                // nur mit Bestenliste in game.
 const top = await GameSave.leaderboard();        // [{ rank, player, score, werte }, …]
 const ich = await GameSave.player();             // "paul"
 GameSave.version                                 // "1.2.0" – vergibt die Bibliothek (lokal und im Entwurf: null)
+await GameSave.erfolg("erster-sieg");            // Erfolg freischalten → { neu: true } beim ersten Mal
+const erfolge = await GameSave.erfolge();        // [{ id, titel, …, freigeschaltet }]
 GameSave.available                               // false beim lokalen Testen</code></pre>
     <ul>
       <li>Alle Aufrufe können fehlschlagen – mit <code>try/catch</code> abfangen. Keys: Buchstaben, Ziffern, <code>. _ : -</code>, max. 100 Zeichen.
@@ -239,11 +242,39 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
         <tr><td><code>thumbnail</code></td><td>empfohlen</td><td>Vorschaubild 16:9 im Spielordner (png, jpg, webp, svg)</td></tr>
         <tr><td><code>saveVersion</code></td><td>ja</td><td>Aufbau des Spielstands, startet bei 1, steigt nur bei Strukturänderungen</td></tr>
         <tr><td><code>leaderboard</code></td><td>nein</td><td>Siehe <a href="#bestenliste">Bestenliste</a></td></tr>
+        <tr><td><code>tags</code></td><td>empfohlen</td><td>Kategorien für Suche und Filter, z. B. <code>["Puzzle", "Wörter"]</code> – höchstens 5</td></tr>
+        <tr><td><code>erfolge</code></td><td>nein</td><td>Siehe <a href="#erfolge">Erfolge</a></td></tr>
         <tr><td><code>leaderboardSeason</code></td><td>nein</td><td>Alternative zum Knopf „Neue Season“</td></tr>
         <tr><td><s><code>version</code></s></td><td>–</td><td>Nicht eintragen – die Nummer vergibt die Bibliothek</td></tr>
       </tbody>
     </table></div>
     <p class="leise">Der Autor kommt immer aus deinem Benutzernamen, nicht aus der <code>game.json</code>.</p>
+
+    <h2 id="erfolge">9b. Erfolge, Kategorien, Spiel der Woche</h2>
+    <h3>Erfolge</h3>
+<pre><code>"erfolge": [
+  { "id": "erster-sieg", "titel": "Erster Sieg", "beschreibung": "Gewinne eine Runde" },
+  { "id": "unbesiegt",   "titel": "Unbesiegt",   "beschreibung": "10 Runden ohne Niederlage", "geheim": true },
+  { "id": "sammler",     "titel": "Sammler",     "bild": "bilder/sammler.png" }
+]</code></pre>
+<pre><code>try { await GameSave.erfolg("erster-sieg"); } catch (e) { console.warn(e.message); }</code></pre>
+    <ul>
+      <li>Die <code>id</code> (a–z, 0–9, <code>_</code>, <code>-</code>, max. 40 Zeichen) <strong>nie umbenennen</strong> – sonst verlieren Spieler den Erfolg. Höchstens 50 Erfolge.</li>
+      <li>Die Bibliothek zeigt beim ersten Freischalten selbst eine Meldung („🏆 Erfolg freigeschaltet“) und listet die Erfolge neben dem Spiel und im Profil der Spieler.
+        <code>geheim</code> zeigt Titel und Beschreibung erst nach dem Freischalten.</li>
+      <li>Im Entwurf kannst du Erfolge testen – sie werden beim nächsten Entwurf oder Veröffentlichen wieder gelöscht.</li>
+    </ul>
+    <h3>Kategorien</h3>
+    <p><code>"tags": ["Puzzle", "Wörter"]</code> – Spieler filtern in der Übersicht danach und finden dein Spiel über die Suche. Höchstens 5, je 20 Zeichen.</p>
+    <h3>Spiel der Woche</h3>
+    <p>Seb kann ein Spiel mit Bestenliste für 7 Tage zum Spiel der Woche machen: Banner in der Übersicht, Meldung an alle und eine eigene
+      Bestenliste nur mit Einträgen aus dieser Woche. Für dich ändert sich nichts – <code>submitScore</code> funktioniert wie immer.</p>
+    <h3>Spielzeit und Speicher</h3>
+    <ul>
+      <li>Die Bibliothek misst, wie lange gespielt wird (nur bei sichtbarem Tab). Unter Menü → Meine Spiele siehst du die Spielzeit aller Spieler zusammen.</li>
+      <li>Jeder Entwickler hat <strong>1 GB Speicher</strong> für Spiele, Entwürfe und aufgehobene Versionen. Die Upload-Seite zeigt, wie viel belegt ist.
+        Ist er voll, wird der Upload abgelehnt – alte Spiele löschen oder Seb um mehr Platz bitten.</li>
+    </ul>
 
     <h2 id="selbst">10. Was du selbst einstellen kannst – und was nicht</h2>
     <div class="tabelle-rahmen"><table class="tabelle">

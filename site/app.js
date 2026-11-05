@@ -16,6 +16,9 @@ let ich = { player: null, uploader: false, admin: false };
 let einstellungen = { sortierung: "alphabetisch", favoriten: [], grossansicht: false, bestenliste: true };
 const seiten = {};   // Unterseiten aus dem Benutzermenü (konto.js): name → async (container) => {}
 let letzteRoute = "#/";   // wohin der Zurück-Pfeil einer Unterseite führt
+let suche = "", tagFilter = null;   // Suche und Kategorien in der Übersicht (Zentrale 1.2.0)
+let profilName = null;              // für #/profil/<name>
+const idPfad = (id) => id.split("/").map(encodeURIComponent).join("/");
 
 async function einstellungenSpeichern(aenderung) {
 	Object.assign(einstellungen, aenderung);
@@ -42,6 +45,7 @@ function formatieren(wert, format) {
 }
 
 async function bestenlisteZeigen(spiel, season) {
+	if (season === undefined && spiel.spielDerWoche) season = "woche";   // Spiel der Woche: Wochen-Bestenliste zuerst
 	const liste = el("bl-liste");
 	const hinweis = el("bl-hinweis");
 	el("bl-titel").textContent = "Bestenliste";
@@ -60,16 +64,22 @@ async function bestenlisteZeigen(spiel, season) {
 	}
 	if (aktuellesSpiel !== spiel.id) return; // inzwischen anderes Spiel offen
 
-	el("bl-titel").textContent = "Bestenliste" + (d.rangiertNach === "score" ? " · " + d.label : "");
-	if (d.seasons.length > 1) {
+	el("bl-titel").textContent = (d.woche ? "⭐ Diese Woche" : "Bestenliste") + (d.rangiertNach === "score" ? " · " + d.label : "");
+	if (d.seasons.length > 1 || d.spielDerWoche || d.woche) {
 		const wahl = el("bl-season");
-		wahl.replaceChildren(...d.seasons.slice().reverse().map((s) => {
+		const optionen = d.seasons.slice().reverse().map((s) => {
 			const o = document.createElement("option");
 			o.value = String(s);
 			o.textContent = s === d.currentSeason ? s + " (aktuell)" : String(s);
-			o.selected = s === d.season;
+			o.selected = !d.woche && s === d.season;
 			return o;
-		}));
+		});
+		if (d.spielDerWoche || d.woche) {
+			const o = document.createElement("option");
+			o.value = "woche"; o.textContent = "⭐ Diese Woche"; o.selected = !!d.woche;
+			optionen.unshift(o);
+		}
+		wahl.replaceChildren(...optionen);
 		el("bl-season-wahl").hidden = false;
 	}
 	// Spalten: eigener Rangwert/Zusatzwerte aus der game.json, sonst nur der Score
@@ -81,7 +91,8 @@ async function bestenlisteZeigen(spiel, season) {
 		const li = document.createElement("li");
 		if (e.player === ichSelbst) li.className = "ich";
 		const platz = document.createElement("span"); platz.className = "platz"; platz.textContent = e.rank + ".";
-		const name = document.createElement("span"); name.className = "name"; name.textContent = e.player;
+		const name = document.createElement(e.player.includes("~") ? "span" : "a"); name.className = "name"; name.textContent = e.player;
+		if (!e.player.includes("~")) { name.href = "#/profil/" + encodeURIComponent(e.player); name.title = "Profil von " + e.player; }
 		li.append(platz, name);
 		const werte = document.createElement("span"); werte.className = "werte";
 		for (const s of spalten) {
@@ -103,7 +114,8 @@ async function bestenlisteZeigen(spiel, season) {
 		kopf.append(leer1, leer2, titel);
 		liste.prepend(kopf);
 	}
-	hinweis.textContent = d.entries.length ? "" : (d.season === d.currentSeason ? "Noch keine Einträge – sei die oder der Erste!" : "In dieser Season gab es keine Einträge.");
+	hinweis.textContent = d.entries.length ? "" : d.woche ? "Diese Woche noch keine Einträge – sei die oder der Erste!"
+		: (d.season === d.currentSeason ? "Noch keine Einträge – sei die oder der Erste!" : "In dieser Season gab es keine Einträge.");
 }
 
 function meldung(text) {
@@ -118,8 +130,44 @@ function sortiert(liste) {
 		alphabetisch: (a, b) => a.title.localeCompare(b.title, "de"),
 		zuletzt: (a, b) => (b.zuletztGespielt || "").localeCompare(a.zuletztGespielt || "") || a.title.localeCompare(b.title, "de"),
 		neu: (a, b) => (b.geaendert || "").localeCompare(a.geaendert || ""),
+		meistgespielt: (a, b) => (b.spielzeit || 0) - (a.spielzeit || 0) || a.title.localeCompare(b.title, "de"),
 	}[einstellungen.sortierung] || ((a, b) => a.title.localeCompare(b.title, "de"));
 	return liste.slice().sort((a, b) => (fav.has(b.id) - fav.has(a.id)) || (b.hervorgehoben - a.hervorgehoben) || nach(a, b));
+}
+
+// Kategorien als Filter-Chips (aus "tags" der game.json)
+function tagFilterZeigen(liste) {
+	const alle = [...new Set(liste.flatMap((s) => s.tags || []))].sort((a, b) => a.localeCompare(b, "de"));
+	if (tagFilter && !alle.includes(tagFilter)) tagFilter = null;
+	el("tag-filter").replaceChildren(...alle.map((t) => {
+		const b = document.createElement("button");
+		b.type = "button";
+		b.className = "tag" + (t === tagFilter ? " an" : "");
+		b.textContent = t;
+		b.onclick = () => { tagFilter = tagFilter === t ? null : t; kachelnZeigen(); };
+		return b;
+	}));
+}
+
+// Daumen hoch – im Spiel und auf der Kachel. Eigene Spiele und „Ansicht als …“: nur Anzeige.
+function daumenEigenschaften(spiel) {
+	const eigen = spiel.author === ich.player;
+	return {
+		gesperrt: eigen || !!ich.ansicht,
+		text: "👍" + (spiel.daumen ? " " + spiel.daumen : "") + (eigen ? " · eigenes Spiel" : ""),
+		titel: eigen ? "Eigene Spiele kann man nicht bewerten – die Zahl zeigt die Daumen der anderen"
+			: ich.ansicht ? "In der Ansicht als … wird nicht bewertet"
+			: spiel.meinDaumen ? "Daumen zurücknehmen" : "Daumen hoch – zeigt dem Entwickler, dass dir das Spiel gefällt",
+	};
+}
+async function daumenUmschalten(spiel) {
+	try {
+		const d = await Bridge.json("PUT", "/api/daumen/" + idPfad(spiel.id), { an: !spiel.meinDaumen });
+		spiel.meinDaumen = d.an;
+		spiel.daumen = d.daumen;
+	} catch (e) {
+		if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Daumen nicht gespeichert: " + e.message);
+	}
 }
 
 // „Aktualisiert“: neue Version seit dem letzten Öffnen bzw. Spielen – nur bei Spielen, die man kennt, höchstens 30 Tage
@@ -175,29 +223,29 @@ function daumenZeigen(spiel, entwurf) {
 	const k = el("daumen");
 	k.hidden = !!entwurf;
 	if (entwurf) return;
-	el("daumen-zahl").textContent = spiel.daumen ? String(spiel.daumen) : "";
+	const d = daumenEigenschaften(spiel);
+	k.textContent = d.text;
+	k.title = d.titel;
+	k.disabled = d.gesperrt;
 	k.classList.toggle("an", !!spiel.meinDaumen);
-	const eigen = spiel.author === ich.player;
-	k.disabled = eigen || !!ich.ansicht;
-	k.title = eigen ? "Eigene Spiele kann man nicht bewerten"
-		: ich.ansicht ? "In der Ansicht als … wird nicht bewertet"
-		: spiel.meinDaumen ? "Daumen zurücknehmen" : "Daumen hoch – zeigt dem Entwickler, dass dir das Spiel gefällt";
-	k.onclick = async () => {
-		try {
-			const d = await Bridge.json("PUT", "/api/daumen/" + spiel.id.split("/").map(encodeURIComponent).join("/"), { an: !spiel.meinDaumen });
-			spiel.meinDaumen = d.an;
-			spiel.daumen = d.daumen;
-			daumenZeigen(spiel, false);
-		} catch (e) {
-			if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Daumen nicht gespeichert: " + e.message);
-		}
-	};
+	k.onclick = async () => { await daumenUmschalten(spiel); daumenZeigen(spiel, false); };
 }
 
 function kachelnZeigen() {
 	el("sortierung").value = einstellungen.sortierung;
 	// Testspiele (Admin-Panel) erscheinen nie in der Übersicht – Admins öffnen sie über das Admin-Panel
-	el("kacheln").replaceChildren(...sortiert(spiele.filter((s) => !s.testspiel)).map(kachel));
+	const sichtbar = spiele.filter((s) => !s.testspiel);
+	tagFilterZeigen(sichtbar);
+	const q = suche.trim().toLowerCase();
+	const treffer = sichtbar.filter((s) => (!tagFilter || (s.tags || []).includes(tagFilter)) &&
+		(!q || [s.title, s.description, s.author, ...(s.tags || [])].join(" ").toLowerCase().includes(q)));
+	el("kacheln").replaceChildren(...sortiert(treffer).map(kachel));
+	if (sichtbar.length && !treffer.length) {
+		const leer = document.createElement("p");
+		leer.className = "leise";
+		leer.textContent = "Keine Spiele gefunden.";
+		el("kacheln").append(leer);
+	}
 }
 
 function spielPfad(id) {
@@ -243,6 +291,7 @@ function kachel(spiel) {
 		if (titel) m.title = titel;
 		marken.append(m);
 	};
+	if (spiel.spielDerWoche) marke("⭐ Spiel der Woche", "sdw");
 	if (spiel.offline) marke("offline", "versteckt", spiel.offlineGrund ? "Offline: " + spiel.offlineGrund : "vom Entwickler offline genommen");
 	if (spiel.versteckt) marke("ausgeblendet", "versteckt");
 	else if (spiel.hervorgehoben) marke("Empfohlen");
@@ -255,18 +304,22 @@ function kachel(spiel) {
 	h.textContent = spiel.title;
 	const autor = document.createElement("span");
 	autor.className = "autor";
-	autor.textContent = "von " + spiel.author;
-	if (spiel.daumen) {
-		const d = document.createElement("span");
-		d.className = "daumen-zahl";
-		d.textContent = " · 👍 " + spiel.daumen;
-		d.title = spiel.daumen === 1 ? "1 Daumen hoch" : spiel.daumen + "-mal Daumen hoch";
-		autor.append(d);
-	}
+	autor.textContent = "von " + spiel.author + (spiel.meineSpielzeit >= 60 ? " · du: " + dauer(spiel.meineSpielzeit) : "");
 	const text = document.createElement("p");
 	text.className = "beschreibung";
 	text.textContent = spiel.description;
 	inhalt.append(h, autor, text);
+	if (spiel.tags && spiel.tags.length) {
+		const t = document.createElement("div");
+		t.className = "tags";
+		for (const tag of spiel.tags) {
+			const b = document.createElement("button");
+			b.type = "button"; b.className = "tag klein"; b.textContent = tag;
+			b.onclick = () => { tagFilter = tag; kachelnZeigen(); };
+			t.append(b);
+		}
+		inhalt.append(t);
+	}
 
 	if (spiel.warning) {
 		const w = document.createElement("p");
@@ -285,14 +338,77 @@ function kachel(spiel) {
 		a.setAttribute("aria-disabled", "true");
 		a.title = "index.html fehlt";
 	}
-	inhalt.append(a);
+	const fuss = document.createElement("div");
+	fuss.className = "kachel-fuss";
+	const daumen = document.createElement("button");
+	const dd = daumenEigenschaften(spiel);
+	daumen.type = "button";
+	daumen.className = "knopf leise daumen klein" + (spiel.meinDaumen ? " an" : "");
+	daumen.textContent = dd.text.replace(" · eigenes Spiel", "");
+	daumen.title = dd.titel;
+	daumen.disabled = dd.gesperrt;
+	daumen.onclick = async () => { await daumenUmschalten(spiel); kachelnZeigen(); };
+	fuss.append(a, daumen);
+	inhalt.append(fuss);
 
 	k.append(bild, inhalt);
 	return k;
 }
 
+// ---------- Spielzeit (Zentrale 1.2.0): nur solange der Tab sichtbar ist ----------
+let zeit = null;   // { id, summe (ms), seit (ms oder null), neu }
+function zeitStart(id) { zeitStop(); zeit = { id, summe: 0, seit: document.visibilityState === "visible" ? Date.now() : null, neu: true }; }
+function zeitSenden(mindestens) {
+	if (!zeit) return;
+	const ms = zeit.summe + (zeit.seit ? Date.now() - zeit.seit : 0);
+	if (ms < mindestens) return;
+	const daten = { sekunden: Math.max(1, Math.min(120, Math.round(ms / 1000))), neu: zeit.neu };
+	const id = zeit.id;
+	zeit.summe = 0; zeit.neu = false; if (zeit.seit) zeit.seit = Date.now();
+	Bridge.json("POST", "/api/spielzeit/" + idPfad(id), daten).catch(() => {});
+}
+function zeitStop() { zeitSenden(5000); zeit = null; }
+document.addEventListener("visibilitychange", () => {
+	if (!zeit) return;
+	if (document.visibilityState === "hidden") { zeit.summe += zeit.seit ? Date.now() - zeit.seit : 0; zeit.seit = null; }
+	else zeit.seit = Date.now();
+});
+setInterval(() => zeitSenden(30000), 60000);
+
+// ---------- Erfolge im Spiel (Zentrale 1.2.0) ----------
+async function erfolgeZeigen(spiel) {
+	const box = el("erfolge");
+	if (!spiel.erfolgeAnzahl) { box.hidden = true; return; }
+	try {
+		const liste = await Bridge.json("GET", "/api/erfolge/" + idPfad(spiel.id));
+		if (aktuellesSpiel !== spiel.id) return;
+		const frei = liste.filter((e) => e.freigeschaltet).length;
+		const titel = document.createElement("h3");
+		titel.textContent = `Erfolge ${frei}/${liste.length}`;
+		const ul = document.createElement("ul");
+		for (const e of liste) {
+			const li = document.createElement("li");
+			li.className = e.freigeschaltet ? "frei" : "";
+			li.textContent = (e.freigeschaltet ? "🏆 " : "🔒 ") + e.titel;
+			li.title = e.beschreibung || "";
+			ul.append(li);
+		}
+		box.replaceChildren(titel, ul);
+		box.hidden = false;
+	} catch { box.hidden = true; }
+}
+
+let toastTimer;
+function toast(text) {
+	el("toast").textContent = text;
+	el("toast").hidden = false;
+	clearTimeout(toastTimer);
+	toastTimer = setTimeout(() => { el("toast").hidden = true; }, 5000);
+}
+
 function spielBeenden() {
 	if (aktuellesSpiel === null) return;
+	zeitStop();
 	aktuellesSpiel = null;
 	Bridge.beenden();
 	el("rahmen").replaceChildren(); // laufendes Spiel beenden
@@ -355,6 +471,7 @@ async function zeigeSpiel(id, entwurfSpiel) {
 	if (!entwurfSpiel) alsGesehenMerken(spiel);
 	daumenZeigen(spiel, entwurfSpiel);
 	versionZeigen(spiel, entwurfSpiel);
+	el("erfolge").hidden = true;
 	aktuellesSpiel = spiel.id;
 	bestenlisteZeigen(spiel);
 	el("spieltitel").textContent = spiel.title;
@@ -365,6 +482,8 @@ async function zeigeSpiel(id, entwurfSpiel) {
 	el("spielansicht").classList.toggle("ohne-bestenliste", !einstellungen.bestenliste);
 	document.title = spiel.title + (entwurfSpiel ? " (Entwurf)" : "") + " – Spielebibliothek";
 	if (entwurfSpiel) el("spieltitel").textContent = spiel.title + " (Entwurf)";
+	erfolgeZeigen(spiel);
+	if (!entwurfSpiel) zeitStart(spiel.id);
 	try {
 		const iframe = await Bridge.starten(spiel, el("rahmen"));
 		iframe.focus();
@@ -393,6 +512,8 @@ function route() {
 	if (ent) { letzteRoute = location.hash; return zeigeEntwurf(ent[1], ent[2]); }
 	const m = location.hash.match(/^#\/spiel\/(.+)$/);
 	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1]); }
+	const pr = location.hash.match(/^#\/profil(?:\/([a-z0-9][a-z0-9_~-]*))?$/);
+	if (pr) { profilName = pr[1] ? decodeURIComponent(pr[1]) : (ich.ansicht ? `${ich.player}~${ich.ansicht}` : ich.player); return zeigeSeite("profil"); }
 	const s = location.hash.match(/^#\/([a-z-]+)$/);
 	if (s && seiten[s[1]]) return zeigeSeite(s[1]);
 	letzteRoute = "#/";
@@ -425,6 +546,63 @@ function ansichtWechseln(rolle) {
 	location.reload();
 }
 
+// ---------- Glocke (Zentrale 1.2.0) ----------
+let glockeDaten = { ungelesen: 0, liste: [] };
+async function glockeLaden() {
+	try { glockeDaten = await Bridge.json("GET", "/api/meldungen"); } catch { return; }
+	el("glocke").hidden = false;
+	el("glocke-zahl").textContent = String(glockeDaten.ungelesen);
+	el("glocke-zahl").hidden = !glockeDaten.ungelesen;
+}
+function glockeEinrichten() {
+	const knopf = el("glocke-knopf"), liste = el("glocke-liste");
+	knopf.onclick = async (e) => {
+		e.stopPropagation();
+		if (!liste.hidden) { liste.hidden = true; return; }
+		liste.replaceChildren(...(glockeDaten.liste.length ? glockeDaten.liste.map((m) => {
+			const a = document.createElement("a");
+			a.href = m.link || "#/";
+			a.className = m.neu ? "neu" : "";
+			const t = document.createElement("span"); t.textContent = m.text;
+			const z = document.createElement("small"); z.className = "leise"; z.textContent = new Date(m.zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+			a.append(t, z);
+			return a;
+		}) : [Object.assign(document.createElement("span"), { className: "leise leer", textContent: "Keine Meldungen." })]));
+		liste.hidden = false;
+		if (glockeDaten.ungelesen) {
+			el("glocke-zahl").hidden = true;
+			try { await Bridge.json("POST", "/api/meldungen/gelesen"); glockeDaten.ungelesen = 0; } catch { /* egal */ }
+		}
+	};
+	document.addEventListener("click", (e) => { if (!liste.contains(e.target)) liste.hidden = true; });
+	setInterval(glockeLaden, 120000);
+	glockeLaden();
+}
+
+// ---------- Spiel der Woche (Zentrale 1.2.0) ----------
+async function sdwZeigen() {
+	let d = null;
+	try { d = await Bridge.json("GET", "/api/spiel-der-woche"); } catch { /* egal */ }
+	const box = el("sdw");
+	box.hidden = !d;
+	if (!d) return;
+	const tage = Math.max(0, Math.ceil((Date.parse(d.ende) - Date.now()) / 864e5));
+	const kopf = document.createElement("div");
+	kopf.className = "sdw-kopf";
+	const titel = document.createElement("strong"); titel.textContent = "⭐ Spiel der Woche: " + d.title;
+	const rest = document.createElement("span"); rest.className = "leise"; rest.textContent = ` · noch ${tage} ${tage === 1 ? "Tag" : "Tage"} · eigene Bestenliste nur für diese Woche`;
+	const los = document.createElement("a"); los.className = "knopf"; los.href = "#/spiel/" + d.id; los.textContent = "Jetzt spielen";
+	kopf.append(titel, rest);
+	const top = document.createElement("ol");
+	for (const e of d.bestenliste.slice(0, 3)) {
+		const li = document.createElement("li");
+		li.textContent = `${e.player} – ${formatieren(e.score, d.format)}`;
+		top.append(li);
+	}
+	if (!d.bestenliste.length) top.append(Object.assign(document.createElement("li"), { className: "leise", textContent: "Noch keine Einträge diese Woche." }));
+	box.replaceChildren(kopf, top, los);
+}
+
 // Version der Zentrale in der Fußzeile (E39) – schreibt scripts/deploy.sh nach site/zentrale.json
 function zentraleVersion() {
 	fetch("/zentrale.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((z) => {
@@ -436,13 +614,19 @@ async function start() {
 	zentraleVersion();
 	Bridge.beiAblauf = () => { el("abgelaufen").hidden = false; };
 	Bridge.beiWieder = () => { el("abgelaufen").hidden = true; };
+	Bridge.beiErfolg = (id, erfolg) => {
+		toast("🏆 Erfolg freigeschaltet: " + erfolg.titel);
+		const spiel = spiele.find((s) => s.id === id);
+		if (spiel && aktuellesSpiel === id) erfolgeZeigen(spiel);
+		glockeLaden();
+	};
 	Bridge.beiScore = (id) => {
 		const spiel = spiele.find((s) => s.id === id);
 		if (spiel && aktuellesSpiel === id) bestenlisteZeigen(spiel);
 	};
 	el("bl-season").addEventListener("change", (e) => {
 		const spiel = spiele.find((s) => s.id === aktuellesSpiel);
-		if (spiel) bestenlisteZeigen(spiel, +e.target.value);
+		if (spiel) bestenlisteZeigen(spiel, e.target.value === "woche" ? "woche" : +e.target.value);
 	});
 	el("vollbild").addEventListener("click", () => {
 		const r = el("rahmen");
@@ -466,6 +650,8 @@ async function start() {
 		el("benutzer").textContent = ich.player;
 		el("upload-link").hidden = !ich.uploader;
 		menueEinrichten();
+		glockeEinrichten();
+		sdwZeigen();
 		spiele = liste.filter((s) => typeof s.id === "string" && ID_MUSTER.test(s.id));
 	} catch (e) {
 		if (!(e instanceof Bridge.SitzungAbgelaufen)) {
@@ -476,6 +662,7 @@ async function start() {
 		return;
 	}
 
+	el("suche").addEventListener("input", (e) => { suche = e.target.value; kachelnZeigen(); });
 	el("sortierung").addEventListener("change", async (e) => {
 		await einstellungenSpeichern({ sortierung: e.target.value });
 		kachelnZeigen();

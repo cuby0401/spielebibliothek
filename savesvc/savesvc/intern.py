@@ -54,3 +54,11 @@ def registrieren(app: FastAPI, e, db, aktuelle_season) -> None:
         if not isinstance(bis, int) or isinstance(bis, bool) or bis < 1:
             raise HTTPException(422, "bisSaveVersion: Zahl ab 1")
         return db.spielstaende_zurueckholen(sid(user, ordner), bis)
+
+    @app.post("/intern/meldung", status_code=204, dependencies=[Depends(intern)])
+    def meldung(body: dict[str, Any] = Body(...)):
+        """Upload-Dienst meldet z. B. „Neues Spiel“ oder „Version 1.2.0“ an alle (Glocke, Zentrale 1.2.0)."""
+        an, text, link = body.get("an"), body.get("text"), body.get("link")
+        if not (isinstance(an, str) and an and isinstance(text, str) and text.strip()):
+            raise HTTPException(422, "an und text nötig")
+        db.melden(an, text.strip(), link if isinstance(link, str) else None)

@@ -5,6 +5,24 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.2.0 – 05.11.2026
+
+Enthält auch 1.1.1, das nicht einzeln ausgeliefert wurde.
+
+- **Neu:** Speichergrenze je Entwickler, Standard 1 GB (`UPLOAD_KONTINGENT_MB`), mit Anzeige auf der Upload-Seite. Das Admin-Panel warnt, wenn auf der NAS wenig Platz frei ist.
+- **Neu:** Spielzeit wird gemessen, solange der Tab sichtbar ist. Dazu die Sortierung „meistgespielt“, „du: …“ auf der Kachel, die Spielzeit unter „Meine Spielstände“, „Meine Spiele“ und im Admin-Panel.
+- **Neu:** Glocke in der Taskleiste. Sie meldet:
+  - Antrag beantwortet
+  - neues Spiel oder neue Version
+  - „… hat dich überholt“
+  - Erfolg freigeschaltet
+  - Spiel der Woche
+- **Neu:** Suche und Kategorien (`"tags"` in der `game.json`) in der Übersicht.
+- **Neu:** Erfolge (`"erfolge"` in der `game.json`, `GameSave.erfolg(id)`). Sie erscheinen neben dem Spiel, als Einblendung und auf der Profilseite. Die Profilseite (Menü → Mein Profil, Klick auf Namen in der Bestenliste) zeigt Spielzeit, Erfolge und Plätze.
+- **Neu:** Spiel der Woche (Admin-Panel → Spiele). Es gibt ein Banner, eine Meldung an alle und eine eigene Wochen-Bestenliste.
+- **Neu:** 👍 auch auf den Kacheln der Übersicht. Bei eigenen Spielen steht deutlich „eigenes Spiel“ dabei, statt den Knopf nur auszugrauen.
+- **Geändert:** Startvorlage, Prompt-Block, Handbuch und Hilfe sind ergänzt. Die Prüfung vor dem Veröffentlichen gibt Hinweise zu Kategorien und Erfolgen.
+
 ## 1.1.1 – 05.11.2026
 
 - **Behoben:** Testspiele (Spike, Böse, Bestenlisten-Vorlage …) erscheinen nicht mehr unter „Meine Spiele“ – verwaltet werden sie nur im Admin-Panel.

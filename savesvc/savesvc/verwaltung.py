@@ -6,6 +6,8 @@ Speicher-Dienst ruft ihn über die interne Schnittstelle /intern (geheimes Token
 
 import json
 import logging
+import os
+import shutil
 import re
 import urllib.error
 import urllib.request
@@ -19,7 +21,7 @@ from .auth import BENUTZER_MUSTER, Benutzerliste
 
 log = logging.getLogger("savesvc.verwaltung")
 
-SORTIERUNGEN = ("alphabetisch", "zuletzt", "neu")
+SORTIERUNGEN = ("alphabetisch", "zuletzt", "neu", "meistgespielt")
 ARTEN = {
     "fehler": "Fehler melden",
     "wunsch": "Wunsch / Idee",
@@ -180,6 +182,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.get("/api/entwickler/spiele")
     def entwickler_spiele(player: str = Depends(entwickler)):
         statistik = db.spiel_statistik()
+        zeit = db.spielzeit_je_spiel()
         daumen = db.daumen_zahlen()
         einst = db.spiel_einstellungen()
         fehler = db.fehler_zahlen()
@@ -204,7 +207,8 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                              "spieler": st.get("spieler", 0), "zuletzt": st.get("zuletzt"), "scores": st.get("scores", 0),
                              "versteckt": einst.get(sid, {}).get("versteckt", False),
                              "offline": einst.get(sid, {}).get("offline", False), "offlineGrund": einst.get(sid, {}).get("offlineGrund"),
-                             "entwurf": entw, "fehler": f_live, "fehlerEntwurf": f_entw, "daumen": daumen.get(sid, 0)})
+                             "entwurf": entw, "fehler": f_live, "fehlerEntwurf": f_entw, "daumen": daumen.get(sid, 0),
+                             "spielzeit": zeit.get(sid, {}).get("sekunden", 0), "sitzungen": zeit.get(sid, {}).get("sitzungen", 0)})
         return ergebnis
 
     @app.put("/api/entwickler/offline/{user}/{game}")
@@ -341,6 +345,20 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     # ---------- Admin ----------
 
+    def platte() -> dict:
+        """Freier Platz auf dem Spiele-Volume – Warnung im Admin-Panel unter 10 % oder 10 GB (Zentrale 1.2.0)."""
+        try:
+            u = shutil.disk_usage(e.spiele_dir)
+        except OSError:
+            return {}
+        return {"frei": u.free, "gesamt": u.total, "knapp": u.free < 10 * 1024 ** 3 or u.free < u.total * 0.1}
+
+    def kontingent_mb() -> int:
+        try:
+            return int(os.environ.get("UPLOAD_KONTINGENT_MB", "1024"))
+        except ValueError:
+            return 1024
+
     @app.get("/api/admin/uebersicht")
     def uebersicht(_: str = Depends(admin)):
         alle_spiele = games.alle(e.spiele_dir)
@@ -366,6 +384,8 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             "uploads": ereignisse,
             "speicher": speicher,
             "datenbank": e.db_path.stat().st_size if e.db_path.exists() else 0,
+            "platte": platte(),
+            "kontingent": kontingent_mb() * 1024 * 1024,
             "sicherung": datetime.fromtimestamp(kopie.stat().st_mtime, timezone.utc).isoformat(timespec="seconds")
                          if kopie and kopie.exists() else None,
         }
@@ -381,12 +401,14 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.get("/api/admin/spiele")
     def admin_spiele(_: str = Depends(admin)):
         statistik = db.spiel_statistik()
+        zeit = db.spielzeit_je_spiel()
         daumen = db.daumen_zahlen()
         einst = db.spiel_einstellungen()
         fehler = db.fehler_zahlen()
         return [{**s, **{"versteckt": False, "hervorgehoben": False, "testspiel": False}, **{k: v for k, v in einst.get(s["id"], {}).items() if k != "season"},
                  "leaderboardSeason": aktuelle_season(s["id"]), **statistik.get(s["id"], {"spieler": 0, "zuletzt": None, "scores": 0}),
-                 "fehler": fehler.get(s["id"], {}), "daumen": daumen.get(s["id"], 0)}
+                 "fehler": fehler.get(s["id"], {}), "daumen": daumen.get(s["id"], 0),
+                 "spielzeit": zeit.get(s["id"], {}).get("sekunden", 0)}
                 for s in games.alle(e.spiele_dir)]
 
     @app.patch("/api/admin/spiele/{user}/{game}")
@@ -521,4 +543,8 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             raise HTTPException(422, "antwort zu lang")
         if not db.antrag_bearbeiten(antrag_id, status, antwort):
             raise HTTPException(404, "Antrag nicht gefunden")
+        a = db.antrag(antrag_id)
+        if a and status != "offen":   # Glocke: Antragsteller erfährt die Antwort (Zentrale 1.2.0)
+            db.melden(a["player"], f"📬 Dein Antrag wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'}"
+                                   + (f": {antwort[:120]}" if antwort else ""), "#/antraege")
         return {"ok": True}

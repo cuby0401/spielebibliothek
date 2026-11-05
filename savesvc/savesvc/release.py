@@ -206,6 +206,14 @@ def pruefen(live: Path | None, entwurf: Path) -> dict:
 
     if not neu.get("title"):
         p("hinweis", "Kein „title“ in der game.json – die Kachel zeigt den Ordnernamen.")
+    if not games.tags(neu):
+        p("hinweis", "Keine „tags“ in der game.json – mit z. B. \"tags\": [\"Puzzle\", \"Wörter\"] wird das Spiel über die Kategorien gefunden.")
+    roh = neu.get("erfolge")
+    if roh is not None:
+        gueltig = len(games.erfolge(entwurf))
+        if not isinstance(roh, list) or gueltig < len(roh):
+            p("warnung", f"„erfolge“ in der game.json: {gueltig} von {len(roh) if isinstance(roh, list) else 0} Einträgen gültig. "
+                         "Jeder braucht eine \"id\" aus a–z, 0–9, _ und - (max. 40 Zeichen), eindeutig.")
 
     season = False
     if live and live.is_dir():

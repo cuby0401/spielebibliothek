@@ -120,6 +120,9 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         simuliert = bool(rollen.simuliert(e, request, player))
         daumen = db.daumen_zahlen()
         meine = set() if rollen.simuliert(e, request, player) else db.meine_daumen(player)
+        zeit_alle = db.spielzeit_je_spiel()
+        zeit_ich = db.spielzeit_von(rollen.daten_id(e, request, player))
+        sdw = db.sdw_aktuell()
         ergebnis = []
         for s in games.alle(e.spiele_dir):
             ein = einst.get(s["id"], {})
@@ -132,7 +135,10 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
                              "testspiel": bool(ein.get("testspiel")),
                              "offline": bool(ein.get("offline")), "offlineGrund": ein.get("offlineGrund"),
                              "zuletztGespielt": zuletzt.get(s["id"]),
-                             "daumen": daumen.get(s["id"], 0), "meinDaumen": s["id"] in meine})
+                             "daumen": daumen.get(s["id"], 0), "meinDaumen": s["id"] in meine,
+                             "spielzeit": zeit_alle.get(s["id"], {}).get("sekunden", 0),
+                             "meineSpielzeit": zeit_ich.get(s["id"], {}).get("sekunden", 0),
+                             "spielDerWoche": bool(sdw and sdw["game"] == s["id"])})
         return ergebnis
 
     @app.get("/api/save/{user}/{game}")
@@ -189,7 +195,19 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
                 raise HTTPException(429, "höchstens ein Score pro Sekunde")
             letzter_score[(player, sp[0])] = jetzt
         season = aktuelle_season(sp[0], sp[1])
+        aufsteigend = lb["order"] == "asc"
+        vorher = db.bestenliste(sp[0], season, aufsteigend, 1000)
         db.score_eintragen(player, sp[0], season, float(wert), werte)
+        # Glocke: wer gerade überholt wurde, bekommt eine Meldung (nur echte Spieler)
+        nachher = db.bestenliste(sp[0], season, aufsteigend, 1000)
+        rang_vorher = next((x["rank"] for x in vorher if x["player"] == player), len(vorher) + 1)
+        rang_nachher = next((x["rank"] for x in nachher if x["player"] == player), None)
+        if rang_nachher and rang_nachher < rang_vorher and "~" not in player:
+            ueber = {x["player"] for x in vorher if x["rank"] < rang_vorher} & {x["player"] for x in nachher if x["rank"] > rang_nachher}
+            for anderer in sorted(ueber):
+                if "~" not in anderer:
+                    db.melden(anderer, f"🏁 {player} hat dich in „{games.beschreibung(e.spiele_dir, *sp[0].split('/', 1))['title']}“ überholt "
+                                       f"(jetzt Platz {rang_nachher})", f"#/spiel/{sp[0]}")
         return {"season": season}
 
     # --- Daumen hoch (Idee „Bewertung“, 05.11.2026): Rückmeldung an die Entwickler ---
@@ -222,10 +240,18 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         sp=Depends(spiel),
         season: int | None = Query(None, ge=1, le=1_000_000),
         limit: int = Query(10, ge=1, le=100),
+        woche: bool = Query(False),
     ):
         lb = games.bestenliste_einstellungen(sp[1])
         aktuell = aktuelle_season(sp[0], sp[1])
         gewaehlt = season or aktuell
+        sdw = db.sdw_aktuell()
+        if woche:   # Spiel der Woche: nur Einträge aus dieser Woche (Zentrale 1.2.0)
+            if not (sdw and sdw["game"] == sp[0]):
+                raise HTTPException(404, "Dieses Spiel ist gerade nicht Spiel der Woche")
+            return {**lb, "season": gewaehlt, "currentSeason": aktuell, "seasons": sorted(set(db.seasons(sp[0])) | {aktuell}),
+                    "woche": {"start": sdw["start"], "ende": sdw["ende"]},
+                    "entries": db.bestenliste_zeitraum(sp[0], sdw["start"], sdw["ende"], lb["order"] == "asc", limit)}
         eintraege = db.bestenliste(sp[0], gewaehlt, lb["order"] == "asc", limit) if lb["enabled"] else []
         return {
             **lb,
@@ -233,12 +259,15 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
             "currentSeason": aktuell,
             "seasons": sorted(set(db.seasons(sp[0])) | {aktuell}),
             "entries": eintraege,
+            "spielDerWoche": bool(sdw and sdw["game"] == sp[0]),
         }
 
     from . import verwaltung
     verwaltung.registrieren(app, e, db, spieler, benutzerliste, aktuelle_season)
     from . import intern
     intern.registrieren(app, e, db, aktuelle_season)
+    from . import gemeinschaft
+    gemeinschaft.registrieren(app, e, db, spieler, spiel, ich_daten, benutzerliste, aktuelle_season)
 
     return app
 

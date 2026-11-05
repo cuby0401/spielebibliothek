@@ -8,7 +8,7 @@ stehen im Vault `seb-brain` unter `Projekte/Spielebibliothek/`. Diese Datei ist 
 | Dienst | Code | Darf | Erreichbar |
 |---|---|---|---|
 | caddy | `Caddyfile` | liefert `site/`, `lib/` und Spieldateien aus, leitet `/api/*` weiter | `games`, `play`, `upload` über den Tunnel |
-| savesvc (Speicher-Dienst) | `savesvc/savesvc/app.py`, `verwaltung.py`, `intern.py` | Datenbank lesen/schreiben, Spiele **nur lesen** | `/api/*` unter `games`, `/intern/*` nur im Docker-Netz |
+| savesvc (Speicher-Dienst) | `savesvc/savesvc/app.py`, `verwaltung.py`, `intern.py`, `gemeinschaft.py` (Spielzeit, Glocke, Erfolge, Profil, Spiel der Woche) | Datenbank lesen/schreiben, Spiele **nur lesen** | `/api/*` unter `games`, `/intern/*` nur im Docker-Netz |
 | upload (Upload-Dienst) | `savesvc/savesvc/upload.py` | Spieldateien schreiben, Upload-Konten | `/api/upload/*` unter `upload`, `/intern/*` nur im Docker-Netz |
 
 Die beiden Python-Dienste rufen sich gegenseitig über `/intern/*` mit `INTERN_TOKEN` auf (aus `.env`, legt `deploy.sh` an):
@@ -56,6 +56,7 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Nach jeder Änderung an Caddyfile oder Bridge: Testspiel „Böse“ öffnen – alle Angriffe müssen abgewehrt sein.
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
+- Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`.
 
 ## Deploy und Versionen der Zentrale (E39)
 

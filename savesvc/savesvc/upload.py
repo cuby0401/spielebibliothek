@@ -161,6 +161,24 @@ def cookie_gueltig(geheim: bytes, wert: str, player: str) -> bool:
             and name == player and ablauf.isdigit() and int(ablauf) > time.time())
 
 
+MB = 1024 * 1024
+
+
+def kontingent() -> int:
+    """Speicher je Entwickler (Spiele + Entwürfe + aufgehobene Versionen), Standard 1 GB. Zentrale 1.2.0."""
+    try:
+        return max(10, int(os.environ.get("UPLOAD_KONTINGENT_MB", "1024"))) * MB
+    except ValueError:
+        return 1024 * MB
+
+
+def belegt(ordner: Path) -> int:
+    try:
+        return sum(f.stat().st_size for f in ordner.rglob("*") if f.is_file())
+    except OSError:
+        return 0
+
+
 ENTWURF_INFO = ".entwurf.json"   # Zeitpunkt des Entwurfs-Uploads (versteckt, nur im Entwurf)
 
 
@@ -240,6 +258,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
             "entwickler": store.vorhanden(player),
             "angemeldet": cookie_gueltig(geheim, request.cookies.get(COOKIE, ""), player),
             "gesperrt": store.gesperrt(player),
+            "speicher": {"belegt": belegt(e.spiele_dir / player), "grenze": kontingent()},
         }
 
     @app.post("/api/upload/anmelden", status_code=204)
@@ -305,6 +324,12 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
             ergebnis = zipinstall.installieren(datei.file, entwurf)
         except zipinstall.UngueltigesZip as fehler:
             raise HTTPException(422, str(fehler)) from None
+        jetzt_belegt, grenze = belegt(basis), kontingent()
+        if jetzt_belegt > grenze:   # Kontingent überschritten → Entwurf wieder entfernen
+            shutil.rmtree(entwurf, ignore_errors=True)
+            raise HTTPException(413, f"Dein Speicher ist voll: {(jetzt_belegt - ergebnis.bytes) // MB} MB belegt, das Spiel braucht "
+                                     f"{ergebnis.bytes // MB + 1} MB, erlaubt sind {grenze // MB} MB. Alte Versionen oder Spiele "
+                                     "löschen – oder Seb um mehr Platz bitten.")
         (entwurf / ENTWURF_INFO).write_text(json.dumps({"zeit": release.jetzt(), "von": player}), encoding="utf-8")
         release.aenderung_merken(basis, ordner, neu, player)
         speicher_still("POST", f"/intern/entwurf/{player}/{ordner}/zuruecksetzen")   # frischer Test mit echtem Spielstand
@@ -395,6 +420,11 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
             except HTTPException as f:
                 log.warning("Neue Season für %s/%s nicht gesetzt: %s", player, ordner, f.detail)
         store.ereignis(player, f"Version {version} veröffentlicht", ordner)
+        titel = games.beschreibung(e.spiele_dir, player, ordner)["title"]
+        speicher_still("POST", "/intern/meldung", {
+            "an": "*", "link": f"#/spiel/{player}/{ordner}",
+            "text": (f"🎮 Neues Spiel: „{titel}“ von {player}" if pr["erstveroeffentlichung"]
+                     else f"🔄 „{titel}“ ist jetzt Version {version}: {' · '.join(aenderungen)[:150]}")})
         return {"version": version, "eintrag": eintrag, "season": season}
 
     @app.delete("/api/upload/spiele/{ordner}/entwurf", status_code=204)

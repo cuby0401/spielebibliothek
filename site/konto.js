@@ -18,6 +18,12 @@ function h(tag, eigenschaften, ...kinder) {
 	for (const kind of kinder.flat()) if (kind !== null && kind !== undefined && kind !== false) e.append(kind);
 	return e;
 }
+// Spielzeit lesbar: 45 s → „< 1 min“, 3900 → „1 h 5 min“
+function dauer(sek) {
+	if (!sek || sek < 60) return "< 1 min";
+	const h = Math.floor(sek / 3600), m = Math.floor(sek / 60) % 60;
+	return h ? `${h} h ${m} min` : `${m} min`;
+}
 const datumZeit = (iso) => iso ? new Date(iso).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
 const groesse = (b) => b > 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.ceil(b / 1024)) + " KB";
 const titelVon = (id) => (spiele.find((s) => s.id === id) || {}).title || id;
@@ -56,6 +62,7 @@ SEITEN_REG["spielstaende"] = async (c) => {
 		h("td", {}, h("strong", { text: s.title }), h("div", { class: "leise", text: s.spiel })),
 		h("td", { text: s.keys.length + (s.keys.length === 1 ? " Eintrag" : " Einträge") + " · " + groesse(s.keys.reduce((n, k) => n + k.bytes, 0)) }),
 		h("td", { text: datumZeit(s.zuletzt) }),
+		h("td", { text: dauer((spiele.find((x) => x.id === s.spiel) || {}).meineSpielzeit) }),
 		h("td", {}, h("button", { type: "button", class: "knopf klein gefahr", text: "Neu anfangen",
 			onclick: async () => {
 				if (!confirm(`Deine Spielstände für „${s.title}“ löschen und neu anfangen?`)) return;
@@ -64,7 +71,7 @@ SEITEN_REG["spielstaende"] = async (c) => {
 				c.replaceChildren(); SEITEN_REG["spielstaende"](c);
 			} }))));
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Umfang", "Zuletzt", ""].map((t) => h("th", { text: t })))), h("tbody", {}, zeilen))));
+		h("thead", {}, h("tr", {}, ...["Spiel", "Umfang", "Zuletzt", "Deine Spielzeit", ""].map((t) => h("th", { text: t })))), h("tbody", {}, zeilen))));
 };
 
 // ---------- Meine Spiele (Entwickler) ----------
@@ -77,7 +84,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
 	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "👍", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
+		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "👍", "Spielzeit", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((s) => {
 			const [user, ordner] = s.id.split("/");
 			return h("tr", {},
@@ -89,6 +96,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 					s.warning ? h("div", { class: "warnung", text: "⚠ " + s.warning }) : null),
 				h("td", { text: String(s.spieler) }),
 				h("td", { text: String(s.daumen || 0), title: "Daumen hoch von Spielern" }),
+				h("td", { text: dauer(s.spielzeit), title: `${s.sitzungen || 0} Sitzungen – Spielzeit aller Spieler zusammen` }),
 				h("td", { text: datumZeit(s.zuletzt) }),
 				h("td", { text: s.leaderboard.enabled ? `Season ${s.leaderboardSeason} · ${s.scores} Einträge` : "aus" }),
 				h("td", {}, fehlerText(s.fehler), s.fehlerEntwurf && s.fehlerEntwurf.arten ? h("div", { class: "leise", text: "Entwurf: " + fehlerText(s.fehlerEntwurf) }) : null),
@@ -161,3 +169,23 @@ SEITEN_REG["antraege"] = async (c) => {
 		h("div", { text: a.text }),
 		a.antwort ? h("div", { class: "antwort" }, h("strong", { text: "Antwort von Seb: " }), a.antwort) : null)));
 };
+
+// ---------- Profil (Zentrale 1.2.0): Spielzeit, Erfolge, Bestplätze ----------
+SEITEN_REG["profil"] = async (c) => {
+	const d = await Bridge.json("GET", "/api/profil/" + encodeURIComponent(profilName));
+	c.append(h("h1", { text: d.ich ? "Mein Profil" : "Profil von " + d.name }),
+		h("div", { class: "profil-zahlen" },
+			h("div", {}, h("b", { text: dauer(d.sekunden) }), "Spielzeit"),
+			h("div", {}, h("b", { text: String(d.spiele.length) }), "Spiele"),
+			h("div", {}, h("b", { text: String(d.erfolge) }), "Erfolge")));
+	if (!d.spiele.length) return c.append(h("p", { class: "leise", text: "Noch nichts gespielt." }));
+	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
+		h("thead", {}, h("tr", {}, ...["Spiel", "Spielzeit", "Platz (aktuelle Season)", "Erfolge"].map((t) => h("th", { text: t })))),
+		h("tbody", {}, d.spiele.map((s) => h("tr", {},
+			h("td", {}, h("a", { href: "#/spiel/" + s.id, text: s.title })),
+			h("td", { text: dauer(s.sekunden) }),
+			h("td", { text: s.platz ? s.platz + "." : "–" }),
+			h("td", {}, s.erfolgeGesamt ? `${s.erfolge.length}/${s.erfolgeGesamt}` : "–",
+				s.erfolge.length ? h("div", { class: "leise", text: s.erfolge.map((e) => "🏆 " + e.titel).join(" · ") }) : null)))))));
+};
+

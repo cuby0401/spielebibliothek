@@ -3,9 +3,14 @@
   "description": "Ein Satz, worum es geht.",
   "thumbnail": "thumb.svg",
   "saveVersion": 1,
+  "tags": ["Geschick"],
   "leaderboard": {
     "enabled": true,
     "order": "desc",
     "label": "Punkte"
-  }
+  },
+  "erfolge": [
+    { "id": "zehn", "titel": "Zweistellig", "beschreibung": "Erreiche 10 Punkte" },
+    { "id": "hundert", "titel": "Ausdauer", "beschreibung": "Erreiche 100 Punkte", "geheim": true }
+  ]
 }
