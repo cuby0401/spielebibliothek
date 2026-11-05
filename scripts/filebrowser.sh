@@ -36,7 +36,9 @@ name_pruefen() {
 # Grundeinstellungen + Vorgaben für neue Benutzer
 # root/address/port ausdrücklich: config init übernimmt sie NICHT aus settings.json (sonst Root "." →
 # Benutzerordner landen außerhalb von /srv, Address 127.0.0.1)
-EINSTELLUNGEN="--root=/srv --address=0.0.0.0 --port=8080 --auth.method=json --signup=false --createUserDir=false --disableExec \
+# fileMode/dirMode mit Gruppenbits: Sie bilden die ACL-Maske – sonst kann Sebi Uploads nicht ändern/löschen.
+# "other" bleibt 0.
+EINSTELLUNGEN="--root=/srv --address=0.0.0.0 --port=8080 --fileMode=0o660 --dirMode=0o770 --auth.method=json --signup=false --createUserDir=false --disableExec \
   --minimumPasswordLength=16 --branding.name=Spielebibliothek-Upload \
   --branding.disableExternal --branding.disableUsedPercentage \
   --perm.admin=false --perm.execute=false --perm.share=false \
