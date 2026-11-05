@@ -55,6 +55,24 @@ async function aktion(fn, erfolg) {
 	liste();
 }
 
+let bekannteOrdner = new Set();
+
+// „Update hochladen“ an einem Spiel: Ordnername festlegen, damit kein zweites Spiel entsteht
+function updateFuer(s) {
+	$("ordner").value = s.ordner;
+	$("ordner").readOnly = true;
+	const hinweis = $("update-fuer");
+	hinweis.replaceChildren(document.createTextNode(`Update für „${s.title}“${s.version ? " (aktuell Version " + s.version + ")" : ""} – Ordner ${s.ordner} ist festgelegt. `),
+		knopfK("Stattdessen neues Spiel", () => updateFuerAufheben()));
+	hinweis.hidden = false;
+	$("uploadform").scrollIntoView({ behavior: "smooth", block: "start" });
+	$("datei").focus();
+}
+function updateFuerAufheben() {
+	$("ordner").readOnly = false;
+	$("update-fuer").hidden = true;
+}
+
 async function liste() {
 	let spiele;
 	try {
@@ -63,6 +81,7 @@ async function liste() {
 		if (e.status === 401) return start();
 		return meldung(e.message, "fehler");
 	}
+	bekannteOrdner = new Set(spiele.map((x) => x.ordner));
 	if (!spiele.length) return $("liste").replaceChildren(span("Noch keine Spiele hochgeladen.", "leise"));
 	$("liste").replaceChildren(...spiele.map((s) => {
 		const pfad = "/spiele/" + encodeURIComponent(s.ordner);
@@ -116,6 +135,7 @@ async function liste() {
 			d.append(sum, ul);
 			bereich.append(d);
 		}
+		bereich.append(div("zeile-klein", knopfK("Update hochladen", () => updateFuer(s), "")));
 		const weg = knopfK("Löschen", () => {
 			if (!confirm(`„${s.title}“ (${s.ordner}) komplett löschen – inklusive Entwurf, älterer Versionen und Versionsverlauf? Spielstände und Bestenliste bleiben erhalten.`)) return;
 			aktion(() => api("DELETE", pfad), `${s.ordner} gelöscht.`);
@@ -220,6 +240,8 @@ $("uploadform").addEventListener("submit", async (ev) => {
 	const ordner = $("ordner").value.trim();
 	if (!datei) return;
 	if (datei.size > 100 * 1024 * 1024) return meldung("Die Datei ist größer als 100 MB.", "fehler");
+	if (!bekannteOrdner.has(ordner) && bekannteOrdner.size &&
+		!confirm(`„${ordner}“ ist ein neuer Ordner – das wird ein NEUES Spiel (eigene Spielstände und Bestenliste).\n\nWolltest du ein bestehendes Spiel aktualisieren? Dann „Abbrechen“ und beim Spiel auf „Update hochladen“ klicken.`)) return;
 	$("fortschritt").hidden = false; $("fortschritt").value = 0;
 	meldung("Lade hoch …");
 	try {
@@ -228,6 +250,7 @@ $("uploadform").addEventListener("submit", async (ev) => {
 		if (d.uebersprungen && d.uebersprungen.length) text += ` Übersprungen (nicht erlaubt): ${d.uebersprungen.join(", ")}.`;
 		meldung(text + " Unten auf „Testen“ klicken, kurz spielen, dann „Veröffentlichen …“.", "ok");
 		$("uploadform").reset();
+		updateFuerAufheben();
 	} catch (e) {
 		if (e.status === 401) { meldung("Sitzung abgelaufen – bitte neu anmelden.", "fehler"); return start(); }
 		meldung("✗ " + e.message, "fehler");

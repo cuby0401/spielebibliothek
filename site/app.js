@@ -243,6 +243,7 @@ function kachel(spiel) {
 		if (titel) m.title = titel;
 		marken.append(m);
 	};
+	if (spiel.offline) marke("offline", "versteckt", spiel.offlineGrund ? "Offline: " + spiel.offlineGrund : "vom Entwickler offline genommen");
 	if (spiel.versteckt) marke("ausgeblendet", "versteckt");
 	else if (spiel.hervorgehoben) marke("Empfohlen");
 	if (aktualisiert(spiel)) marke("Aktualisiert", "aktualisiert", spiel.neu ? "Neu: " + spiel.neu.text : "");
@@ -335,7 +336,11 @@ async function zeigeSpiel(id, entwurfSpiel) {
 		location.hash = "#/";
 		return;
 	}
-	el("entwurf-hinweis").hidden = !entwurfSpiel;
+	el("entwurf-hinweis").hidden = !entwurfSpiel && !spiel.offline;
+	if (!entwurfSpiel && spiel.offline) {
+		el("entwurf-hinweis").textContent = "Offline – andere Spieler sehen dieses Spiel gerade nicht." + (spiel.offlineGrund ? " Grund: " + spiel.offlineGrund : "") +
+			" Wieder online stellen: Menü → Meine Spiele.";
+	}
 	if (entwurfSpiel) {
 		el("entwurf-hinweis").textContent = "Entwurf – nur du siehst ihn. " +
 			(spiel.spielstaendeKopiert ? "Dein Spielstand wurde als Kopie übernommen. " : "Dein Spielstand im Entwurf ist getrennt vom echten. ") +
@@ -420,7 +425,15 @@ function ansichtWechseln(rolle) {
 	location.reload();
 }
 
+// Version der Zentrale in der Fußzeile (E39) – schreibt scripts/deploy.sh nach site/zentrale.json
+function zentraleVersion() {
+	fetch("/zentrale.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((z) => {
+		if (z && z.version) el("zentrale-version").textContent = "Spielebibliothek " + z.version;
+	}).catch(() => {});
+}
+
 async function start() {
+	zentraleVersion();
 	Bridge.beiAblauf = () => { el("abgelaufen").hidden = false; };
 	Bridge.beiWieder = () => { el("abgelaufen").hidden = true; };
 	Bridge.beiScore = (id) => {

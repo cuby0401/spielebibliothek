@@ -117,6 +117,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         einst = db.spiel_einstellungen()
         zuletzt = db.zuletzt_gespielt(rollen.daten_id(e, request, player))
         ist_admin = rollen.rolle(e, request, player)["admin"]
+        simuliert = bool(rollen.simuliert(e, request, player))
         daumen = db.daumen_zahlen()
         meine = set() if rollen.simuliert(e, request, player) else db.meine_daumen(player)
         ergebnis = []
@@ -124,9 +125,12 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
             ein = einst.get(s["id"], {})
             if (ein.get("versteckt") or ein.get("testspiel")) and not ist_admin:
                 continue   # ausgeblendet bzw. Testspiel (nur Anzeige – die Dateien bleiben unter play erreichbar)
+            if ein.get("offline") and not ist_admin and (s["author"] != player or simuliert):
+                continue   # vom Entwickler offline genommen (E40) – nur er selbst und Admins sehen es (nicht in „Ansicht als …“)
             ergebnis.append({**s, "leaderboardSeason": aktuelle_season(s["id"]),
                              "versteckt": bool(ein.get("versteckt")), "hervorgehoben": bool(ein.get("hervorgehoben")),
                              "testspiel": bool(ein.get("testspiel")),
+                             "offline": bool(ein.get("offline")), "offlineGrund": ein.get("offlineGrund"),
                              "zuletztGespielt": zuletzt.get(s["id"]),
                              "daumen": daumen.get(s["id"], 0), "meinDaumen": s["id"] in meine})
         return ergebnis

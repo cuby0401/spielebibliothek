@@ -11,12 +11,16 @@
   <header class="kopf">
     <a class="marke" href="/">Spielebibliothek</a>
     <nav>
-      <a class="knopf leise" href="/hilfe/">Hilfe</a>
       <button id="zurueck" class="knopf leise" type="button" title="Zurück, wo du herkamst">← Zurück</button>
     </nav>
   </header>
 
   <main class="hilfe">
+    <nav class="hilfe-reiter" aria-label="Hilfe-Center">
+      <a href="/hilfe/">Spielen</a>
+      <a href="/handbuch/" class="aktiv" aria-current="page">Spiele entwickeln</a>
+      <a href="/#/antraege">Fehler melden / Idee</a>
+    </nav>
     <h1>Entwickler-Handbuch</h1>
     <p>Alles, was du brauchst, um Spiele für die Spielebibliothek zu bauen, hochzuladen und zu aktualisieren –
       so, dass bei allen Spielen alles gleich funktioniert und kein Spielstand verloren geht.
@@ -48,7 +52,7 @@
         und dein Spiel beschreiben. Lokal testen: <code>index.html</code> im Browser öffnen (Speichern geht dort nur bis zum Neuladen – normal).</li>
       <li><strong>Als ZIP packen</strong> – Mac: Rechtsklick → „Komprimieren“. Windows: Rechtsklick → „Senden an“ → „ZIP-komprimierter Ordner“.</li>
       <li><strong>Hochladen</strong> – <a href="https://upload.cuby0401.uk" target="_blank" rel="noopener">upload.cuby0401.uk</a>, E-Mail-Code, dann dein
-        <strong>Upload-Passwort</strong> (nicht im Browser speichern). Ordnernamen wählen – <strong>bei Updates immer denselben</strong> –
+        <strong>Upload-Passwort</strong> (nicht im Browser speichern). Ordnernamen wählen – <strong>für Updates beim Spiel auf „Update hochladen“ klicken</strong>, dann ist der Ordner festgelegt –
         und in einer Zeile schreiben, was du geändert hast. Jeder Upload landet als <strong>Entwurf</strong>; nur du siehst ihn.</li>
       <li><strong>Entwurf testen</strong> – „Testen“ auf der Upload-Seite. Der Entwurf startet mit einer <em>Kopie</em> deines Spielstands,
         Bestenlisten-Einträge zählen noch nicht. Mehrmals hochladen ist normal – die Änderungszeilen werden gesammelt.</li>
@@ -80,7 +84,8 @@
         kein eigener Server-Code. Die Bibliothek blockiert das sonst.</li>
       <li><strong>Speichern mit <code>GameSave</code>.</strong> <code>localStorage</code> funktioniert auch (landet automatisch auf dem Server),
         aber nur mit <code>GameSave</code> gibt es Bestenlisten und sauber geprüfte Updates.</li>
-      <li><strong>Updates immer in denselben Ordner.</strong> Neuer Ordnername = neues Spiel, Spielstände und Bestenliste wären weg.</li>
+      <li><strong>Updates immer in denselben Ordner</strong> – am sichersten über „Update hochladen“ beim Spiel. Neuer Ordnername = neues Spiel,
+        Spielstände und Bestenliste wären weg; die Upload-Seite fragt deshalb bei neuen Ordnern nach.</li>
       <li><strong>Spielstände bei Updates absichern</strong> – <code>standard</code> und <code>migration</code>, siehe <a href="#updates">Updates</a>.</li>
       <li><strong>Erlaubte Dateitypen:</strong> html, js, mjs, css, json, png, jpg, gif, webp, svg, ico, mp3, ogg, wav, m4a, mp4, webm,
         woff, woff2, ttf, otf, wasm, txt, glb, gltf, bin. Alles andere (<code>.exe</code>, Skripte, versteckte Dateien) wird übersprungen.</li>
@@ -249,6 +254,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
           <li>Bestenliste, Spalten, Formate, neue Season</li>
           <li>Speicherstruktur und Migrationen</li>
           <li>Entwürfe, Updates, Zurücksetzen, eigenes Spiel löschen</li>
+          <li>Eigenes Spiel vorübergehend offline nehmen</li>
         </ul></td>
         <td><ul>
           <li>Einzelne Bestenlisten-Einträge löschen</li>
@@ -296,6 +302,9 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       <dd>Anderer Ordnername? <code>saveVersion</code> vergessen? Sonst Antrag an Seb – die Stände vor jeder Umwandlung sind dauerhaft aufgehoben.</dd>
       <dt>Mein Bestenlisten-Eintrag wird abgelehnt.</dt>
       <dd>Steht jeder Schlüssel aus <code>submitScore({...})</code> in <code>leaderboard.spalten</code>? Die Fehlermeldung nennt den Grund.</dd>
+      <dt>Mein Spiel hat plötzlich viele Fehler – was tun?</dt>
+      <dd>Menü → Meine Spiele → <strong>„Offline nehmen“</strong> (optional mit Grund). Andere sehen das Spiel dann nicht mehr, Spielstände und
+        Bestenliste bleiben. Danach in Ruhe reparieren oder auf eine ältere Version <a href="#rollback">zurücksetzen</a> und wieder „online stellen“.</dd>
       <dt>Kann ich ohne Update-Fenster veröffentlichen?</dt>
       <dd>Nein – jedes Update läuft über Entwurf und Prüfung. Das schützt die Spielstände aller Spieler.</dd>
       <dt>Was ist mit Spielen von vor der Versionierung?</dt>

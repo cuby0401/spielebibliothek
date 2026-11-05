@@ -378,3 +378,28 @@ def test_testspiel_nie_in_der_uebersicht_fuer_andere(client):
     assert {s["id"]: s for s in client.get("/api/admin/spiele", headers=client.als()).json()}["paul/snake"]["testspiel"] is True
     sim = {**client.als(), "X-Ansicht": "spieler"}
     assert "paul/snake" not in {s["id"] for s in client.get("/api/games", headers=sim).json()}
+
+
+def test_uebersicht_zaehlt_testspiele_getrennt(client, upload):
+    client.patch("/api/admin/spiele/paul/snake", json={"testspiel": True}, headers=client.als())
+    d = client.get("/api/admin/uebersicht", headers=client.als()).json()
+    assert d["spiele"] == 3 and d["testspiele"] == 1
+
+
+def test_entwickler_nimmt_spiel_offline(client):
+    p = client.als(PAUL)
+    r = client.put("/api/entwickler/offline/paul/snake", json={"offline": True, "grund": "  zu viele   Fehler "}, headers=p)
+    assert r.json() == {"offline": True, "grund": "zu viele Fehler"}
+    # andere Spieler sehen es nicht, der Entwickler selbst und Admins schon
+    assert "paul/snake" not in {s["id"] for s in client.get("/api/games", headers={**client.als(), "X-Ansicht": "spieler"}).json()}
+    # auch der Autor selbst sieht es in „Ansicht als Spieler“ nicht (Simulation = Sicht eines anderen Spielers)
+    client.put("/api/entwickler/offline/seb/zaehler", json={"offline": True}, headers=client.als())
+    assert "seb/zaehler" not in {s["id"] for s in client.get("/api/games", headers={**client.als(), "X-Ansicht": "spieler"}).json()}
+    eigen = {s["id"]: s for s in client.get("/api/games", headers=p).json()}["paul/snake"]
+    assert eigen["offline"] is True and eigen["offlineGrund"] == "zu viele Fehler"
+    assert {s["id"]: s for s in client.get("/api/games", headers=client.als()).json()}["paul/snake"]["offline"] is True
+    assert {s["id"]: s for s in client.get("/api/entwickler/spiele", headers=p).json()}["paul/snake"]["offline"] is True
+    # fremdes Spiel: nein (außer Admin)
+    assert client.put("/api/entwickler/offline/seb/zaehler", json={"offline": True}, headers=p).status_code == 403
+    assert client.put("/api/entwickler/offline/paul/snake", json={"offline": False}, headers=client.als()).json()["offline"] is False
+    assert "paul/snake" in {s["id"] for s in client.get("/api/games", headers={**client.als(), "X-Ansicht": "spieler"}).json()}

@@ -83,6 +83,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 			return h("tr", {},
 				h("td", {}, h("strong", { text: s.title }),
 					h("div", { class: "leise", text: "Ordner " + ordner + (s.live ? "" : " · noch nicht veröffentlicht") + (s.versteckt ? " · von Seb ausgeblendet" : "") }),
+					s.offline ? h("div", {}, h("span", { class: "status abgelehnt", text: "offline" }), s.offlineGrund ? " " + s.offlineGrund : "") : null,
 					s.entwurf ? h("div", {}, h("span", { class: "status offen", text: "Entwurf" }), " vom " + datumZeit(s.entwurf.geaendert) + " · ",
 						h("a", { href: `#/entwurf/${user}/${ordner}`, text: "Entwurf testen" })) : null,
 					s.warning ? h("div", { class: "warnung", text: "⚠ " + s.warning }) : null),
@@ -91,7 +92,20 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 				h("td", { text: datumZeit(s.zuletzt) }),
 				h("td", { text: s.leaderboard.enabled ? `Season ${s.leaderboardSeason} · ${s.scores} Einträge` : "aus" }),
 				h("td", {}, fehlerText(s.fehler), s.fehlerEntwurf && s.fehlerEntwurf.arten ? h("div", { class: "leise", text: "Entwurf: " + fehlerText(s.fehlerEntwurf) }) : null),
-				h("td", {}, s.live && s.leaderboard.enabled ? h("button", { type: "button", class: "knopf klein leise", text: "Neue Season",
+				h("td", {}, s.live ? h("button", { type: "button", class: "knopf klein " + (s.offline ? "" : "leise"),
+					text: s.offline ? "Wieder online stellen" : "Offline nehmen",
+					title: s.offline ? "Spiel wieder für alle sichtbar machen" : "Spiel vorübergehend für alle anderen ausblenden – z. B. bei vielen Fehlern",
+					onclick: async () => {
+						let grund = null;
+						if (!s.offline) {
+							grund = prompt(`„${s.title}“ offline nehmen? Andere sehen es dann nicht mehr in der Übersicht, bis du es wieder online stellst.\nSpielstände und Bestenliste bleiben.\n\nGrund (optional, nur für dich und Seb):`, "");
+							if (grund === null) return;
+						}
+						await Bridge.json("PUT", "/api/entwickler/offline/" + s.id.split("/").map(encodeURIComponent).join("/"), { offline: !s.offline, grund });
+						meldung(s.offline ? `„${s.title}“ ist wieder online.` : `„${s.title}“ ist offline – nur du und Seb sehen es.`);
+						c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
+					} }) : null,
+					s.live && s.leaderboard.enabled ? h("button", { type: "button", class: "knopf klein leise", text: "Neue Season",
 					title: "Neue, leere Bestenliste beginnen – die alte bleibt abrufbar",
 					onclick: async () => {
 						if (!confirm(`Neue Season für „${s.title}“ beginnen? Die Bestenliste startet leer, die alte bleibt über die Season-Auswahl abrufbar.`)) return;

@@ -44,8 +44,12 @@ docs/          betrieb.md (NAS, Backup), entwicklung.md (Aufbau, Regeln, Tests �
 
 ## Deploy
 
+Die Zentrale ist versioniert (`VERSION`, `CHANGELOG.md`, Details in `docs/entwicklung.md`):
+
 ```sh
-scripts/deploy.sh             # Stack übertragen (git-verfolgte Dateien) und starten
+scripts/deploy.sh             # neue Version: Tests, DB-Sicherung, Archiv, übertragen, starten, Tag
+scripts/deploy.sh --zurueck 1.0.0   # zurück auf eine archivierte Version
+scripts/deploy.sh --versionen # archivierte Versionen anzeigen
 scripts/deploy.sh --examples  # zusätzlich Testspiele nach spiele/seb/
 scripts/startvorlage.sh       # nach Änderungen an vorlage/ oder site/handbuch/prompt.txt – ZIP mit committen
 ```

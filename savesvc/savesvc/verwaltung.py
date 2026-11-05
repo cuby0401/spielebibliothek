@@ -201,8 +201,26 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             ergebnis.append({**s, "live": live, "leaderboardSeason": aktuelle_season(sid),
                              "spieler": st.get("spieler", 0), "zuletzt": st.get("zuletzt"), "scores": st.get("scores", 0),
                              "versteckt": einst.get(sid, {}).get("versteckt", False),
+                             "offline": einst.get(sid, {}).get("offline", False), "offlineGrund": einst.get(sid, {}).get("offlineGrund"),
                              "entwurf": entw, "fehler": f_live, "fehlerEntwurf": f_entw, "daumen": daumen.get(sid, 0)})
         return ergebnis
+
+    @app.put("/api/entwickler/offline/{user}/{game}")
+    def offline_setzen(request: Request, player: str = Depends(entwickler), user: str = P(...), game: str = P(...),
+                       body: dict[str, Any] = Body(...)):
+        """Eigenes Spiel vorübergehend offline nehmen, z. B. bei vielen Fehlern (E40). Wirkt wie „ausblenden“,
+        aber der Entwickler entscheidet selbst; Admins dürfen es für jedes Spiel."""
+        if user != player and not rollen.rolle(e, request, player)["admin"]:
+            raise HTTPException(403, "nur für eigene Spiele")
+        sid, _o = spiel_id(user, game)
+        an = body.get("offline")
+        if not isinstance(an, bool):
+            raise HTTPException(422, "offline: true oder false")
+        grund = " ".join(str(body.get("grund") or "").split())[:200] or None
+        db.spiel_setzen(sid, offline=int(an), offline_grund=grund if an else None,
+                        offline_seit=datetime.now(timezone.utc).isoformat(timespec="seconds") if an else None)
+        log.info("%s hat %s %s", player, sid, "offline genommen" if an else "wieder online gestellt")
+        return {"offline": an, "grund": grund if an else None}
 
     @app.post("/api/entwickler/entwurf/{user}/{game}")
     def entwurf_starten(request: Request, player: str = Depends(spieler), user: str = P(...), game: str = P(...)):
@@ -324,6 +342,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.get("/api/admin/uebersicht")
     def uebersicht(_: str = Depends(admin)):
         alle_spiele = games.alle(e.spiele_dir)
+        einst_alle = db.spiel_einstellungen()
         speicher: dict[str, int] = {}
         for s in alle_spiele:
             ordner = e.spiele_dir / s["id"]
@@ -335,7 +354,10 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             ereignisse = [{"fehler": f.detail}]
         return {
             "spieler": len(benutzerliste.alle()),
-            "spiele": len(alle_spiele),
+            # Testspiele (E38) sind keine Spiele für Spieler – getrennt zählen
+            "spiele": sum(1 for x in alle_spiele if not einst_alle.get(x["id"], {}).get("testspiel")),
+            "testspiele": sum(1 for x in alle_spiele if einst_alle.get(x["id"], {}).get("testspiel")),
+            "offline": sum(1 for x in alle_spiele if einst_alle.get(x["id"], {}).get("offline")),
             "zaehler": db.zaehlen(),
             "offeneAntraege": sum(1 for a in db.antraege() if a["status"] == "offen"),
             "aktivitaet": [{**a, "title": titel_von(a["game"])} for a in db.letzte_aktivitaet()],

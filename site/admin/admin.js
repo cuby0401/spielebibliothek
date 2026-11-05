@@ -25,10 +25,13 @@ async function uebersicht(c) {
 	const d = await api("GET", "/uebersicht");
 	const kz = (wert, text) => h("div", { class: "kennzahl" }, h("div", { class: "wert", text: String(wert) }), h("div", { class: "text", text }));
 	c.append(h("div", { class: "kacheln-klein" },
-		kz(d.spieler, "Spieler (users.yaml)"), kz(d.spiele, "Spiele"), kz(d.zaehler.saves, "Spielstände"),
+		kz(d.spieler, "Spieler (users.yaml)"),
+		kz(d.spiele, "Spiele" + (d.testspiele ? ` (+${d.testspiele} Testspiele)` : "") + (d.offline ? ` · ${d.offline} offline` : "")),
+		kz(d.zaehler.saves, "Spielstände"),
 		kz(d.zaehler.scores, "Bestenlisten-Einträge"), kz(d.offeneAntraege, "offene Anträge"),
 		kz(groesse(d.datenbank), "Datenbank"), kz(d.sicherung ? datumZeit(d.sicherung) : "–", "letzte DB-Kopie fürs Backup")));
 	c.append(h("p", { class: "leise", text: "Backup: borgmatic sichert jede Nacht um 02:00 – den Erfolg zeigt das borgmatic-Log auf der NAS (docker logs borgmatic)." }));
+	await zentraleZeigen(c);
 	// „Ansicht als …“ (E26/E27): gilt für diesen Tab, beendet wird über das lila Band in der Bibliothek
 	const ansichtStarten = (rolle) => { Bridge.ansicht = rolle; location.href = "/#/"; };
 	c.append(h("h2", { text: "Bibliothek als Rolle ansehen" }),
@@ -41,6 +44,17 @@ async function uebersicht(c) {
 			: h("tr", {}, h("td", { text: datumZeit(u.zeit) }), h("td", { text: u.player }), h("td", { text: u.aktion + (u.dateien ? ` (${u.dateien} Dateien)` : "") }), h("td", { text: u.ordner || "" })))));
 	c.append(h("h2", { text: "Speicher je Entwickler" }), tabelle(["Entwickler", "Spieldateien"],
 		Object.entries(d.speicher).map(([n, b]) => h("tr", {}, h("td", { text: n }), h("td", { text: groesse(b) })))));
+}
+
+// Version der Zentrale (E39): site/zentrale.json und CHANGELOG.md schreibt scripts/deploy.sh
+async function zentraleZeigen(c) {
+	let z = null, log = "";
+	try { z = await (await fetch("/zentrale.json", { cache: "no-store" })).json(); } catch { /* vor E39 deployt */ }
+	try { const r = await fetch("/admin/CHANGELOG.md", { cache: "no-store" }); if (r.ok) log = await r.text(); } catch { /* egal */ }
+	c.append(h("h2", { text: "Zentrale" }),
+		h("p", {}, z ? `Version ${z.version} · Commit ${z.commit} · deployt ${datumZeit(z.zeit)}` : "Version unbekannt (noch nicht mit Versionierung deployt)."),
+		h("p", { class: "leise", text: "Zurück auf eine frühere Version: auf dem Mac scripts/deploy.sh --zurueck <version>. Vor jedem Deploy wird die Datenbank gesichert (data/backup/vor-deploy/)." }),
+		log ? h("details", {}, h("summary", { text: "Änderungsprotokoll der Zentrale" }), h("pre", { class: "changelog", text: log })) : null);
 }
 
 // ---------- Spiele ----------
@@ -56,7 +70,12 @@ async function spieleSeite(c) {
 			h("td", { text: String(s.spieler) }), h("td", { text: String(s.daumen || 0) }), h("td", { text: datumZeit(s.zuletzt) }),
 			h("td", { text: s.leaderboard.enabled ? `S${s.leaderboardSeason} · ${s.scores}` : "aus" }),
 			h("td", { text: s.fehler && s.fehler.arten ? `${s.fehler.arten24h || 0} neu · ${s.fehler.anzahl}×` : "–" }),
-			h("td", {}, h("div", { class: "zeile" }, schalter("versteckt", "ausblenden"), schalter("hervorgehoben", "empfehlen"), schalter("testspiel", "Testspiel"))),
+			h("td", {}, h("div", { class: "zeile" }, schalter("versteckt", "ausblenden"), schalter("hervorgehoben", "empfehlen"), schalter("testspiel", "Testspiel"),
+				h("label", { class: "haken", title: s.offlineGrund || "" }, h("input", { type: "checkbox", checked: !!s.offline,
+					onchange: (e) => sicher(async () => {
+						await Bridge.json("PUT", "/api/entwickler/offline/" + idPfad(s.id), { offline: e.target.checked });
+						meldung(`${s.title}: ${e.target.checked ? "offline" : "wieder online"}`);
+					}) }), "offline" + (s.offline && s.offlineGrund ? ` (${s.offlineGrund})` : "")))),
 			h("td", {}, h("div", { class: "zeile" },
 				s.leaderboard.enabled ? knopf("Bestenliste", () => bestenlisteDetail(c, s)) : null,
 				s.leaderboard.enabled ? knopf("Neue Season", async () => {

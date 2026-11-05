@@ -80,8 +80,13 @@ class Datenbank:
             spalten = {z["name"] for z in v.execute("PRAGMA table_info(scores)")}
             if "werte" not in spalten:
                 v.execute("ALTER TABLE scores ADD COLUMN werte TEXT")
-            if "testspiel" not in {z["name"] for z in v.execute("PRAGMA table_info(spiel_einstellungen)")}:
+            se = {z["name"] for z in v.execute("PRAGMA table_info(spiel_einstellungen)")}
+            if "testspiel" not in se:
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN testspiel INTEGER NOT NULL DEFAULT 0")
+            if "offline" not in se:   # E40: Entwickler nimmt sein Spiel vorübergehend offline
+                v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline INTEGER NOT NULL DEFAULT 0")
+                v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline_grund TEXT")
+                v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline_seit TEXT")
 
     @contextmanager
     def verbindung(self):
@@ -299,11 +304,12 @@ class Datenbank:
     def spiel_einstellungen(self) -> dict[str, dict]:
         with self.verbindung() as v:
             return {z["game"]: {"versteckt": bool(z["versteckt"]), "hervorgehoben": bool(z["hervorgehoben"]), "season": z["season"],
-                                "testspiel": bool(z["testspiel"])}
+                                "testspiel": bool(z["testspiel"]), "offline": bool(z["offline"]),
+                                "offlineGrund": z["offline_grund"], "offlineSeit": z["offline_seit"]}
                     for z in v.execute("SELECT * FROM spiel_einstellungen")}
 
     def spiel_setzen(self, game: str, **felder) -> None:
-        erlaubt = {"versteckt", "hervorgehoben", "season", "testspiel"}
+        erlaubt = {"versteckt", "hervorgehoben", "season", "testspiel", "offline", "offline_grund", "offline_seit"}
         felder = {k: v for k, v in felder.items() if k in erlaubt}
         if not felder:
             return

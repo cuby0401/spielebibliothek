@@ -57,7 +57,17 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
 
-## Deploy
+## Deploy und Versionen der Zentrale (E39)
 
-`scripts/deploy.sh` überträgt alle git-verfolgten Dateien (außer `examples/`) und startet neu. Datenbank-Erweiterungen laufen beim
-Start automatisch (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE … ADD COLUMN`) – nie Spalten löschen oder umbenennen.
+- **Neue Version:**
+  - `VERSION` erhöhen, in `CHANGELOG.md` einen Abschnitt `## <Version> – <Datum>` ergänzen, committen.
+  - Dann `scripts/deploy.sh`. Das Skript macht danach den Rest:
+    - verweigert nicht committete Stände und doppelte Nummern
+    - führt die Unit-Tests auf der NAS aus
+    - sichert die Datenbank nach `data/backup/vor-deploy/`
+    - archiviert den laufenden Stand nach `/volume1/docker/spielebibliothek-releases/<alt>.tar`
+    - überträgt, startet und setzt den Git-Tag `zentrale-v<Version>`
+- **Zurück:** `scripts/deploy.sh --zurueck <version>` (die vorhandenen zeigt `--versionen`). Auch dabei werden vorher Datenbank und laufender Stand gesichert.
+- **Datenbank:** Erweiterungen laufen beim Start automatisch (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE … ADD COLUMN`). Deshalb laufen alte Stände der Zentrale mit einer neueren Datenbank weiter: Spalten nie löschen oder umbenennen.
+- **Anzeige:** Die Version steht in der Fußzeile und im Admin-Panel (`site/zentrale.json`, `site/admin/CHANGELOG.md`, beide schreibt `deploy.sh`).
+- `scripts/deploy.sh --examples` kopiert zusätzlich die Testspiele aus `examples/`.
