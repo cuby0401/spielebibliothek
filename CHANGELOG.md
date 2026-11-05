@@ -24,6 +24,10 @@ Enthält auch 1.1.1, das nicht einzeln ausgeliefert wurde.
   - neuer Antrag (für Admins)
 - **Neu:** Wächter. Er prüft alle 5 Minuten Datenbank, Upload-Dienst, Caddy, die Erreichbarkeit über Cloudflare, den Speicher und die Backup-Kopie. Er meldet an Home Assistant (Lebenszeichen, Probleme, neue Anträge) und zeigt den Status im Admin-Panel. Einrichtung: `docs/home-assistant.md`.
 - **Neu:** `scripts/deploy.sh --gruendlich` fährt vor dem Deploy alle Ende-zu-Ende-Tests und „Böse“ im Teststand durch. Einzeln: `scripts/e2e-alle.sh`.
+- **Neu:** Probe-Zentrale. `scripts/deploy.sh --probe` setzt eine Kopie mit den echten Spielen und Daten auf, nur über Tailscale erreichbar, mit orangem Band.
+  - Dort testen, dann im Admin-Panel der Probe „Für Live freigeben“.
+  - `scripts/deploy.sh` spielt nur freigegebene Commits live ein. Notfall: `--ohne-probe`.
+- **Neu:** „Meine Anmeldungen“ (Menü) zeigt Gerät, Ort, IP, Anmeldezeit und letzte Aktivität je Sitzung. Im Admin-Panel unter Benutzer stehen alle.
 - **Neu:** Speicher je Spiel auf der Upload-Seite (live, Entwurf, ältere Versionen, Anteil am Kontingent).
 - **Neu:** Suche und Kategorien (`"tags"` in der `game.json`) in der Übersicht.
 - **Neu:** Erfolge (`"erfolge"` in der `game.json`, `GameSave.erfolg(id)`). Sie erscheinen neben dem Spiel, als Einblendung und auf der Profilseite. Die Profilseite (Menü → Mein Profil, Klick auf Namen in der Bestenliste) zeigt Spielzeit, Erfolge und Plätze.

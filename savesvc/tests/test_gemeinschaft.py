@@ -145,3 +145,41 @@ def test_waechter_meldet_probleme(monkeypatch, umgebung):
     assert any("Upload-Dienst" in p for p in probleme) and any("Caddy" in p for p in probleme)
     assert not any("außen" in p for p in probleme)                                 # 302 von Cloudflare Access = erreichbar
     waechter.ha_senden(e, "test")                                                     # ohne URL: tut nichts, kein Fehler
+
+
+# ---------- Anmeldungen (E55) und Probe-Zentrale (E56) ----------
+
+def test_anmeldungen(client):
+    h = {**client.als(PAUL), "User-Agent": "Mozilla/5.0 (iPad; CPU OS 18) Safari/605.1", "Cf-Connecting-Ip": "203.0.113.7",
+         "Cf-Ipcountry": "DE", "Cf-Ipcity": "Berlin"}
+    client.get("/api/me", headers=h)
+    client.get("/api/me", headers=h)                                   # gleiche Sitzung, gleiches Gerät → ein Eintrag
+    client.get("/api/me", headers={**client.als(PAUL), "User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130"})
+    liste = client.get("/api/meine/anmeldungen", headers=h).json()
+    assert len(liste) == 2
+    ipad = next(a for a in liste if a["geraet"] == "Safari (iPad)")
+    assert ipad["ip"] == "203.0.113.7" and ipad["ort"] == "Berlin, DE" and ipad["aktuell"] is True
+    assert {a["player"] for a in client.get("/api/admin/anmeldungen", headers=client.als()).json()} >= {"paul"}
+    assert client.get("/api/admin/anmeldungen", headers=client.als(PAUL)).status_code == 403
+
+
+def test_probe_freigabe(umgebung, rsa_schluessel, token):
+    from fastapi.testclient import TestClient
+    from savesvc.app import erstellen
+    from savesvc.config import Einstellungen
+    from .conftest import AUD, TEAM, Schluessel
+    def app(probe):
+        e = Einstellungen(team_domain=TEAM, audience=AUD, users_file=umgebung.users, spiele_dir=umgebung.spiele,
+                          db_path=umgebung.db, dev_user=None, probe=probe, zentrale_commit="abc1234", zentrale_version="1.2.0")
+        return TestClient(erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key())))
+    h = {"Cf-Access-Jwt-Assertion": token(), "X-Bibliothek": "1"}
+    live = app(False)
+    assert live.post("/api/admin/probe/freigeben", headers=h).status_code == 409   # nur in der Probe
+    probe = app(True)
+    assert probe.get("/api/me", headers=h).json()["probe"] is True
+    d = probe.post("/api/admin/probe/freigeben", json={"notiz": "alles getestet"}, headers=h).json()
+    assert d["commit"] == "abc1234" and d["notiz"] == "alles getestet"
+    assert json.loads((umgebung.db.parent / "freigabe.json").read_text())["commit"] == "abc1234"
+    assert probe.get("/api/admin/probe", headers=h).json()["freigabe"]["version"] == "1.2.0"
+    assert probe.delete("/api/admin/probe/freigeben", headers=h).status_code == 204
+    assert not (umgebung.db.parent / "freigabe.json").exists()

@@ -1,7 +1,10 @@
 #!/bin/sh
 # Schiebt den Stack (die „Zentrale“) vom Mac auf die NAS und startet ihn – versioniert (E39).
 #
-#   scripts/deploy.sh                    neue Version deployen (VERSION + CHANGELOG.md), vorher Tests auf der NAS
+#   scripts/deploy.sh --probe            neue Version zuerst in die PROBE-Zentrale (Kopie der echten Daten, nur über Tailscale)
+#   scripts/deploy.sh --probe --daten-behalten   Probe aktualisieren, ohne die Daten neu zu kopieren
+#   scripts/deploy.sh                    neue Version LIVE – nur wenn genau dieser Commit in der Probe freigegeben wurde (E56)
+#   scripts/deploy.sh --ohne-probe       Live ohne Freigabe (nur im Notfall, z. B. dringender Hotfix)
 #   scripts/deploy.sh --examples         zusätzlich examples/* nach /volume1/games/spiele/seb/ kopieren
 #   scripts/deploy.sh --no-start         nur übertragen, nicht starten
 #   scripts/deploy.sh --gruendlich       zusätzlich alle Ende-zu-Ende-Tests und „Böse“ im Teststand (ca. 6–8 Min., für große Updates)
@@ -10,6 +13,7 @@
 #   scripts/deploy.sh --versionen        aufgehobene Versionen auf der NAS anzeigen
 #
 # Schutz vor „Peng, alles kaputt“:
+#   0. Live nur nach Test in der Probe-Zentrale und „Für Live freigeben“ im Admin-Panel der Probe.
 #   1. Nur ein sauberer, committeter Stand wird deployt – mit neuer Nummer in VERSION und Eintrag „## <Version>“ in CHANGELOG.md.
 #      Dieselbe Nummer für einen anderen Commit wird abgelehnt (Git-Tag zentrale-v<Version>).
 #   2. Vorher laufen alle Unit-Tests auf der NAS (Python 3.12 wie in Produktion). Rot = kein Deploy.
@@ -31,6 +35,11 @@ BEISPIELE=0
 STARTEN=1
 TESTS=1
 GRUENDLICH=0
+PROBE=0
+OHNE_PROBE=0
+BEHALTEN=""
+PROBE_DIR=/volume1/docker/spielebibliothek-probe
+PROBE_URL=http://<NAS_GH>:18188
 ZURUECK=""
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -38,6 +47,9 @@ while [ $# -gt 0 ]; do
 		--no-start) STARTEN=0 ;;
 		--ohne-tests) TESTS=0 ;;
 		--gruendlich) GRUENDLICH=1 ;;
+		--probe) PROBE=1 ;;
+		--ohne-probe) OHNE_PROBE=1 ;;
+		--daten-behalten) BEHALTEN="--daten-behalten" ;;
 		--zurueck) shift; ZURUECK="${1:-}"; [ -n "$ZURUECK" ] || { echo "--zurueck braucht eine Version, z. B. 1.1.0" >&2; exit 2; } ;;
 		--versionen) ssh "$NAS" "ls -1t $RELEASES 2>/dev/null | sed 's/\.tar\$//' || echo '(noch keine)'"; exit 0 ;;
 		*) echo "Unbekannte Option: $1" >&2; exit 2 ;;
@@ -130,6 +142,19 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
 	echo "  (Version $VERSION_ZENTRALE, Commit $COMMIT wird erneut deployt)"
 fi
 
+# Live nur mit Freigabe aus der Probe (früh prüfen, damit niemand umsonst auf Tests wartet)
+if [ "$PROBE" = 0 ] && [ "$OHNE_PROBE" = 0 ]; then
+	FREIGABE=$(ssh "$NAS" "cat $PROBE_DIR/data/freigabe.json 2>/dev/null" || true)
+	FC=$(printf '%s' "$FREIGABE" | sed -n 's/.*"commit": *"\([^"]*\)".*/\1/p')
+	if [ "$FC" != "$COMMIT" ]; then
+		echo "✗ Commit $COMMIT ist nicht in der Probe-Zentrale freigegeben (freigegeben: ${FC:-nichts})." >&2
+		echo "  1. scripts/deploy.sh --probe   2. $PROBE_URL testen   3. dort Admin-Panel → „Für Live freigeben“   4. scripts/deploy.sh" >&2
+		echo "  Notfall ohne Probe: scripts/deploy.sh --ohne-probe" >&2
+		exit 1
+	fi
+	echo "  ✓ in der Probe freigegeben: $(printf '%s' "$FREIGABE" | sed -n 's/.*"zeit": *"\([^"]*\)".*/\1/p')"
+fi
+
 if [ "$TESTS" = 1 ]; then
 	echo "→ Tests auf der NAS (dauert ca. 2–3 Minuten) …"
 	if ! git ls-files savesvc | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
@@ -144,6 +169,19 @@ fi
 if [ "$GRUENDLICH" = 1 ]; then
 	echo "→ Ende-zu-Ende-Tests im Teststand (ca. 6–8 Minuten) …"
 	sh scripts/e2e-alle.sh || { echo "✗ Ende-zu-Ende-Tests fehlgeschlagen – nichts deployt." >&2; exit 1; }
+fi
+
+# ---------- Probe-Zentrale aufsetzen ----------
+if [ "$PROBE" = 1 ]; then
+	echo "→ Probe-Zentrale $VERSION_ZENTRALE (Commit $COMMIT) mit ${BEHALTEN:+bisherigen Daten}${BEHALTEN:-frischer Kopie der echten Daten}"
+	git ls-files | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+		set -e
+		rm -rf /tmp/sb-probe-repo && mkdir -p /tmp/sb-probe-repo && tar -xf - -C /tmp/sb-probe-repo
+		ART=probe ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_ZENTRALE sh /tmp/sb-probe-repo/scripts/teststand.sh up /tmp/sb-probe-repo $BEHALTEN
+		rm -rf /tmp/sb-probe-repo"
+	echo "✓ Probe läuft: $PROBE_URL  (nur über Tailscale; angemeldet als seb, Upload mit deinem normalen Upload-Passwort)"
+	echo "  Testen, dann dort Admin-Panel → „Für Live freigeben“, danach: scripts/deploy.sh"
+	exit 0
 fi
 
 # Versionskennung gegen Browser-/CDN-Cache: Commit plus Zeitstempel, ersetzt __VERSION__ in site/**/*.html

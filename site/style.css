@@ -256,3 +256,8 @@ main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
 .alarm-box strong { color: var(--warn); }
 .alarm-box ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; font-size: 0.9rem; }
 .alarm-box .knopf { justify-self: end; }
+
+/* Probe-Zentrale (E56): unübersehbar, damit niemand Probe und Live verwechselt */
+.probe-band { margin: 0; padding: 0.5rem 1.25rem; background: repeating-linear-gradient(45deg, #e67e22, #e67e22 12px, #d35400 12px, #d35400 24px);
+  color: #fff; font-weight: 600; text-align: center; }
+.probe-band a { color: #fff; margin-left: 0.6rem; }

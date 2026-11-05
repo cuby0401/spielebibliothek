@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 NAS="${NAS:-$NAS}"
 TMP=$(mktemp -d)
 aufraeumen() {
-	ssh -o LogLevel=ERROR "$NAS" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:test >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
+	ssh -o LogLevel=ERROR "$NAS" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:sbtest >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
 	rm -rf "$TMP"
 }
 trap aufraeumen EXIT

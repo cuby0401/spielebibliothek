@@ -676,6 +676,8 @@ async function start() {
 		ichSelbst = ich.player;
 		el("benutzer").textContent = ich.player;
 		el("upload-link").hidden = !ich.uploader;
+		el("probe-band").hidden = !ich.probe;
+		if (ich.probe) document.title = "🧪 " + document.title;
 		menueEinrichten();
 		glockeEinrichten();
 		sdwZeigen();

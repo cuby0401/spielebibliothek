@@ -20,6 +20,9 @@ class Einstellungen:
     upload_url: str = "http://upload:8000"
     ha_webhook: str = ""                    # Home-Assistant-Webhook für Wächter und Anträge (leer = aus)
     waechter: bool = False                  # Gesundheitsprüfung alle 5 Minuten (im Betrieb an, in Tests aus)
+    probe: bool = False                     # Probe-Zentrale (Kopie zum Testen vor dem Live-Gang, E56)
+    zentrale_commit: str = ""
+    zentrale_version: str = ""
 
     @property
     def jwks_url(self) -> str:
@@ -49,4 +52,7 @@ def laden() -> Einstellungen:
         upload_url=os.environ.get("UPLOAD_URL", "http://upload:8000"),
         ha_webhook=os.environ.get("HA_WEBHOOK_URL", ""),
         waechter=os.environ.get("WAECHTER", "1") != "0",
+        probe=os.environ.get("PROBE", "0") == "1",
+        zentrale_commit=os.environ.get("ZENTRALE_COMMIT", ""),
+        zentrale_version=os.environ.get("ZENTRALE_VERSION", ""),
     )

@@ -42,6 +42,7 @@ async function uebersicht(c) {
 		h("p", { class: "leise", text: w.homeAssistant ? "Home Assistant bekommt Lebenszeichen, Probleme und neue Anträge (HA_WEBHOOK_URL gesetzt)."
 			: "Home Assistant ist nicht verbunden – HA_WEBHOOK_URL in der .env setzen, Anleitung: docs/home-assistant.md im Repo." }));
 	await zentraleZeigen(c);
+	await probeZeigen(c);
 	// „Ansicht als …“ (E26/E27): gilt für diesen Tab, beendet wird über das lila Band in der Bibliothek
 	// Jeder Start beginnt mit leerem simulierten Konto – auch der Zwischenspeicher dieses Browsers dafür wird geleert
 	const ansichtStarten = async (rolle) => {
@@ -71,6 +72,33 @@ async function zentraleZeigen(c) {
 		h("p", {}, z ? `Version ${z.version} · Commit ${z.commit} · deployt ${datumZeit(z.zeit)}` : "Version unbekannt (noch nicht mit Versionierung deployt)."),
 		h("p", { class: "leise", text: "Zurück auf eine frühere Version: auf dem Mac scripts/deploy.sh --zurueck <version>. Vor jedem Deploy wird die Datenbank gesichert (data/backup/vor-deploy/)." }),
 		log ? h("details", {}, h("summary", { text: "Änderungsprotokoll der Zentrale" }), h("pre", { class: "changelog", text: log })) : null);
+}
+
+// Probe-Zentrale (E56): Kopie zum Testen; „Für Live freigeben“ erlaubt scripts/deploy.sh genau diesen Commit
+const PROBE_URL = "http://<NAS_GH>:18188";
+async function probeZeigen(c) {
+	const p = await api("GET", "/probe").catch(() => null);
+	if (!p) return;
+	c.append(h("h2", { text: p.probe ? "🧪 Diese Seite ist die Probe-Zentrale" : "Probe-Zentrale" }));
+	if (!p.probe) {
+		return c.append(h("p", {}, "Neue Versionen der Zentrale laufen zuerst in der Probe – einer Kopie mit den echten Spielen und Daten, nur für dich über Tailscale: ",
+			h("a", { href: PROBE_URL, target: "_blank", rel: "noopener", text: PROBE_URL.replace("http://", "") }),
+			". Aufsetzen: scripts/deploy.sh --probe. Live geht eine Version erst, wenn du sie dort freigegeben hast."));
+	}
+	const f = p.freigabe;
+	c.append(h("p", {}, `Version ${p.version || "?"} · Commit ${p.commit || "?"}` + (p.kopieVon ? ` · Daten kopiert ${datumZeit(p.kopieVon)}` : "")),
+		h("p", { class: f && f.commit === p.commit ? "hinweis-box" : "leise" },
+			f && f.commit === p.commit ? `✓ Freigegeben am ${datumZeit(f.zeit)}${f.notiz ? " – " + f.notiz : ""}. Jetzt live einspielen: scripts/deploy.sh` : "Noch nicht freigegeben."),
+		h("div", { class: "zeile" },
+			f && f.commit === p.commit
+				? knopf("Freigabe zurücknehmen", async () => { await api("DELETE", "/probe/freigeben"); meldung("Freigabe zurückgenommen."); zeigen(); }, "gefahr")
+				: knopf("Getestet – für Live freigeben", async () => {
+					const notiz = prompt("Für Live freigeben? Was hast du getestet? (optional, steht in der Freigabe)", "");
+					if (notiz === null) return;
+					await api("POST", "/probe/freigeben", { notiz });
+					meldung("Freigegeben – jetzt auf dem Mac: scripts/deploy.sh");
+					zeigen();
+				}, "")));
 }
 
 // ---------- Spiele ----------
@@ -236,7 +264,16 @@ async function antraegeSeite(c) {
 }
 
 // ---------- Navigation ----------
-const SEITEN = { uebersicht, spiele: spieleSeite, benutzer: benutzerSeite, spielstaende: spielstaendeSeite, antraege: antraegeSeite };
+// Benutzer + letzte Anmeldungen aller (E55)
+async function benutzerMitAnmeldungen(c) {
+	await benutzerSeite(c);
+	const liste = await api("GET", "/anmeldungen");
+	c.append(h("h2", { text: "Letzte Anmeldungen" }),
+		h("p", { class: "leise", text: "Je Cloudflare-Sitzung und Gerät. Unbekanntes Gerät? In Cloudflare Zero Trust → Access → Benutzer die Sitzungen widerrufen. Stadt und Region erscheinen erst mit der Managed Transform „Add visitor location headers“ in Cloudflare, sonst nur das Land." }),
+		liste.length ? anmeldeTabelle(liste, true) : h("p", { class: "leise", text: "Noch keine Anmeldungen aufgezeichnet." }));
+}
+
+const SEITEN = { uebersicht, spiele: spieleSeite, benutzer: benutzerMitAnmeldungen, spielstaende: spielstaendeSeite, antraege: antraegeSeite };
 
 async function zeigen() {
 	const name = SEITEN[location.hash.slice(1)] ? location.hash.slice(1) : "uebersicht";

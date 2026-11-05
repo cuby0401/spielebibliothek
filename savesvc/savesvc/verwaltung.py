@@ -360,6 +360,50 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def meine_antraege(player: str = Depends(ich_daten)):
         return db.antraege(player)
 
+    # ---------- Anmeldungen (E55) ----------
+
+    @app.get("/api/meine/anmeldungen")
+    def meine_anmeldungen(request: Request, player: str = Depends(spieler)):
+        aktuell = (int(getattr(request.state, "sitzung_start", 0) or 0), browser_von(request.headers.get("user-agent", "")))
+        return [{**a, "aktuell": (a["sitzung"], a["geraet"]) == aktuell} for a in db.anmeldungen(player, 50)]
+
+    @app.get("/api/admin/anmeldungen")
+    def alle_anmeldungen(_: str = Depends(admin)):
+        return db.anmeldungen(None, 200)
+
+    # ---------- Probe-Zentrale (E56) ----------
+
+    freigabe_datei = e.db_path.parent / "freigabe.json"
+
+    @app.get("/api/admin/probe")
+    def probe_status(_: str = Depends(admin)):
+        kopie = e.db_path.parent / "kopie-von"
+        try:
+            freigabe = json.loads(freigabe_datei.read_text())
+        except (OSError, ValueError):
+            freigabe = None
+        return {"probe": e.probe, "commit": e.zentrale_commit, "version": e.zentrale_version,
+                "kopieVon": kopie.read_text().strip() if kopie.exists() else None, "freigabe": freigabe}
+
+    @app.post("/api/admin/probe/freigeben")
+    def probe_freigeben(player: str = Depends(admin), body: dict[str, Any] = Body(default={})):
+        """Seb hat die Probe getestet → scripts/deploy.sh darf genau diesen Commit live einspielen."""
+        if not e.probe:
+            raise HTTPException(409, "Nur in der Probe-Zentrale")
+        if not e.zentrale_commit:
+            raise HTTPException(409, "Probe ohne Commit gestartet – mit scripts/deploy.sh --probe aufsetzen")
+        notiz = " ".join(str(body.get("notiz") or "").split())[:300]
+        daten = {"commit": e.zentrale_commit, "version": e.zentrale_version, "von": player,
+                 "zeit": datetime.now(timezone.utc).isoformat(timespec="seconds"), "notiz": notiz}
+        freigabe_datei.write_text(json.dumps(daten, ensure_ascii=False))
+        return daten
+
+    @app.delete("/api/admin/probe/freigeben", status_code=204)
+    def probe_freigabe_zurueck(_: str = Depends(admin)):
+        if not e.probe:
+            raise HTTPException(409, "Nur in der Probe-Zentrale")
+        freigabe_datei.unlink(missing_ok=True)
+
     # ---------- Admin ----------
 
     def platte() -> dict:

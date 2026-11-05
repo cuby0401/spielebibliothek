@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS erfolge (
     player TEXT NOT NULL, game TEXT NOT NULL, erfolg TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game, erfolg));
 CREATE TABLE IF NOT EXISTS spiel_der_woche (
     id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, start TEXT NOT NULL, ende TEXT NOT NULL);
+-- Anmeldungen: Gerät, Ort, IP je Cloudflare-Sitzung (E55)
+CREATE TABLE IF NOT EXISTS anmeldungen (
+    player TEXT NOT NULL, sitzung INTEGER NOT NULL, geraet TEXT NOT NULL, ip TEXT, ort TEXT,
+    erste TEXT NOT NULL, letzte TEXT NOT NULL, PRIMARY KEY (player, sitzung, geraet));
 -- Daumen hoch je Spieler und Spiel (Idee „Bewertung“, 05.11.2026)
 CREATE TABLE IF NOT EXISTS daumen (
     player TEXT NOT NULL, game TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game));
@@ -401,6 +405,25 @@ class Datenbank:
         with self.verbindung() as v:
             z = v.execute("SELECT * FROM antraege WHERE id=?", (antrag_id,)).fetchone()
         return dict(z) if z else None
+
+    # --- Anmeldungen (E55) ---
+
+    ANMELDUNGEN_MAX = 100
+
+    def anmeldung(self, player: str, sitzung: int, geraet: str, ip: str | None, ort: str | None) -> None:
+        with self.verbindung() as v:
+            v.execute("""INSERT INTO anmeldungen (player, sitzung, geraet, ip, ort, erste, letzte) VALUES (?,?,?,?,?,?,?)
+                         ON CONFLICT (player, sitzung, geraet) DO UPDATE SET letzte=excluded.letzte,
+                           ip=COALESCE(excluded.ip, ip), ort=COALESCE(excluded.ort, ort)""",
+                      (player, sitzung, geraet, ip, ort, jetzt(), jetzt()))
+            v.execute("""DELETE FROM anmeldungen WHERE player=? AND rowid NOT IN (
+                             SELECT rowid FROM anmeldungen WHERE player=? ORDER BY letzte DESC LIMIT ?)""",
+                      (player, player, self.ANMELDUNGEN_MAX))
+
+    def anmeldungen(self, player: str | None = None, limit: int = 100) -> list[dict]:
+        with self.verbindung() as v:
+            sql = "SELECT * FROM anmeldungen" + (" WHERE player=?" if player else "") + " ORDER BY letzte DESC LIMIT ?"
+            return [dict(z) for z in v.execute(sql, ((player, limit) if player else (limit,)))]
 
     # --- Simulation („Ansicht als …“) ---
 

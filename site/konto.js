@@ -189,3 +189,24 @@ SEITEN_REG["profil"] = async (c) => {
 				s.erfolge.length ? h("div", { class: "leise", text: s.erfolge.map((e) => "🏆 " + e.titel).join(" · ") }) : null)))))));
 };
 
+// ---------- Meine Anmeldungen (E55): wo, mit welchem Gerät, wann ----------
+SEITEN_REG["anmeldungen"] = async (c) => {
+	c.append(h("h1", { text: "Meine Anmeldungen" }),
+		h("p", { class: "leise", text: "Jede Anmeldung per E-Mail-Code gilt eine Woche auf einem Gerät. Hier siehst du, wo und mit welchem Gerät du angemeldet warst. Ein Eintrag, den du nicht kennst? Abmelden und Seb Bescheid geben – er kann alle Sitzungen in Cloudflare widerrufen." }));
+	const liste = await Bridge.json("GET", "/api/meine/anmeldungen");
+	if (!liste.length) return c.append(h("p", { text: "Noch keine Anmeldungen aufgezeichnet." }));
+	c.append(anmeldeTabelle(liste, false));
+};
+
+function anmeldeTabelle(liste, mitSpieler) {
+	return h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
+		h("thead", {}, h("tr", {}, ...[...(mitSpieler ? ["Spieler"] : []), "Gerät", "Ort", "IP", "Angemeldet", "Zuletzt aktiv"].map((t) => h("th", { text: t })))),
+		h("tbody", {}, liste.map((a) => h("tr", {},
+			mitSpieler ? h("td", { text: a.player }) : null,
+			h("td", {}, a.geraet, a.aktuell ? h("span", { class: "status erledigt", text: " dieses Gerät " }) : null),
+			h("td", { text: a.ort || "–" }),
+			h("td", { text: a.ip || "–" }),
+			h("td", { text: a.sitzung ? datumZeit(new Date(a.sitzung * 1000).toISOString()) : "–" }),
+			h("td", { text: datumZeit(a.letzte) }))))));
+}
+

@@ -59,6 +59,20 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`.
 - **Alle Ende-zu-Ende-Tests auf einmal:** `scripts/e2e-alle.sh` (frischer Teststand je Test, ca. 4–8 Min., räumt danach auf). Vor dem Deploy automatisch mit `scripts/deploy.sh --gruendlich`.
 
+## Probe-Zentrale (E56) – erst testen, dann live
+
+1. `scripts/deploy.sh --probe` (gleiche Prüfungen wie live: committet, neue Nummer, Changelog, Tests) baut auf der NAS eine zweite Zentrale auf:
+   - eine **frische Kopie** der echten Spiele, Datenbank, Konten und Upload-Passwörter
+   - erreichbar unter `http://<NAS_GH>:18188`, nur über Tailscale
+   - Angemeldet ist man automatisch als seb.
+   - Ein oranges Band zeigt „Probe-Zentrale“.
+   - Mit `--daten-behalten` bleiben die Probe-Daten, nur der Code wird erneuert.
+2. Dort testen. Was dort passiert, bleibt dort.
+3. Admin-Panel der Probe → „Getestet – für Live freigeben“ (optional mit Notiz). Das schreibt `data/freigabe.json` mit dem Commit.
+4. `scripts/deploy.sh` prüft als Erstes, ob genau dieser Commit freigegeben ist, sonst Abbruch. Notfall: `--ohne-probe`.
+
+Technisch ist die Probe derselbe Aufbau wie der Teststand (`scripts/teststand.sh`, `ART=probe`, Container `sbprobe-*`, Ordner `/volume1/docker/spielebibliothek-probe`). Wächter und Home Assistant sind dort aus.
+
 ## Deploy und Versionen der Zentrale (E39)
 
 - **Neue Version:**

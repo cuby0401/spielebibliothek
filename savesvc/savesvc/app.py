@@ -103,12 +103,30 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         ordner = ordner or e.spiele_dir / game_id
         return max(games.season(ordner), db.season_override(game_id) or 0)
 
+    letzte_anmeldung: dict[tuple, float] = {}
+
+    def anmeldung_merken(request: Request, player: str) -> None:
+        """Gerät, Ort und IP je Cloudflare-Sitzung festhalten (E55). Höchstens alle 5 Minuten ein Schreibzugriff."""
+        from .verwaltung import browser_von
+        sitzung = int(getattr(request.state, "sitzung_start", 0) or 0)
+        geraet = browser_von(request.headers.get("user-agent", ""))
+        schluessel = (player, sitzung, geraet)
+        if time.monotonic() - letzte_anmeldung.get(schluessel, -1e9) < 300:
+            return
+        letzte_anmeldung[schluessel] = time.monotonic()
+        h = request.headers
+        ip = h.get("cf-connecting-ip") or (request.client.host if request.client else None)
+        # Ort: Land kommt von Cloudflare immer, Stadt/Region nur mit der Managed Transform „Add visitor location headers“
+        ort = ", ".join(x for x in (h.get("cf-ipcity"), h.get("cf-region"), h.get("cf-ipcountry")) if x and x != "XX") or None
+        db.anmeldung(player, sitzung, geraet, ip, ort)
+
     @app.get("/api/me")
     def me(request: Request, player: str = Depends(spieler)):
         # Entwickler = hat einen eigenen Spielordner (wird beim Anlegen des Upload-Kontos erzeugt).
         # „Ansicht als …“ (rollen.py): echte Admins können Spieler- oder Entwickler-Sicht simulieren.
         r = rollen.rolle(e, request, player)
-        return {"player": player, "uploader": r["uploader"], "admin": r["admin"],
+        anmeldung_merken(request, player)
+        return {"player": player, "uploader": r["uploader"], "admin": r["admin"], "probe": e.probe,
                 "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"],
                 "sitzungBis": getattr(request.state, "sitzung_bis", None)}
 
