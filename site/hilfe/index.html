@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hilfe – Spielebibliothek</title>
+  <link rel="stylesheet" href="/style.css?v=__VERSION__">
+  <link rel="stylesheet" href="/hilfe/hilfe.css?v=__VERSION__">
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="/">Spielebibliothek</a>
+    <nav><a class="knopf leise" href="/">← Zu den Spielen</a></nav>
+  </header>
+
+  <main class="hilfe">
+    <h1>So kommt dein Spiel in die Bibliothek</h1>
+    <ol class="schritte">
+      <li><strong>Spiel bauen</strong> – am einfachsten mit KI. Kopiere den <a href="#prompt">Prompt-Block</a> unten in deinen Prompt.</li>
+      <li><strong>Testen</strong> – <code>index.html</code> lokal im Browser öffnen. Speichern geht dort nur bis zum Neuladen, das ist normal.</li>
+      <li><strong>Als ZIP packen</strong> – den Spielordner komprimieren.
+        Mac: Rechtsklick → „Komprimieren“. Windows: Rechtsklick → „Senden an“ → „ZIP-komprimierter Ordner“.</li>
+      <li><strong>Hochladen</strong> – <a href="https://upload.cuby0401.uk" target="_blank" rel="noopener">upload.cuby0401.uk</a> öffnen,
+        mit dem E-Mail-Code anmelden, dann mit deinem <strong>Upload-Passwort</strong> (bitte nicht im Browser speichern).
+        ZIP auswählen, Ordnernamen prüfen, „Hochladen“.</li>
+      <li><strong>Spielen</strong> – hier die Seite neu laden, dein Spiel ist da.</li>
+    </ol>
+    <p class="hinweis">Hochladen können nur Entwickler mit Upload-Konto. Wenn du auch Spiele bauen willst, melde dich bei Seb.</p>
+
+    <h2>Regeln</h2>
+    <ol class="regeln">
+      <li><strong>Ein Ordner pro Spiel</strong>, <code>index.html</code> direkt darin. Im ZIP darf der Ordner drumherum sein – das wird erkannt.</li>
+      <li><strong>Nur relative Pfade:</strong> <code>./sprites/held.png</code>, nicht <code>/sprites/held.png</code>.
+        Einzige Ausnahme: <code>/lib/gamesave.js</code>.</li>
+      <li><strong>Nur fertige Dateien.</strong> Mit Vite/React: den Ordner <code>dist/</code> hochladen, vorher <code>base: './'</code> setzen.</li>
+      <li><strong>Keine externen Server.</strong> Keine CDNs – Bibliotheken wie three.js oder Phaser als Datei mitliefern.
+        Keine Aufrufe ins Internet, kein eigener Server-Code. Die Bibliothek blockiert das sonst.</li>
+      <li><strong>Speichern mit <code>GameSave</code>.</strong> <code>localStorage</code> funktioniert auch (wird automatisch auf dem Server gespeichert),
+        aber nur mit <code>GameSave</code> gibt es Bestenlisten und saubere Updates.</li>
+      <li><strong>Updates immer in denselben Ordner</strong> – also beim Hochladen denselben Ordnernamen nehmen.
+        Neuer Ordnername = neues Spiel, Spielstände und Bestenliste wären weg.</li>
+      <li><strong>Speicherstruktur nicht ohne Migration ändern:</strong> neue Felder mit Standardwerten, nichts umbenennen oder löschen;
+        bei Strukturänderung <code>saveVersion</code> in der <code>game.json</code> erhöhen und alte Stände beim Laden umwandeln.</li>
+      <li><strong>Erlaubte Dateitypen:</strong> html, js, mjs, css, json, png, jpg, gif, webp, svg, ico, mp3, ogg, wav, m4a, mp4, webm,
+        woff, woff2, ttf, otf, wasm, txt, glb, gltf, bin. Alles andere (z. B. <code>.exe</code>, Skripte, versteckte Dateien)
+        wird beim Hochladen übersprungen.</li>
+      <li><strong>Größe:</strong> höchstens 100 MB pro ZIP.</li>
+      <li><strong>Nach Logins fragen nur Cloudflare (E-Mail-Code) und die Upload-Seite.</strong>
+        Fragt ein Spiel nach einem Passwort, ist etwas faul – bitte Seb Bescheid geben.</li>
+    </ol>
+
+    <h2>GameSave – Speichern und Bestenliste</h2>
+<pre><code>&lt;script src="/lib/gamesave.js"&gt;&lt;/script&gt;   &lt;!-- als ERSTES Script --&gt;
+
+await GameSave.save("spielstand", { level: 3, punkte: 500 });
+const { data, version } = await GameSave.load("spielstand");  // data = null, wenn nichts da
+await GameSave.remove("spielstand");
+await GameSave.submitScore(1250);                // nur mit Bestenliste in game.json
+const top = await GameSave.leaderboard();        // [{ player: "paul", score: 1250 }, …]
+const ich = await GameSave.player();             // "paul"
+GameSave.available                               // false beim lokalen Testen</code></pre>
+    <p>Alle Aufrufe können fehlschlagen (z. B. offline) – Fehler mit <code>try/catch</code> abfangen.
+      Keys: Buchstaben, Ziffern, <code>. _ : -</code>, max. 100 Zeichen. Ein Spielstand darf höchstens 256 KB groß sein.</p>
+
+    <h2><code>game.json</code></h2>
+<pre><code>{
+  "title": "Snake",
+  "description": "Klassisches Snake mit Power-ups",
+  "thumbnail": "thumb.png",
+  "saveVersion": 1,
+  "leaderboard": { "enabled": true, "order": "desc", "label": "Punkte" },
+  "leaderboardSeason": 1
+}</code></pre>
+    <ul>
+      <li><code>order</code>: <code>"desc"</code> = mehr ist besser, <code>"asc"</code> = weniger ist besser (z. B. Zeit).</li>
+      <li><code>leaderboardSeason</code> erhöhen, wenn ein Update das Spiel deutlich leichter oder schwerer macht – dann beginnt eine neue Bestenliste, die alte bleibt abrufbar.</li>
+      <li>Der Autor kommt immer aus deinem Benutzernamen, nicht aus der <code>game.json</code>.</li>
+    </ul>
+
+    <h2 id="prompt">Prompt-Block zum Kopieren</h2>
+    <div class="prompt-kopf">
+      <span class="leise">In deinen KI-Prompt einfügen, zusätzlich zur Beschreibung deines Spiels.</span>
+      <button id="kopieren" class="knopf" type="button">Kopieren</button>
+    </div>
+<pre id="prompt-text">Baue das Spiel als statische Web-App für die Spielebibliothek:
+- index.html im Hauptordner, alle Pfade relativ (./…), keine CDNs, alle Bibliotheken als Datei mitliefern, kein Server-Code, keine Netzwerkaufrufe nach außen.
+- Binde &lt;script src="/lib/gamesave.js"&gt;&lt;/script&gt; als erstes Script ein und speichere Fortschritt mit await GameSave.save(key, data) / const {data, version} = await GameSave.load(key). Fange Fehler von GameSave ab. GameSave.available ist false beim lokalen Testen – das Spiel muss trotzdem laufen.
+- Für Highscores: await GameSave.submitScore(zahl) und await GameSave.leaderboard() (Liste von {player, score}).
+- Lege eine game.json an: {"title": "...", "description": "...", "thumbnail": "thumb.png", "saveVersion": 1, "leaderboard": {"enabled": true, "order": "desc", "label": "Punkte"}, "leaderboardSeason": 1} und erstelle ein Vorschaubild thumb.png oder thumb.svg im Format 16:9.
+- Wenn du Elemente mit dem hidden-Attribut ein- und ausblendest, ergänze im CSS [hidden] { display: none !important; } – sonst bleiben Overlays mit display:flex/grid sichtbar.
+- Ändere bei späteren Updates die Struktur gespeicherter Daten nie ohne Migration: neue Felder mit Standardwerten, nichts umbenennen oder löschen. Wenn sich die Struktur ändert, erhöhe saveVersion und wandle alte Stände beim Laden um.
+- Nur diese Dateitypen verwenden: html, js, css, json, png, jpg, gif, webp, svg, mp3, ogg, wav, woff2, wasm, glb, gltf.</pre>
+
+    <h2>Häufige Fragen</h2>
+    <dl>
+      <dt>Mein Spiel zeigt nur eine weiße Fläche.</dt>
+      <dd>Meist ein absoluter Pfad (<code>/assets/…</code>) oder eine Bibliothek vom CDN. Beides geht hier nicht – siehe Regeln 2 und 4.</dd>
+      <dt>Ein Overlay oder Menü verschwindet nicht.</dt>
+      <dd>Siehe die <code>hidden</code>-Zeile im Prompt-Block.</dd>
+      <dt>Mein Spielstand ist nach einem Update weg.</dt>
+      <dd>Wurde ein anderer Ordnername verwendet? Sonst bei Seb melden – die letzten 5 Stände jedes Spielstands sind gesichert.</dd>
+      <dt>Die Seite sagt „Anmeldung abgelaufen“.</dt>
+      <dd>Nach einer Woche ist ein neuer E-Mail-Code nötig – Seite neu laden.</dd>
+    </dl>
+  </main>
+  <script src="/hilfe/hilfe.js?v=__VERSION__"></script>
+</body>
+</html>

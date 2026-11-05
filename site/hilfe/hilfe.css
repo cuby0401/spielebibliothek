@@ -1,0 +1,11 @@
+.hilfe { max-width: 860px; line-height: 1.6; }
+.hilfe h1 { font-size: 1.5rem; margin: 0.5rem 0 1rem; }
+.hilfe h2 { font-size: 1.15rem; margin: 2rem 0 0.6rem; padding-top: 0.5rem; border-top: 1px solid var(--linie); }
+.hilfe li { margin: 0.35rem 0; }
+.hilfe code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--flaeche); padding: 0.05em 0.3em; border-radius: 4px; }
+.hilfe pre { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; padding: 0.8rem 1rem; overflow-x: auto; white-space: pre-wrap; font: 0.85rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.hilfe pre code { background: none; padding: 0; }
+.hinweis { background: var(--flaeche); border-left: 3px solid var(--akzent); padding: 0.5rem 0.8rem; border-radius: 4px; }
+.prompt-kopf { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.hilfe dt { font-weight: 650; margin-top: 0.8rem; }
+.hilfe dd { margin: 0.2rem 0 0 1rem; }
