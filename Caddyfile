@@ -5,6 +5,7 @@
 # TLS macht Cloudflare, deshalb nur HTTP. Alle Hostnamen kommen über denselben Tunnel:
 #   games.cuby0401.uk → Bibliotheksseite, /lib, /api
 #   play.cuby0401.uk  → nur Spieldateien (/play) und /lib – eigener Origin für die Spiele (E14)
+#   upload.cuby0401.uk → Upload-Seite + Upload-Dienst (Phase 6b, ersetzt File Browser – E19)
 {
 	admin off
 	auto_https off
@@ -72,10 +73,37 @@
 		}
 	}
 
+	# ---------- upload.cuby0401.uk: Upload für Entwickler ----------
+	@upload host upload.cuby0401.uk
+	handle @upload {
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+		# Der Upload-Dienst prüft das Access-JWT (eigene AUD) und das Upload-Passwort
+		handle /api/upload/* {
+			reverse_proxy upload:8000
+		}
+		handle /style.css {
+			root * /srv/site
+			file_server
+		}
+		handle /upload/* {
+			root * /srv/site
+			file_server
+		}
+		handle / {
+			rewrite * /upload/index.html
+			root * /srv/site
+			file_server
+		}
+		handle {
+			respond 404
+		}
+	}
+
 	# ---------- games.cuby0401.uk: Bibliothek ----------
 
 	# Die Bibliothek spricht nur mit sich selbst und mit play; sie lässt sich nirgends einbetten.
-	@games not host play.cuby0401.uk
+	@games not host play.cuby0401.uk upload.cuby0401.uk
 	header @games Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://play.cuby0401.uk; frame-src https://play.cuby0401.uk; connect-src 'self' https://play.cuby0401.uk; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 	# GameSave-Bibliothek und Bridge
@@ -89,8 +117,11 @@
 		reverse_proxy savesvc:8000
 	}
 
-	# Spiele gibt es nur unter play.cuby0401.uk (E14)
+	# Spiele gibt es nur unter play.cuby0401.uk (E14), den Upload nur unter upload.cuby0401.uk
 	handle /play/* {
+		respond 404
+	}
+	handle /upload/* {
 		respond 404
 	}
 

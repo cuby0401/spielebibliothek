@@ -1,0 +1,21 @@
+.upload { max-width: 820px; }
+.upload h1 { font-size: 1.3rem; margin: 0.5rem 0 0.75rem; }
+.upload h2 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; }
+.zeile { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.karte { display: grid; gap: 0.8rem; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 1rem; }
+.karte label { display: grid; gap: 0.3rem; font-weight: 600; }
+.upload input[type=text], .upload input[type=password] {
+  font: inherit; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--linie); background: var(--grund); color: var(--text);
+}
+.upload input[type=password] { min-width: 16rem; }
+.klein { font-size: 0.85rem; margin: 0; }
+progress { flex: 1; min-width: 8rem; }
+.liste { display: grid; gap: 0.5rem; }
+.eintrag { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; padding: 0.6rem 0.9rem; }
+.eintrag .titel { font-weight: 650; }
+.eintrag .info { color: var(--leise); font-size: 0.85rem; }
+.eintrag .warnung { color: var(--warn); font-size: 0.85rem; }
+.knopf.gefahr { background: transparent; color: var(--warn); border-color: var(--warn); }
+.meldung.ok { border-color: var(--akzent); }
+.meldung.fehler { border-color: var(--warn); color: var(--warn); }

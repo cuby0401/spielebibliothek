@@ -30,7 +30,7 @@ docs/          Betriebsnotizen
 | 5 | Bestenliste mit Seasons | deployt 05.11.2026, Abnahme mit zweitem Konto offen |
 | 6 | Upload (File Browser) | deployt 05.11.2026, Abnahme offen |
 | 7 | Härtung: Dateityp-Whitelist, CSP, SVG, Test-Spiel `boese` | deployt 05.11.2026 |
-| 6b | Eigener ZIP-Upload ersetzt File Browser (archiviert) | geplant |
+| 6b | Eigener ZIP-Upload ersetzt File Browser (archiviert) | ✓ 05.11.2026 |
 | 8 | Backup über borgmatic, Wiederherstellung getestet | ✓ 05.11.2026 |
 | 9 | Anleitung, erster Kollege | offen |
 
@@ -48,4 +48,4 @@ Für LAN-Tests den Port in `compose.yaml` vorübergehend einkommentieren.
 
 - `.env`: `TUNNEL_TOKEN`
 - `config/users.yaml`: Login-E-Mail → Benutzername (Vorlage `users.example.yaml`), wirkt ohne Neustart
-- File-Browser-Benutzer: nur über `scripts/filebrowser.sh` (einrichten · anlegen · passwort · sperren · liste)
+- Upload-Konten (Entwickler): `docker exec spielebibliothek-upload python -m savesvc entwickler anlegen|passwort|sperren|liste <name>`

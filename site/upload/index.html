@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spiel hochladen – Spielebibliothek</title>
+  <link rel="stylesheet" href="/style.css?v=__VERSION__">
+  <link rel="stylesheet" href="/upload/upload.css?v=__VERSION__">
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="https://games.cuby0401.uk">Spielebibliothek · Upload</a>
+    <nav>
+      <span id="benutzer" class="benutzer" hidden></span>
+      <button id="abmelden" class="knopf leise" type="button" hidden>Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="upload">
+    <p id="meldung" class="meldung" hidden></p>
+
+    <section id="anmeldung" hidden>
+      <h1>Upload-Passwort</h1>
+      <p class="leise">Zusätzlich zum E-Mail-Code: dein persönliches Upload-Passwort. Bitte <strong>nicht</strong> im Browser speichern.</p>
+      <form id="anmeldeform" class="zeile">
+        <input id="passwort" type="password" autocomplete="off" required placeholder="Passwort" aria-label="Upload-Passwort">
+        <button class="knopf" type="submit">Anmelden</button>
+      </form>
+    </section>
+
+    <section id="bereich" hidden>
+      <h1>Spiel hochladen oder aktualisieren</h1>
+      <form id="uploadform" class="karte">
+        <label>ZIP-Datei mit deinem Spiel
+          <input id="datei" type="file" accept=".zip,application/zip" required>
+        </label>
+        <label>Ordnername (bleibt immer gleich – Updates gehen in denselben Ordner)
+          <input id="ordner" type="text" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" placeholder="z. B. snake">
+        </label>
+        <p class="leise klein">
+          Im ZIP muss <code>index.html</code> ganz oben liegen (oder in genau einem Ordner).
+          Mac: Ordner rechtsklicken → „Komprimieren“. Windows: Rechtsklick → „Senden an“ → „ZIP-komprimierter Ordner“.
+          Max. 100 MB. <code>.exe</code>, Skripte und versteckte Dateien werden übersprungen.
+        </p>
+        <div class="zeile">
+          <button class="knopf" type="submit">Hochladen</button>
+          <progress id="fortschritt" max="100" value="0" hidden></progress>
+        </div>
+      </form>
+
+      <h2>Deine Spiele</h2>
+      <div id="liste" class="liste"></div>
+    </section>
+  </main>
+
+  <script src="/upload/upload.js?v=__VERSION__"></script>
+</body>
+</html>

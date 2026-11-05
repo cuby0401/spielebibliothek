@@ -44,6 +44,11 @@ class Benutzerliste:
         self._zuordnung, self._stand = neu, stand
         log.info("users.yaml geladen: %d Benutzer", len(neu))
 
+    def namen(self) -> set[str]:
+        with self._sperre:
+            self._neu_laden()
+            return set(self._zuordnung.values())
+
     def benutzer(self, email: str) -> str | None:
         with self._sperre:
             self._neu_laden()

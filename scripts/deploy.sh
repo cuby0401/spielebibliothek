@@ -63,7 +63,9 @@ tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "
 	chmod 600 .env
 	# config/: savesvc (UID 10022) darf lesen, sonst niemand außer Sebi – auch für neu angelegte Dateien
 	chmod 750 config && chmod 640 config/users.yaml
-	setfacl -m u:10022:rx -d -m u:10022:r config && setfacl -m u:10022:r config/users.yaml
+	setfacl -m u:10022:rx,u:10021:rx -d -m u:10022:r,u:10021:r config && setfacl -m u:10022:r,u:10021:r config/users.yaml
+	# Datenordner des Upload-Dienstes (erbt rwX für UID 10021 von filebrowser/)
+	mkdir -p /volume1/games/filebrowser/upload
 "
 
 if [ "$BEISPIELE" = 1 ]; then

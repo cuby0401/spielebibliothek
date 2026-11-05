@@ -2,7 +2,7 @@
 # Liegt auf der NAS unter /volume1/docker/spielebibliothek/compose.yaml
 # Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
 #
-# Stand: Phase 6 (caddy, savesvc, filebrowser, cloudflared; kein Port am Host).
+# Stand: Phase 6b (caddy, savesvc, upload, cloudflared; kein Port am Host).
 
 name: spielebibliothek
 
@@ -64,26 +64,31 @@ services:
       - ./config:/config:ro
     networks: [intern]
 
-  filebrowser:
-    # Upload unter upload.cuby0401.uk. Version fest, damit ein Update nicht unbemerkt Einstellungen ändert.
-    image: filebrowser/filebrowser:v2.63.23
-    container_name: spielebibliothek-filebrowser
+  upload:
+    # Upload-Dienst (Phase 6b, ersetzt File Browser – E19): gleicher Code wie savesvc, anderer Einstieg.
+    image: spielebibliothek-savesvc
+    pull_policy: never        # wird von savesvc gebaut
+    depends_on: [savesvc]
+    container_name: spielebibliothek-upload
     restart: unless-stopped
-    # Feste UID 10021: rwX auf spiele/ und filebrowser/ (scripts/nas-setup.sh). Das Image wäre sonst 1000 = Sebi.
+    command: ["uvicorn", "savesvc.upload:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-server-header"]
+    # UID 10021 (früher File Browser): rwX auf spiele/ und filebrowser/ (scripts/nas-setup.sh)
     user: "10021:10021"
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:size=300m        # Uploads bis 100 MB werden hier zwischengespeichert
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     environment:
-      # Nicht-root darf nicht auf 80 lauschen; gilt auch für den Healthcheck des Images
-      FB_PORT: "8080"
+      ACCESS_TEAM_DOMAIN: cold-glitter-fc3b.cloudflareaccess.com
+      # AUD der Access-Anwendung "upload" (Richtlinie Entwickler, 15 min)
+      ACCESS_AUD: 1437ffb5ec6d16a425902f5569fea23258ab8ff2cafdfc0d52c1b968b9657351
+      UPLOAD_DATA: /data
     volumes:
-      - /volume1/games/spiele:/srv
-      - /volume1/games/filebrowser/config:/config
-      - /volume1/games/filebrowser/database:/database
-    # Einstellungen und Benutzer NUR über scripts/filebrowser.sh (legt keinen Standard-Admin an)
+      - /volume1/games/spiele:/spiele
+      # Passwort-Hashes und Sitzungs-Schlüssel (Ordner liegt unter filebrowser/, dort hat UID 10021 schon Rechte)
+      - /volume1/games/filebrowser/upload:/data
+      - ./config:/config:ro
     networks: [intern]
 
   cloudflared:
@@ -99,7 +104,7 @@ services:
     # Public Hostnames im Cloudflare-Dashboard:
     #   games.cuby0401.uk  → http://caddy:8080
     #   play.cuby0401.uk   → http://caddy:8080
-    #   upload.cuby0401.uk → http://filebrowser:8080
+    #   upload.cuby0401.uk → http://caddy:8080
     depends_on: [caddy]
     networks: [intern]
 
