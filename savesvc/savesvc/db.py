@@ -95,6 +95,8 @@ class Datenbank:
             se = {z["name"] for z in v.execute("PRAGMA table_info(spiel_einstellungen)")}
             if "testspiel" not in se:
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN testspiel INTEGER NOT NULL DEFAULT 0")
+            if "wichtig" not in {z["name"] for z in v.execute("PRAGMA table_info(meldungen)")}:
+                v.execute("ALTER TABLE meldungen ADD COLUMN wichtig INTEGER NOT NULL DEFAULT 0")
             if "offline" not in se:   # E40: Entwickler nimmt sein Spiel vorübergehend offline
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline INTEGER NOT NULL DEFAULT 0")
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline_grund TEXT")
@@ -304,10 +306,10 @@ class Datenbank:
 
     # --- Meldungen / Glocke (Zentrale 1.2.0) ---
 
-    def melden(self, an: str, text: str, link: str | None = None) -> None:
-        """an = Spielername oder "*" (alle)."""
+    def melden(self, an: str, text: str, link: str | None = None, wichtig: bool = False) -> None:
+        """an = Spielername oder "*" (alle). wichtig = rote, wackelnde Glocke und Einblendung (Fehler, Anträge)."""
         with self.verbindung() as v:
-            v.execute("INSERT INTO meldungen (an, text, link, zeit) VALUES (?,?,?,?)", (an, text[:300], link, jetzt()))
+            v.execute("INSERT INTO meldungen (an, text, link, zeit, wichtig) VALUES (?,?,?,?,?)", (an, text[:300], link, jetzt(), int(wichtig)))
             v.execute("DELETE FROM meldungen WHERE id NOT IN (SELECT id FROM meldungen ORDER BY id DESC LIMIT 5000)")
 
     def meldungen(self, player: str, limit: int = 30) -> dict:
@@ -315,11 +317,34 @@ class Datenbank:
             z = v.execute("SELECT bis_id FROM meldungen_gelesen WHERE player=?", (player,)).fetchone()
             bis = z["bis_id"] if z else 0
             liste = [dict(r) for r in v.execute(
-                "SELECT id, text, link, zeit FROM meldungen WHERE an IN (?, '*') ORDER BY id DESC LIMIT ?", (player, limit))]
+                "SELECT id, text, link, zeit, wichtig FROM meldungen WHERE an IN (?, '*') ORDER BY id DESC LIMIT ?", (player, limit))]
             neu = v.execute("SELECT COUNT(*) FROM meldungen WHERE an IN (?, '*') AND id > ?", (player, bis)).fetchone()[0]
+            wichtig = v.execute("SELECT COUNT(*) FROM meldungen WHERE an IN (?, '*') AND id > ? AND wichtig=1", (player, bis)).fetchone()[0]
         for m in liste:
             m["neu"] = m["id"] > bis
-        return {"ungelesen": neu, "liste": liste}
+            m["wichtig"] = bool(m["wichtig"])
+        return {"ungelesen": neu, "wichtigUngelesen": wichtig, "liste": liste}
+
+    def melden_favoriten(self, game: str, text: str, link: str | None = None) -> int:
+        """Meldung an alle echten Spieler, die das Spiel als Favorit markiert haben (Updates, Zentrale 1.2.0)."""
+        n = 0
+        with self.verbindung() as v:
+            for z in v.execute(f"SELECT player, daten FROM einstellungen WHERE {ECHT}").fetchall():
+                try:
+                    fav = json.loads(z["daten"]).get("favoriten") or []
+                except ValueError:
+                    continue
+                if game in fav:
+                    v.execute("INSERT INTO meldungen (an, text, link, zeit) VALUES (?,?,?,?)", (z["player"], text[:300], link, jetzt()))
+                    n += 1
+        return n
+
+    def wichtig_kuerzlich(self, an: str, link: str, minuten: int = 60) -> bool:
+        """Gab es für diesen Empfänger und Link schon eine wichtige Meldung? (gegen Meldungsfluten bei vielen Fehlern)"""
+        grenze = (datetime.now(timezone.utc) - timedelta(minutes=minuten)).isoformat(timespec="seconds")
+        with self.verbindung() as v:
+            return v.execute("SELECT 1 FROM meldungen WHERE an=? AND link=? AND wichtig=1 AND zeit > ? LIMIT 1",
+                             (an, link, grenze)).fetchone() is not None
 
     def meldungen_gelesen(self, player: str) -> None:
         with self.verbindung() as v:
@@ -528,9 +553,12 @@ class Datenbank:
 
     FEHLER_MAX_JE_SPIEL = 200
 
-    def fehler_melden(self, game: str, meldung: str, quelle: str, zeile: int, spalte: int, stack: str | None, browser: str) -> None:
+    def fehler_melden(self, game: str, meldung: str, quelle: str, zeile: int, spalte: int, stack: str | None, browser: str) -> bool:
+        """Liefert True, wenn diese Fehlerart neu ist (für die Glocke des Entwicklers)."""
         zeit = jetzt()
         with self.verbindung() as v:
+            neu = v.execute("SELECT 1 FROM fehler WHERE game=? AND meldung=? AND quelle=? AND zeile=?",
+                            (game, meldung, quelle, zeile)).fetchone() is None
             v.execute(
                 """INSERT INTO fehler (game, meldung, quelle, zeile, spalte, stack, browser, erstes, letztes)
                    VALUES (?,?,?,?,?,?,?,?,?)
@@ -540,6 +568,7 @@ class Datenbank:
             v.execute("""DELETE FROM fehler WHERE game=? AND id NOT IN (
                              SELECT id FROM fehler WHERE game=? ORDER BY letztes DESC LIMIT ?)""",
                       (game, game, self.FEHLER_MAX_JE_SPIEL))
+        return neu
 
     def fehler_liste(self, spiele: list[str] | None = None) -> list[dict]:
         with self.verbindung() as v:

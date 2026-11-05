@@ -61,6 +61,8 @@ services:
       BACKUP_UHRZEIT: "01:45"
       # Speicher je Entwickler in MB (Anzeige im Admin-Panel; muss zum Upload-Dienst passen), in .env änderbar
       UPLOAD_KONTINGENT_MB: ${UPLOAD_KONTINGENT_MB:-1024}
+      # Home Assistant: Wächter (alle 5 Min Lebenszeichen/Probleme) und neue Anträge, siehe docs/home-assistant.md. Leer = aus.
+      HA_WEBHOOK_URL: ${HA_WEBHOOK_URL:-}
       # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
     volumes:
       - /volume1/games/data:/data

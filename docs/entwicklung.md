@@ -8,7 +8,7 @@ stehen im Vault `seb-brain` unter `Projekte/Spielebibliothek/`. Diese Datei ist 
 | Dienst | Code | Darf | Erreichbar |
 |---|---|---|---|
 | caddy | `Caddyfile` | liefert `site/`, `lib/` und Spieldateien aus, leitet `/api/*` weiter | `games`, `play`, `upload` über den Tunnel |
-| savesvc (Speicher-Dienst) | `savesvc/savesvc/app.py`, `verwaltung.py`, `intern.py`, `gemeinschaft.py` (Spielzeit, Glocke, Erfolge, Profil, Spiel der Woche) | Datenbank lesen/schreiben, Spiele **nur lesen** | `/api/*` unter `games`, `/intern/*` nur im Docker-Netz |
+| savesvc (Speicher-Dienst) | `savesvc/savesvc/app.py`, `verwaltung.py`, `intern.py`, `gemeinschaft.py` (Spielzeit, Glocke, Erfolge, Profil, Spiel der Woche), `waechter.py` (Gesundheit, Home Assistant) | Datenbank lesen/schreiben, Spiele **nur lesen** | `/api/*` unter `games`, `/intern/*` nur im Docker-Netz |
 | upload (Upload-Dienst) | `savesvc/savesvc/upload.py` | Spieldateien schreiben, Upload-Konten | `/api/upload/*` unter `upload`, `/intern/*` nur im Docker-Netz |
 
 Die beiden Python-Dienste rufen sich gegenseitig über `/intern/*` mit `INTERN_TOKEN` auf (aus `.env`, legt `deploy.sh` an):
@@ -57,6 +57,7 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
 - Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`.
+- **Alle Ende-zu-Ende-Tests auf einmal:** `scripts/e2e-alle.sh` (frischer Teststand je Test, ca. 4–8 Min., räumt danach auf). Vor dem Deploy automatisch mit `scripts/deploy.sh --gruendlich`.
 
 ## Deploy und Versionen der Zentrale (E39)
 
@@ -72,3 +73,8 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - **Datenbank:** Erweiterungen laufen beim Start automatisch (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE … ADD COLUMN`). Deshalb laufen alte Stände der Zentrale mit einer neueren Datenbank weiter: Spalten nie löschen oder umbenennen.
 - **Anzeige:** Die Version steht in der Fußzeile und im Admin-Panel (`site/zentrale.json`, `site/admin/CHANGELOG.md`, beide schreibt `deploy.sh`).
 - `scripts/deploy.sh --examples` kopiert zusätzlich die Testspiele aus `examples/`.
+
+## Home Assistant
+
+Wächter und Anträge melden sich per Webhook (`HA_WEBHOOK_URL` in der `.env`). Einrichtung mit Automationen zum Einfügen: `docs/home-assistant.md`.
+

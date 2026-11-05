@@ -422,3 +422,5 @@ def test_speicher_kontingent(uclient, umgebung, monkeypatch):
     assert r.status_code == 413 and "Speicher ist voll" in r.json()["detail"]
     assert not (umgebung.spiele / "paul" / "riesig~entwurf").exists()
     assert hoch(c, "klein").status_code == 200
+    s = liste(c)["klein"]["speicher"]
+    assert s["entwurf"] > 0 and s["live"] == 0 and s["versionen"] == 0

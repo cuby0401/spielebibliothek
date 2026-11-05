@@ -73,6 +73,10 @@ def browser_von(ua: str) -> str:
 
 def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, aktuelle_season, upload: UploadDienst | None = None):
     upload = upload or UploadDienst(e.upload_url, e.intern_token)
+    waechter_zustand: dict = {"letzterLauf": None, "probleme": [], "homeAssistant": bool(e.ha_webhook), "aktiv": e.waechter}
+    if e.waechter:
+        from . import waechter
+        waechter.starten(e, db, upload, waechter_zustand)
 
     def ist_entwickler(player: str) -> bool:
         return (e.spiele_dir / player).is_dir()
@@ -283,8 +287,12 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             x = body.get(k)
             return int(x) if isinstance(x, (int, float)) and not isinstance(x, bool) and 0 <= x < 10_000_000 else 0
         meldung = text("meldung", 300).strip() or "(ohne Meldung)"
-        db.fehler_melden(sid, meldung, text("quelle", 200), zahl("zeile"), zahl("spalte"),
-                         text("stack", 1500) or None, browser_von(request.headers.get("user-agent", "")))
+        neu = db.fehler_melden(sid, meldung, text("quelle", 200), zahl("zeile"), zahl("spalte"),
+                               text("stack", 1500) or None, browser_von(request.headers.get("user-agent", "")))
+        # Glocke des Entwicklers: neue Fehlerart in einem veröffentlichten Spiel – höchstens eine Meldung je Spiel und Stunde
+        if neu and not game.endswith(versionen.ENTWURF) and not db.wichtig_kuerzlich(user, f"#/meine-spiele?{sid}"):
+            db.melden(user, f"⚠ Neuer Fehler in „{titel_von(sid)}“: {meldung[:120]}" + (f" (Zeile {zahl('zeile')})" if zahl("zeile") else ""),
+                      f"#/meine-spiele?{sid}", wichtig=True)
 
     @app.get("/api/entwickler/fehler")
     def fehler_ansehen(request: Request, player: str = Depends(entwickler), alle: bool = Query(False)):
@@ -337,6 +345,15 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             raise HTTPException(422, "spiel ungültig")
         aid = db.antrag_anlegen(player, art, spiel, text.strip())
         log.info("neuer Antrag %d von %s (%s)", aid, player, art)
+        # Glocke: Admins bekommen jeden Antrag, Entwickler Fehlermeldungen zu ihren Spielen – beides auffällig
+        kurz = " ".join(text.split())[:100]
+        for a in sorted(e.admins):
+            db.melden(a, f"📮 Neuer Antrag von {player} ({art}): {kurz}", "/admin/#antraege", wichtig=True)
+        besitzer = spiel.split("/", 1)[0] if spiel and "/" in spiel else None
+        if art == "fehler" and besitzer and besitzer != player and besitzer not in e.admins:
+            db.melden(besitzer, f"🐞 {player} meldet einen Fehler in „{titel_von(spiel)}“: {kurz}", "#/meine-spiele", wichtig=True)
+        from . import waechter
+        waechter.ha_senden(e, "antrag", f"Neuer Antrag von {player} ({art}): {kurz}")
         return {"id": aid}
 
     @app.get("/api/antraege")
@@ -385,6 +402,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             "speicher": speicher,
             "datenbank": e.db_path.stat().st_size if e.db_path.exists() else 0,
             "platte": platte(),
+            "waechter": waechter_zustand,
             "kontingent": kontingent_mb() * 1024 * 1024,
             "sicherung": datetime.fromtimestamp(kopie.stat().st_mtime, timezone.utc).isoformat(timespec="seconds")
                          if kopie and kopie.exists() else None,

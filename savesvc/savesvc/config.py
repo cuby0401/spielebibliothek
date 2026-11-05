@@ -18,6 +18,8 @@ class Einstellungen:
     admins: frozenset = frozenset({"seb"})   # dürfen /admin
     intern_token: str = ""                  # für den Upload-Dienst (Spiele löschen, Upload-Konten)
     upload_url: str = "http://upload:8000"
+    ha_webhook: str = ""                    # Home-Assistant-Webhook für Wächter und Anträge (leer = aus)
+    waechter: bool = False                  # Gesundheitsprüfung alle 5 Minuten (im Betrieb an, in Tests aus)
 
     @property
     def jwks_url(self) -> str:
@@ -45,4 +47,6 @@ def laden() -> Einstellungen:
         admins=frozenset(n.strip() for n in os.environ.get("ADMINS", "seb").split(",") if n.strip()),
         intern_token=os.environ.get("INTERN_TOKEN", ""),
         upload_url=os.environ.get("UPLOAD_URL", "http://upload:8000"),
+        ha_webhook=os.environ.get("HA_WEBHOOK_URL", ""),
+        waechter=os.environ.get("WAECHTER", "1") != "0",
     )

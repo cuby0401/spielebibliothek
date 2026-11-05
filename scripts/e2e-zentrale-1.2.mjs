@@ -90,6 +90,16 @@ const dialoge = [];
   await gehe(G + "/#/spielstaende", 2500);
   // (Spalte „Deine Spielzeit“ erscheint nur, wenn es Spielstände gibt)
 
+  // 4b) Wichtige Meldung (Antrag → Admin): rote, wackelnde Glocke + Einblendung
+  await eval_(`fetch("/api/antraege",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({art:"fehler",spiel:"paul/raetsel",text:"Stürzt beim Start ab"})}).then(r=>r.status)`);
+  await gehe(G + "/", 3500);
+  ok(await eval_(`document.getElementById("glocke-knopf").classList.contains("alarm")`), "Glocke rot/wackelnd bei wichtiger Meldung");
+  ok(await eval_(`!document.getElementById("alarm").hidden && document.getElementById("alarm").textContent.includes("Neuer Antrag")`), "Einblendung „Wichtige Meldung“");
+  await eval_(`document.querySelector("#alarm button").click(); document.getElementById("glocke-knopf").click(); true`);
+  ok(await bis(`!document.getElementById("glocke-knopf").classList.contains("alarm")`), "Nach dem Öffnen nicht mehr rot");
+  await gehe(G + "/", 3000);
+  ok(await eval_(`document.getElementById("alarm").hidden`), "Einblendung kommt nicht erneut");
+
   // 5) Admin + Upload
   await gehe(G + "/admin/", 3000);
   ok(await eval_(`document.body.textContent.includes("frei auf der NAS")`), "Admin: freier Speicher");

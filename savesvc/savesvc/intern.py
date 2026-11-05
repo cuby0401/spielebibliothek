@@ -61,4 +61,7 @@ def registrieren(app: FastAPI, e, db, aktuelle_season) -> None:
         an, text, link = body.get("an"), body.get("text"), body.get("link")
         if not (isinstance(an, str) and an and isinstance(text, str) and text.strip()):
             raise HTTPException(422, "an und text nötig")
-        db.melden(an, text.strip(), link if isinstance(link, str) else None)
+        if an.startswith("favoriten:"):   # Updates nur an Spieler, die das Spiel als Favorit haben
+            db.melden_favoriten(an[len("favoriten:"):], text.strip(), link if isinstance(link, str) else None)
+        else:
+            db.melden(an, text.strip(), link if isinstance(link, str) else None)

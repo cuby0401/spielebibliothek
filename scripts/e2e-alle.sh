@@ -1,0 +1,43 @@
+#!/bin/sh
+# Alle Ende-zu-Ende-Tests im Teststand auf der NAS (Idee 10, Zentrale 1.2.0). Läuft auch bei scripts/deploy.sh --gruendlich.
+# Braucht auf dem Mac: Google Chrome und Node ≥ 22. Dauer ca. 6–8 Minuten. Der Teststand wird für jeden Test frisch aufgebaut
+# und am Ende wieder entfernt – die echte Bibliothek wird nicht angefasst.
+set -eu
+cd "$(dirname "$0")/.."
+NAS="${NAS:-$NAS}"
+TMP=$(mktemp -d)
+aufraeumen() {
+	ssh -o LogLevel=ERROR "$NAS" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:test >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
+	rm -rf "$TMP"
+}
+trap aufraeumen EXIT
+
+python3 -I scripts/e2e-vorbereiten.py "$TMP"
+git ls-files -co --exclude-standard | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$NAS" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
+
+# Teststand frisch aufbauen, Spiel von „paul“ mit Kategorien/Erfolgen/Bestenliste anlegen, Upload-Passwort zurückgeben
+teststand() {
+	ssh -o LogLevel=ERROR "$NAS" '
+		sh /tmp/sb-repo/scripts/teststand.sh up /tmp/sb-repo >/dev/null 2>&1; sleep 3
+		d=/tmp/sb-teststand/spiele/paul/raetsel; mkdir -p $d
+		printf "%s" "{\"title\":\"Rätselspaß\",\"description\":\"Test\",\"tags\":[\"Puzzle\",\"Wörter\"],\"leaderboard\":{\"enabled\":true},\"erfolge\":[{\"id\":\"start\",\"titel\":\"Losgelegt\"},{\"id\":\"profi\",\"titel\":\"Profi\",\"geheim\":true}]}" > $d/game.json
+		printf "%s" "<!doctype html><script src=\"/lib/gamesave.js\"></script><p>R</p><script>setTimeout(()=>GameSave.erfolg(\"start\"),800)</script>" > $d/index.html
+		chmod -R a+rwX /tmp/sb-teststand/spiele/paul
+		docker exec sbtest-upload python -m savesvc entwickler anlegen seb 2>&1 | sed -n "s/^Passwort: *//p"' 2>/dev/null
+}
+
+FEHLER=""
+for t in versionierung zentrale-1.1 zentrale-1.2 boese; do
+	echo "→ Ende-zu-Ende: $t"
+	PW=$(teststand)
+	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"
+	if [ "$t" = boese ]; then set -- node scripts/e2e-boese.mjs "$TMP"; else set -- node "scripts/e2e-$t.mjs" "$TMP" "$PW"; fi
+	if "$@" > "$TMP/log" 2>&1; then
+		echo "  ✓ $(grep -c '^✓' "$TMP/log") Prüfpunkte grün"
+	else
+		grep -E "^✗|ABBRUCH" "$TMP/log" | sed 's/^/  /'
+		FEHLER="$FEHLER $t"
+	fi
+done
+[ -z "$FEHLER" ] || { echo "✗ Ende-zu-Ende fehlgeschlagen:$FEHLER"; exit 1; }
+echo "✓ Alle Ende-zu-Ende-Tests grün"

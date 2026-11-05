@@ -514,7 +514,7 @@ function route() {
 	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1]); }
 	const pr = location.hash.match(/^#\/profil(?:\/([a-z0-9][a-z0-9_~-]*))?$/);
 	if (pr) { profilName = pr[1] ? decodeURIComponent(pr[1]) : (ich.ansicht ? `${ich.player}~${ich.ansicht}` : ich.player); return zeigeSeite("profil"); }
-	const s = location.hash.match(/^#\/([a-z-]+)$/);
+	const s = location.hash.match(/^#\/([a-z-]+)(?:\?.*)?$/);
 	if (s && seiten[s[1]]) return zeigeSeite(s[1]);
 	letzteRoute = "#/";
 	zeigeUebersicht();
@@ -553,6 +553,32 @@ async function glockeLaden() {
 	el("glocke").hidden = false;
 	el("glocke-zahl").textContent = String(glockeDaten.ungelesen);
 	el("glocke-zahl").hidden = !glockeDaten.ungelesen;
+	// Wichtig (Fehler in deinen Spielen, Anträge): rote, wackelnde Glocke + einmalige Einblendung
+	el("glocke-knopf").classList.toggle("alarm", !!glockeDaten.wichtigUngelesen);
+	const wichtige = glockeDaten.liste.filter((m) => m.neu && m.wichtig);
+	let gezeigt = 0;
+	try { gezeigt = +sessionStorage.getItem("glocke-alarm-bis") || 0; } catch { /* egal */ }
+	if (wichtige.length && wichtige[0].id > gezeigt) {
+		try { sessionStorage.setItem("glocke-alarm-bis", String(wichtige[0].id)); } catch { /* egal */ }
+		alarmZeigen(wichtige);
+	}
+}
+function alarmZeigen(wichtige) {
+	const box = el("alarm");
+	const titel = document.createElement("strong");
+	titel.textContent = wichtige.length === 1 ? "⚠ Wichtige Meldung" : `⚠ ${wichtige.length} wichtige Meldungen`;
+	const ul = document.createElement("ul");
+	for (const m of wichtige.slice(0, 5)) {
+		const li = document.createElement("li");
+		const a = document.createElement("a"); a.href = m.link || "#/"; a.textContent = m.text;
+		a.onclick = () => { box.hidden = true; };
+		li.append(a); ul.append(li);
+	}
+	const zu = document.createElement("button");
+	zu.type = "button"; zu.className = "knopf klein"; zu.textContent = "Später";
+	zu.onclick = () => { box.hidden = true; };
+	box.replaceChildren(titel, ul, zu);
+	box.hidden = false;
 }
 function glockeEinrichten() {
 	const knopf = el("glocke-knopf"), liste = el("glocke-liste");
@@ -562,7 +588,7 @@ function glockeEinrichten() {
 		liste.replaceChildren(...(glockeDaten.liste.length ? glockeDaten.liste.map((m) => {
 			const a = document.createElement("a");
 			a.href = m.link || "#/";
-			a.className = m.neu ? "neu" : "";
+			a.className = (m.neu ? "neu" : "") + (m.wichtig ? " wichtig" : "");
 			const t = document.createElement("span"); t.textContent = m.text;
 			const z = document.createElement("small"); z.className = "leise"; z.textContent = new Date(m.zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
 			a.append(t, z);
@@ -571,6 +597,7 @@ function glockeEinrichten() {
 		liste.hidden = false;
 		if (glockeDaten.ungelesen) {
 			el("glocke-zahl").hidden = true;
+			el("glocke-knopf").classList.remove("alarm");
 			try { await Bridge.json("POST", "/api/meldungen/gelesen"); glockeDaten.ungelesen = 0; } catch { /* egal */ }
 		}
 	};

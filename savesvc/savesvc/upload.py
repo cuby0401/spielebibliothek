@@ -310,6 +310,10 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
                 "live": versionen._info(live) if live.is_dir() else None,
                 "entwurf": entw,
                 "versionen": versionen.versionen(basis, name),
+                # Speicher dieses Spiels (zählt alles zum Kontingent), Zentrale 1.2.0
+                "speicher": {"live": belegt(live) if live.is_dir() else 0,
+                             "entwurf": belegt(versionen.entwurf(basis, name)) if entw else 0,
+                             "versionen": sum(belegt(basis / f"{name}{versionen.VERSION}{v['id']}") for v in versionen.versionen(basis, name))},
             })
         return ergebnis
 
@@ -422,7 +426,8 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         store.ereignis(player, f"Version {version} veröffentlicht", ordner)
         titel = games.beschreibung(e.spiele_dir, player, ordner)["title"]
         speicher_still("POST", "/intern/meldung", {
-            "an": "*", "link": f"#/spiel/{player}/{ordner}",
+            # neues Spiel → alle; Update → nur wer es als Favorit hat (Seb, 05.11.2026)
+            "an": "*" if pr["erstveroeffentlichung"] else f"favoriten:{player}/{ordner}", "link": f"#/spiel/{player}/{ordner}",
             "text": (f"🎮 Neues Spiel: „{titel}“ von {player}" if pr["erstveroeffentlichung"]
                      else f"🔄 „{titel}“ ist jetzt Version {version}: {' · '.join(aenderungen)[:150]}")})
         return {"version": version, "eintrag": eintrag, "season": season}

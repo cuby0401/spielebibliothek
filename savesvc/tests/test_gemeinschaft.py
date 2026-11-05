@@ -5,7 +5,7 @@ import sqlite3
 
 import pytest
 
-from .test_verwaltung import upload  # noqa: F401 (Fixture)
+from .test_verwaltung import iclient, upload  # noqa: F401 (Fixtures)
 
 SEB, PAUL = "seb@example.com", "paul@example.com"
 
@@ -101,3 +101,47 @@ def test_simulation_leert_auch_neue_tabellen(client):
 def test_admin_platte(client, upload):
     d = client.get("/api/admin/uebersicht", headers=client.als()).json()
     assert d["platte"]["gesamt"] > 0 and d["kontingent"] == 1024 * 1024 * 1024
+
+
+# ---------- Glocke: Favoriten, Fehler, Anträge (wichtig) ----------
+
+def test_updates_nur_an_favoriten(iclient):
+    c = iclient
+    c.put("/api/einstellungen", json={"favoriten": ["seb/zaehler"]}, headers=c.als(PAUL))
+    T = {"X-Intern-Token": "geheim"}
+    assert c.post("/intern/meldung", json={"an": "favoriten:seb/zaehler", "text": "Zähler 1.1.0"}, headers=T).status_code == 204
+    assert c.get("/api/meldungen", headers=c.als(PAUL)).json()["liste"][0]["text"] == "Zähler 1.1.0"
+    assert c.get("/api/meldungen", headers=c.als()).json()["liste"] == []          # seb hat es nicht als Favorit
+
+
+def test_neuer_fehler_meldet_sich_beim_entwickler(client):
+    p = client.als(PAUL)
+    melde = lambda m: client.post("/api/fehler/paul/snake", json={"meldung": m, "quelle": "a.js", "zeile": 3}, headers=client.als())
+    melde("TypeError: x"); melde("TypeError: x"); melde("ReferenceError: y")
+    m = client.get("/api/meldungen", headers=p).json()
+    assert m["wichtigUngelesen"] == 1 and "TypeError" in m["liste"][0]["text"]     # nur eine je Spiel und Stunde
+    assert m["liste"][0]["wichtig"] is True
+
+
+def test_antrag_meldet_sich_bei_admin_und_entwickler(client):
+    client.post("/api/antraege", json={"art": "fehler", "spiel": "paul/snake", "text": "Stürzt ab"}, headers=client.als("seb@example.com"))
+    # seb ist Admin → Meldung an seb; paul ist Besitzer → Meldung an paul
+    assert "Neuer Antrag" in client.get("/api/meldungen", headers=client.als()).json()["liste"][0]["text"]
+    pm = client.get("/api/meldungen", headers=client.als(PAUL)).json()
+    assert pm["wichtigUngelesen"] == 1 and "meldet einen Fehler" in pm["liste"][0]["text"]
+
+
+def test_waechter_meldet_probleme(monkeypatch, umgebung):
+    from types import SimpleNamespace
+    from savesvc import waechter
+    gesendet = []
+    monkeypatch.setattr(waechter.urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("weg")))
+    monkeypatch.setattr(waechter.urllib.request, "build_opener", lambda *a: SimpleNamespace(open=lambda *a, **k: SimpleNamespace(status=302)))
+    e = SimpleNamespace(spiele_dir=umgebung.spiele, backup_ziel=None, ha_webhook="")
+    db = SimpleNamespace(zaehlen=lambda: {})
+    def upload(*a):
+        raise RuntimeError("Upload weg")
+    probleme = waechter.pruefen(e, db, upload)
+    assert any("Upload-Dienst" in p for p in probleme) and any("Caddy" in p for p in probleme)
+    assert not any("außen" in p for p in probleme)                                 # 302 von Cloudflare Access = erreichbar
+    waechter.ha_senden(e, "test")                                                     # ohne URL: tut nichts, kein Fehler

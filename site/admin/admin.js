@@ -33,6 +33,14 @@ async function uebersicht(c) {
 		d.platte && d.platte.gesamt ? kz(groesse(d.platte.frei), "frei auf der NAS" + (d.platte.knapp ? " ⚠" : "")) : null, kz(d.sicherung ? datumZeit(d.sicherung) : "–", "letzte DB-Kopie fürs Backup")));
 	if (d.platte && d.platte.knapp) c.append(h("p", { class: "meldung fehler", text: `⚠ Speicher auf der NAS wird knapp: nur noch ${groesse(d.platte.frei)} von ${groesse(d.platte.gesamt)} frei. Alte Versionen löschen oder Kontingente (UPLOAD_KONTINGENT_MB) senken.` }));
 	c.append(h("p", { class: "leise", text: "Backup: borgmatic sichert jede Nacht um 02:00 – den Erfolg zeigt das borgmatic-Log auf der NAS (docker logs borgmatic)." }));
+	const w = d.waechter || {};
+	c.append(h("h2", { text: "Wächter" }),
+		h("p", { class: w.probleme && w.probleme.length ? "meldung fehler" : "leise",
+			text: !w.aktiv ? "Wächter ist aus (WAECHTER=0)."
+				: !w.letzterLauf ? "Wächter startet – erster Lauf etwa eine Minute nach dem Start."
+				: (w.probleme.length ? "⚠ " + w.probleme.join(" · ") : "✓ Alles in Ordnung") + ` · zuletzt geprüft ${datumZeit(w.letzterLauf)}` }),
+		h("p", { class: "leise", text: w.homeAssistant ? "Home Assistant bekommt Lebenszeichen, Probleme und neue Anträge (HA_WEBHOOK_URL gesetzt)."
+			: "Home Assistant ist nicht verbunden – HA_WEBHOOK_URL in der .env setzen, Anleitung: docs/home-assistant.md im Repo." }));
 	await zentraleZeigen(c);
 	// „Ansicht als …“ (E26/E27): gilt für diesen Tab, beendet wird über das lila Band in der Bibliothek
 	// Jeder Start beginnt mit leerem simulierten Konto – auch der Zwischenspeicher dieses Browsers dafür wird geleert

@@ -245,3 +245,14 @@ main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
 .profil-zahlen { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .profil-zahlen div { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; padding: 0.5rem 1rem; }
 .profil-zahlen b { display: block; font-size: 1.3rem; }
+
+/* Glocke: wichtige Meldungen (Fehler, Anträge) – rot und wackelnd, dazu eine Einblendung */
+.glocke-knopf.alarm { color: #fff; background: var(--warn); border-color: var(--warn); animation: wackeln 1.2s ease-in-out infinite; }
+@keyframes wackeln { 0%, 60%, 100% { transform: rotate(0); } 10%, 30%, 50% { transform: rotate(-14deg); } 20%, 40% { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) { .glocke-knopf.alarm { animation: none; } }
+.glocke-liste a.wichtig { border-left: 3px solid var(--warn); }
+.alarm-box { position: fixed; top: 4.2rem; right: 1rem; z-index: 60; max-width: 26rem; background: var(--flaeche); border: 2px solid var(--warn);
+  border-radius: 10px; padding: 0.8rem 1rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); display: grid; gap: 0.5rem; }
+.alarm-box strong { color: var(--warn); }
+.alarm-box ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; font-size: 0.9rem; }
+.alarm-box .knopf { justify-self: end; }

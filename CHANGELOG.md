@@ -11,12 +11,20 @@ Enthält auch 1.1.1, das nicht einzeln ausgeliefert wurde.
 
 - **Neu:** Speichergrenze je Entwickler, Standard 1 GB (`UPLOAD_KONTINGENT_MB`), mit Anzeige auf der Upload-Seite. Das Admin-Panel warnt, wenn auf der NAS wenig Platz frei ist.
 - **Neu:** Spielzeit wird gemessen, solange der Tab sichtbar ist. Dazu die Sortierung „meistgespielt“, „du: …“ auf der Kachel, die Spielzeit unter „Meine Spielstände“, „Meine Spiele“ und im Admin-Panel.
-- **Neu:** Glocke in der Taskleiste. Sie meldet:
+- **Neu:** Glocke in der Taskleiste, für alle mit eigenen Meldungen:
   - Antrag beantwortet
-  - neues Spiel oder neue Version
+  - neues Spiel (an alle)
+  - Updates nur von Spielen, die du als Favorit hast
   - „… hat dich überholt“
-  - Erfolg freigeschaltet
+  - Erfolge
   - Spiel der Woche
+- **Neu:** Wichtige Meldungen machen die Glocke rot und lassen sie wackeln, dazu eine einmalige Einblendung:
+  - neuer Fehler in deinem Spiel (höchstens eine Meldung je Spiel und Stunde)
+  - ein Spieler meldet einen Fehler in deinem Spiel
+  - neuer Antrag (für Admins)
+- **Neu:** Wächter. Er prüft alle 5 Minuten Datenbank, Upload-Dienst, Caddy, die Erreichbarkeit über Cloudflare, den Speicher und die Backup-Kopie. Er meldet an Home Assistant (Lebenszeichen, Probleme, neue Anträge) und zeigt den Status im Admin-Panel. Einrichtung: `docs/home-assistant.md`.
+- **Neu:** `scripts/deploy.sh --gruendlich` fährt vor dem Deploy alle Ende-zu-Ende-Tests und „Böse“ im Teststand durch. Einzeln: `scripts/e2e-alle.sh`.
+- **Neu:** Speicher je Spiel auf der Upload-Seite (live, Entwurf, ältere Versionen, Anteil am Kontingent).
 - **Neu:** Suche und Kategorien (`"tags"` in der `game.json`) in der Übersicht.
 - **Neu:** Erfolge (`"erfolge"` in der `game.json`, `GameSave.erfolg(id)`). Sie erscheinen neben dem Spiel, als Einblendung und auf der Profilseite. Die Profilseite (Menü → Mein Profil, Klick auf Namen in der Bestenliste) zeigt Spielzeit, Erfolge und Plätze.
 - **Neu:** Spiel der Woche (Admin-Panel → Spiele). Es gibt ein Banner, eine Meldung an alle und eine eigene Wochen-Bestenliste.

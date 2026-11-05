@@ -4,6 +4,7 @@
 #   scripts/deploy.sh                    neue Version deployen (VERSION + CHANGELOG.md), vorher Tests auf der NAS
 #   scripts/deploy.sh --examples         zusätzlich examples/* nach /volume1/games/spiele/seb/ kopieren
 #   scripts/deploy.sh --no-start         nur übertragen, nicht starten
+#   scripts/deploy.sh --gruendlich       zusätzlich alle Ende-zu-Ende-Tests und „Böse“ im Teststand (ca. 6–8 Min., für große Updates)
 #   scripts/deploy.sh --ohne-tests       Tests überspringen (nur im Notfall)
 #   scripts/deploy.sh --zurueck 1.1.0    auf eine früher deployte Version zurück (aus dem Release-Archiv)
 #   scripts/deploy.sh --versionen        aufgehobene Versionen auf der NAS anzeigen
@@ -29,12 +30,14 @@ SPIELE=/volume1/games/spiele/seb
 BEISPIELE=0
 STARTEN=1
 TESTS=1
+GRUENDLICH=0
 ZURUECK=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--examples) BEISPIELE=1 ;;
 		--no-start) STARTEN=0 ;;
 		--ohne-tests) TESTS=0 ;;
+		--gruendlich) GRUENDLICH=1 ;;
 		--zurueck) shift; ZURUECK="${1:-}"; [ -n "$ZURUECK" ] || { echo "--zurueck braucht eine Version, z. B. 1.1.0" >&2; exit 2; } ;;
 		--versionen) ssh "$NAS" "ls -1t $RELEASES 2>/dev/null | sed 's/\.tar\$//' || echo '(noch keine)'"; exit 0 ;;
 		*) echo "Unbekannte Option: $1" >&2; exit 2 ;;
@@ -136,6 +139,11 @@ if [ "$TESTS" = 1 ]; then
 		echo "✗ Tests fehlgeschlagen – nichts deployt. Log auf der NAS: /tmp/sb-deploy-test.log" >&2
 		exit 1
 	fi
+fi
+
+if [ "$GRUENDLICH" = 1 ]; then
+	echo "→ Ende-zu-Ende-Tests im Teststand (ca. 6–8 Minuten) …"
+	sh scripts/e2e-alle.sh || { echo "✗ Ende-zu-Ende-Tests fehlgeschlagen – nichts deployt." >&2; exit 1; }
 fi
 
 # Versionskennung gegen Browser-/CDN-Cache: Commit plus Zeitstempel, ersetzt __VERSION__ in site/**/*.html

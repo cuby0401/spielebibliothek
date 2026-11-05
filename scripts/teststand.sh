@@ -35,7 +35,7 @@ up)
 	setfacl -R -m u:10020:rX,u:10022:rX,u:10021:rwX "$T/spiele" && setfacl -R -d -m u:10020:rX,u:10022:rX,u:10021:rwX "$T/spiele"
 	docker network create sbtest >/dev/null
 	docker build -q -t spielebibliothek-savesvc:test "$T/repo/savesvc" >/dev/null
-	docker run -d --name sbtest-savesvc --network sbtest -e DEV_USER=seb -e DEV_ALLOW=1 \
+	docker run -d --name sbtest-savesvc --network sbtest -e DEV_USER=seb -e DEV_ALLOW=1 -e WAECHTER=0 \
 		-e ADMINS=seb -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://sbtest-upload:8000 \
 		-v "$T/data:/data" -v "$T/spiele:/spiele:ro" -v "$T/config:/config" spielebibliothek-savesvc:test >/dev/null
 	docker run -d --name sbtest-upload --network sbtest --user 10021:10021 -e DEV_USER=seb -e DEV_ALLOW=1 -e UPLOAD_DATA=/data \

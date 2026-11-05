@@ -56,6 +56,7 @@ async function aktion(fn, erfolg) {
 }
 
 let bekannteOrdner = new Set();
+let kontingent = 0;   // aus /status, für „% deines Kontingents“
 
 // „Update hochladen“ an einem Spiel: Ordnername festlegen, damit kein zweites Spiel entsteht
 function updateFuer(s) {
@@ -89,6 +90,11 @@ async function liste() {
 			div("titel", s.title + (s.version ? `  ·  Version ${s.version}` : "")),
 			div("info", s.live ? `Live · Ordner ${s.ordner} · ${s.live.dateien} Dateien · ${groesse(s.live.bytes)} · geändert ${datum(s.live.geaendert)}`
 				: `Ordner ${s.ordner} · noch nicht veröffentlicht`));
+		if (s.speicher) {   // Speicher dieses Spiels – zählt alles zu deinem Kontingent (Zentrale 1.2.0)
+			const sp = s.speicher, gesamt = sp.live + sp.entwurf + sp.versionen;
+			bereich.append(div("info", `Speicher: ${groesse(gesamt)}` + (kontingent ? ` (${Math.max(1, Math.round(gesamt / kontingent * 100))} % deines Kontingents)` : "") +
+				` – live ${groesse(sp.live)}` + (sp.entwurf ? `, Entwurf ${groesse(sp.entwurf)}` : "") + (sp.versionen ? `, ältere Versionen ${groesse(sp.versionen)}` : "")));
+		}
 		if (s.warning || (s.live && !s.complete)) bereich.append(div("warnung", "⚠ " + (s.warning || "index.html fehlt")));
 
 		if (s.entwurf) {
@@ -292,6 +298,7 @@ async function start() {
 	if (s.gesperrt) meldung("Zu viele falsche Passwörter – bitte 15 Minuten warten.", "fehler");
 	if (!s.angemeldet) { zeige("anmeldung"); $("passwort").focus(); return; }
 	zeige("bereich");
+	if (s.speicher) kontingent = s.speicher.grenze;
 	if (s.speicher) {   // Kontingent je Entwickler (Zentrale 1.2.0)
 		const anteil = s.speicher.belegt / s.speicher.grenze;
 		$("speicher").textContent = `Dein Speicher: ${groesse(s.speicher.belegt)} von ${groesse(s.speicher.grenze)} belegt` +
