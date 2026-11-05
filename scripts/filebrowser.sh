@@ -34,7 +34,9 @@ name_pruefen() {
 }
 
 # Grundeinstellungen + Vorgaben für neue Benutzer
-EINSTELLUNGEN="--auth.method=json --signup=false --createUserDir=false --disableExec \
+# root/address/port ausdrücklich: config init übernimmt sie NICHT aus settings.json (sonst Root "." →
+# Benutzerordner landen außerhalb von /srv, Address 127.0.0.1)
+EINSTELLUNGEN="--root=/srv --address=0.0.0.0 --port=8080 --auth.method=json --signup=false --createUserDir=false --disableExec \
   --minimumPasswordLength=16 --branding.name=Spielebibliothek-Upload \
   --branding.disableExternal --branding.disableUsedPercentage \
   --perm.admin=false --perm.execute=false --perm.share=false \
