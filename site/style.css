@@ -24,6 +24,8 @@
 }
 
 * { box-sizing: border-box; }
+/* hidden muss immer gewinnen, auch gegen display-Regeln weiter unten */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--grund);
