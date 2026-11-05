@@ -2,8 +2,7 @@
 # Liegt auf der NAS unter /volume1/docker/spielebibliothek/compose.yaml
 # Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
 #
-# Stand: Phase 4 (caddy, cloudflared, savesvc; kein Port am Host). Es fehlt noch:
-#   Phase 6 filebrowser
+# Stand: Phase 6 (caddy, savesvc, filebrowser, cloudflared; kein Port am Host).
 
 name: spielebibliothek
 
@@ -62,6 +61,28 @@ services:
       - ./config:/config:ro
     networks: [intern]
 
+  filebrowser:
+    # Upload unter upload.cuby0401.uk. Version fest, damit ein Update nicht unbemerkt Einstellungen ändert.
+    image: filebrowser/filebrowser:v2.63.23
+    container_name: spielebibliothek-filebrowser
+    restart: unless-stopped
+    # Feste UID 10021: rwX auf spiele/ und filebrowser/ (scripts/nas-setup.sh). Das Image wäre sonst 1000 = Sebi.
+    user: "10021:10021"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      # Nicht-root darf nicht auf 80 lauschen; gilt auch für den Healthcheck des Images
+      FB_PORT: "8080"
+    volumes:
+      - /volume1/games/spiele:/srv
+      - /volume1/games/filebrowser/config:/config
+      - /volume1/games/filebrowser/database:/database
+    # Einstellungen und Benutzer NUR über scripts/filebrowser.sh (legt keinen Standard-Admin an)
+    networks: [intern]
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: spielebibliothek-cloudflared
@@ -74,7 +95,8 @@ services:
     security_opt: ["no-new-privileges:true"]
     # Public Hostnames im Cloudflare-Dashboard:
     #   games.cuby0401.uk  → http://caddy:8080
-    #   upload.cuby0401.uk → http://filebrowser:80   (ab Phase 6)
+    #   play.cuby0401.uk   → http://caddy:8080
+    #   upload.cuby0401.uk → http://filebrowser:8080
     depends_on: [caddy]
     networks: [intern]
 
