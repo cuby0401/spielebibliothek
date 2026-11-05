@@ -11,8 +11,8 @@ Die **Spezifikation** steht im Obsidian-Vault `seb-brain` unter `Projekte/Spiele
 ```
 compose.yaml  Caddyfile  .env.example
 site/          Bibliotheksseite (statisch, ohne Build-Schritt)
-lib/           gamesave.js (für Spiele), später bridge.js
-savesvc/       Speicher-Dienst (FastAPI + SQLite), ab Phase 4
+lib/           gamesave.js (für Spiele, inkl. localStorage-Ersatz), bridge.js (Bibliothek)
+savesvc/       Speicher-Dienst (FastAPI + SQLite); Tests: docker build --target test savesvc
 examples/      Testspiele: zaehler (ab Phase 1), legacy-localstorage, boese (später)
 scripts/       nas-setup.sh (Ordner + ACLs), deploy.sh (rsync vom Mac)
 docs/          Betriebsnotizen
@@ -26,7 +26,8 @@ docs/          Betriebsnotizen
 | 1 | Statische Bibliothek im LAN | ✓ abgenommen 03.11.2026 |
 | 2 | Tunnel und Access | ✓ abgenommen 05.11.2026 |
 | 3 | Sandbox-Spike → Spiele auf `play.cuby0401.uk`, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (Mac/Safari; iPad/Windows offen) |
-| 4–9 | savesvc, Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
+| 4 | Speicher-Dienst, GameSave, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (zweites Gerät/Konto offen) |
+| 5–9 | Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
 
 ## Deploy
 
@@ -37,3 +38,8 @@ scripts/deploy.sh --examples  # zusätzlich Testspiele nach spiele/seb/
 
 Erreichbar nur über `https://games.cuby0401.uk` (Cloudflare Tunnel + Access).
 Für LAN-Tests den Port in `compose.yaml` vorübergehend einkommentieren.
+
+## Konfiguration auf der NAS (nicht im Git)
+
+- `.env`: `TUNNEL_TOKEN`
+- `config/users.yaml`: Login-E-Mail → Benutzername (Vorlage `users.example.yaml`), wirkt ohne Neustart
