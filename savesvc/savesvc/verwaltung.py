@@ -21,13 +21,14 @@ log = logging.getLogger("savesvc.verwaltung")
 
 SORTIERUNGEN = ("alphabetisch", "zuletzt", "neu")
 ARTEN = {
-    "wunsch": "Feature-Wunsch",
     "fehler": "Fehler melden",
+    "wunsch": "Wunsch / Idee",
+    "spielstand": "Spielstand wiederherstellen",
     "bestenliste": "Bestenliste zurücksetzen",
     "spiel": "Spiel löschen oder umbenennen",
-    "spielstand": "Spielstand wiederherstellen",
     "sonstiges": "Sonstiges",
 }
+NUR_ENTWICKLER = {"bestenliste", "spiel"}   # betreffen eigene Spiele
 STATUS = ("offen", "erledigt", "abgelehnt")
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -91,8 +92,11 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     # ---------- Einstellungen (alle) ----------
 
+    def ich_daten(request: Request, player: str = Depends(spieler)) -> str:
+        return rollen.daten_id(e, request, player)
+
     @app.get("/api/einstellungen")
-    def einstellungen_lesen(player: str = Depends(spieler)):
+    def einstellungen_lesen(player: str = Depends(ich_daten)):
         d = db.einstellungen(player)
         return {
             "sortierung": d.get("sortierung") if d.get("sortierung") in SORTIERUNGEN else "alphabetisch",
@@ -102,7 +106,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         }
 
     @app.put("/api/einstellungen")
-    def einstellungen_schreiben(player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
+    def einstellungen_schreiben(player: str = Depends(ich_daten), body: dict[str, Any] = Body(...)):
         d = einstellungen_lesen(player)
         if "sortierung" in body:
             if body["sortierung"] not in SORTIERUNGEN:
@@ -124,7 +128,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     # ---------- Meine Spielstände (alle) ----------
 
     @app.get("/api/meine/spielstaende")
-    def meine_spielstaende(player: str = Depends(spieler)):
+    def meine_spielstaende(player: str = Depends(ich_daten)):
         nach_spiel: dict[str, dict] = {}
         for z in db.meine_spielstaende(player):
             s = nach_spiel.setdefault(z["game"], {"spiel": z["game"], "title": titel_von(z["game"]), "keys": [], "zuletzt": ""})
@@ -133,7 +137,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         return sorted(nach_spiel.values(), key=lambda s: s["zuletzt"], reverse=True)
 
     @app.delete("/api/meine/spielstaende/{user}/{game}")
-    def spielstaende_zuruecksetzen(player: str = Depends(spieler), user: str = P(...), game: str = P(...)):
+    def spielstaende_zuruecksetzen(player: str = Depends(ich_daten), user: str = P(...), game: str = P(...)):
         if not (BENUTZER_MUSTER.match(user) and games.ORDNER_MUSTER.match(game)):
             raise HTTPException(404, "Spiel nicht gefunden")
         return {"geloescht": db.spielstaende_loeschen(player, f"{user}/{game}")}
@@ -166,15 +170,21 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     # ---------- Anträge ----------
 
+    def arten_fuer(request: Request, player: str) -> dict:
+        ist_entw = rollen.rolle(e, request, player)["entwickler"]
+        return {k: t for k, t in ARTEN.items() if ist_entw or k not in NUR_ENTWICKLER}
+
     @app.get("/api/antraege/arten")
-    def antragsarten(player: str = Depends(spieler)):
-        return ARTEN
+    def antragsarten(request: Request, player: str = Depends(spieler)):
+        return arten_fuer(request, player)
 
     @app.post("/api/antraege", status_code=201)
-    def antrag_stellen(player: str = Depends(entwickler), body: dict[str, Any] = Body(...)):
+    def antrag_stellen(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
+        if rollen.simuliert(e, request, player):
+            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Anträge verschickt")
         art, text, spiel = body.get("art"), body.get("text"), body.get("spiel") or None
-        if art not in ARTEN:
-            raise HTTPException(422, "unbekannte Art")
+        if art not in arten_fuer(request, player):
+            raise HTTPException(422, "unbekannte oder nicht erlaubte Art")
         if not isinstance(text, str) or not 3 <= len(text.strip()) <= 4000:
             raise HTTPException(422, "Beschreibung: 3 bis 4000 Zeichen")
         if spiel is not None and (not isinstance(spiel, str) or len(spiel) > 100):
@@ -184,7 +194,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         return {"id": aid}
 
     @app.get("/api/antraege")
-    def meine_antraege(player: str = Depends(spieler)):
+    def meine_antraege(player: str = Depends(ich_daten)):
         return db.antraege(player)
 
     # ---------- Admin ----------

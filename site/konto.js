@@ -94,8 +94,8 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 
 // ---------- Anträge (Entwickler) ----------
 SEITEN_REG["antraege"] = async (c) => {
-	const [arten, meine, eigene] = await Promise.all([
-		Bridge.json("GET", "/api/antraege/arten"), Bridge.json("GET", "/api/antraege"), Bridge.json("GET", "/api/entwickler/spiele")]);
+	const [arten, meine] = await Promise.all([Bridge.json("GET", "/api/antraege/arten"), Bridge.json("GET", "/api/antraege")]);
+	const eigene = spiele.slice().sort((x, y) => x.title.localeCompare(y.title, "de"));   // alle sichtbaren Spiele
 	const art = h("select", { required: true }, ...Object.entries(arten).map(([k, t]) => h("option", { value: k, text: t })));
 	const spiel = h("select", {}, h("option", { value: "", text: "– kein bestimmtes Spiel –" }),
 		...eigene.map((s) => h("option", { value: s.id, text: s.title })));
@@ -111,7 +111,9 @@ SEITEN_REG["antraege"] = async (c) => {
 		h("label", {}, "Art", art), h("label", {}, "Spiel", spiel), h("label", {}, "Beschreibung", text),
 		h("div", {}, h("button", { type: "submit", class: "knopf", text: "Antrag senden" })));
 	c.append(h("h1", { text: "Anträge" }),
-		h("p", { class: "leise", text: "Wünsche, Fehler oder Dinge, die nur Seb erledigen kann (z. B. Bestenliste zurücksetzen, Spielstand wiederherstellen, Spiel umbenennen)." }),
+		h("p", { class: "leise", text: ich.uploader || ich.admin
+			? "Fehler, Wünsche oder Dinge, die nur Seb erledigen kann (z. B. Bestenliste zurücksetzen, Spielstand wiederherstellen, Spiel umbenennen)."
+			: "Dir ist ein Fehler aufgefallen, du hast eine Idee oder dein Spielstand ist weg? Schreib es hier – Seb bekommt es direkt." }),
 		formular, h("h2", { text: "Meine Anträge" }));
 	if (!meine.length) return c.append(h("p", { class: "leise", text: "Noch keine Anträge." }));
 	c.append(...meine.map((a) => h("div", { class: "karte" },

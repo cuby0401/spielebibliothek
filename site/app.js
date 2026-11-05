@@ -15,6 +15,7 @@ let ichSelbst = null;
 let ich = { player: null, uploader: false, admin: false };
 let einstellungen = { sortierung: "alphabetisch", favoriten: [], grossansicht: false, bestenliste: true };
 const seiten = {};   // Unterseiten aus dem Benutzermenü (konto.js): name → async (container) => {}
+let letzteRoute = "#/";   // wohin der Zurück-Pfeil einer Unterseite führt
 
 async function einstellungenSpeichern(aenderung) {
 	Object.assign(einstellungen, aenderung);
@@ -223,7 +224,13 @@ async function zeigeSeite(name) {
 	el("uebersicht").hidden = true;
 	el("spielansicht").hidden = true;
 	el("seite").hidden = false;
-	el("seite").replaceChildren();
+	const zurueck = document.createElement("a");
+	zurueck.className = "zurueck-pfeil";
+	zurueck.href = letzteRoute;
+	zurueck.textContent = "←";
+	zurueck.title = letzteRoute.startsWith("#/spiel/") ? "Zurück zum Spiel" : "Zurück zur Übersicht";
+	zurueck.setAttribute("aria-label", zurueck.title);
+	el("seite").replaceChildren(zurueck);
 	meldung("");
 	try { await seiten[name](el("seite")); }
 	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message); }
@@ -259,9 +266,10 @@ async function zeigeSpiel(id) {
 function route() {
 	el("menue").hidden = true;
 	const m = location.hash.match(/^#\/spiel\/(.+)$/);
-	if (m && ID_MUSTER.test(m[1])) return zeigeSpiel(m[1]);
+	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1]); }
 	const s = location.hash.match(/^#\/([a-z-]+)$/);
 	if (s && seiten[s[1]]) return zeigeSeite(s[1]);
+	letzteRoute = "#/";
 	zeigeUebersicht();
 }
 
@@ -275,7 +283,6 @@ function menueEinrichten() {
 		admin: ich.admin,
 		entwickler: ich.uploader || ich.admin,
 		echteradmin: ich.echterAdmin && !ich.ansicht,
-		simuliert: !!ich.ansicht,
 	};
 	for (const a of menue.querySelectorAll("[data-rolle]")) a.hidden = !darf[a.dataset.rolle];
 	for (const a of menue.querySelectorAll("[data-ansicht]")) {

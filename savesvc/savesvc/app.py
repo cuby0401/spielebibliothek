@@ -85,6 +85,9 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     async def zu_gross(_, fehler: ZuGross):
         return JSONResponse({"detail": str(fehler)}, status_code=413)
 
+    def ich_daten(request: Request, player: str = Depends(spieler)) -> str:
+        return rollen.daten_id(e, request, player)
+
     def aktuelle_season(game_id: str, ordner=None) -> int:
         # game.json oder – falls höher – per Knopf gesetzte Season (Entwickler/Admin)
         ordner = ordner or e.spiele_dir / game_id
@@ -101,7 +104,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     @app.get("/api/games")
     def spiele(request: Request, player: str = Depends(spieler)):
         einst = db.spiel_einstellungen()
-        zuletzt = db.zuletzt_gespielt(player)
+        zuletzt = db.zuletzt_gespielt(rollen.daten_id(e, request, player))
         ist_admin = rollen.rolle(e, request, player)["admin"]
         ergebnis = []
         for s in games.alle(e.spiele_dir):
@@ -114,11 +117,11 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         return ergebnis
 
     @app.get("/api/save/{user}/{game}")
-    def alle_keys(player: str = Depends(spieler), sp=Depends(spiel)):
+    def alle_keys(player: str = Depends(ich_daten), sp=Depends(spiel)):
         return {"keys": db.keys(player, sp[0])}
 
     @app.get("/api/save/{user}/{game}/{key}")
-    def laden_(player: str = Depends(spieler), sp=Depends(spiel), key: str = P(..., pattern=KEY_MUSTER)):
+    def laden_(player: str = Depends(ich_daten), sp=Depends(spiel), key: str = P(..., pattern=KEY_MUSTER)):
         stand = db.laden(player, sp[0], key)
         if stand is None:
             raise HTTPException(404, "kein Spielstand")
@@ -126,7 +129,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
 
     @app.put("/api/save/{user}/{game}/{key}")
     def speichern(
-        player: str = Depends(spieler),
+        player: str = Depends(ich_daten),
         sp=Depends(spiel),
         key: str = P(..., pattern=KEY_MUSTER),
         body: dict[str, Any] = Body(...),
@@ -136,7 +139,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         return db.speichern(player, sp[0], key, body["data"], games.save_version(sp[1]))
 
     @app.delete("/api/save/{user}/{game}/{key}", status_code=204)
-    def loeschen(player: str = Depends(spieler), sp=Depends(spiel), key: str = P(..., pattern=KEY_MUSTER)):
+    def loeschen(player: str = Depends(ich_daten), sp=Depends(spiel), key: str = P(..., pattern=KEY_MUSTER)):
         db.loeschen(player, sp[0], key)
 
     # --- Bestenliste ---
@@ -144,7 +147,9 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     score_sperre = threading.Lock()
 
     @app.post("/api/score/{user}/{game}", status_code=201)
-    def score(player: str = Depends(spieler), sp=Depends(spiel), body: dict[str, Any] = Body(...)):
+    def score(request: Request, player: str = Depends(spieler), sp=Depends(spiel), body: dict[str, Any] = Body(...)):
+        if rollen.simuliert(e, request, player):
+            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Bestenlisten-Einträge gespeichert")
         lb = games.bestenliste_einstellungen(sp[1])
         if not lb["enabled"]:
             raise HTTPException(409, "dieses Spiel hat keine Bestenliste")

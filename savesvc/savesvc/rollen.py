@@ -19,3 +19,14 @@ def rolle(e, request: Request, player: str) -> dict:
                 "ansicht": ansicht, "echterAdmin": True}
     return {"admin": echter_admin, "entwickler": hat_ordner or echter_admin, "uploader": hat_ordner,
             "ansicht": None, "echterAdmin": echter_admin}
+
+
+def daten_id(e, request: Request, player: str) -> str:
+    """Unter welchem Namen Spielstände, Einstellungen und Anträge liegen. In der Simulation eine eigene,
+    leere Identität (z. B. „seb~spieler“) – wie ein neuer Kollege; Sebs echte Daten bleiben unberührt."""
+    a = rolle(e, request, player)["ansicht"]
+    return f"{player}~{a}" if a else player
+
+
+def simuliert(e, request: Request, player: str) -> str | None:
+    return rolle(e, request, player)["ansicht"]

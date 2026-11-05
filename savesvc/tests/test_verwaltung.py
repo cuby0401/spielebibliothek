@@ -86,13 +86,16 @@ def test_entwickler_season(client, umgebung):
 
 def test_antraege(client, umgebung):
     (umgebung.users).write_text("seb@example.com: seb\npaul@example.com: paul\nmia@example.com: mia\n")
-    assert client.post("/api/antraege", json={"art": "wunsch", "text": "Bitte Gamepad"}, headers=client.als("mia@example.com")).status_code == 403  # nur Entwickler
+    # Spieler dürfen Anträge stellen (z. B. Fehler melden), aber nicht die Entwickler-Arten
+    assert client.post("/api/antraege", json={"art": "fehler", "text": "Spiel friert ein"}, headers=client.als("mia@example.com")).status_code == 201
+    assert client.post("/api/antraege", json={"art": "bestenliste", "text": "Bitte leeren"}, headers=client.als("mia@example.com")).status_code == 422
+    assert "bestenliste" not in client.get("/api/antraege/arten", headers=client.als("mia@example.com")).json()
     r = client.post("/api/antraege", json={"art": "wunsch", "spiel": "paul/snake", "text": "Bitte Gamepad-Unterstützung"}, headers=client.als(PAUL))
     assert r.status_code == 201
     aid = r.json()["id"]
     assert client.post("/api/antraege", json={"art": "quatsch", "text": "xxx"}, headers=client.als(PAUL)).status_code == 422
     alle = client.get("/api/admin/antraege", headers=client.als()).json()
-    assert alle[0]["status"] == "offen" and alle[0]["artText"] == "Feature-Wunsch"
+    assert alle[0]["status"] == "offen" and alle[0]["artText"] == "Wunsch / Idee"
     assert client.patch(f"/api/admin/antraege/{aid}", json={"status": "erledigt", "antwort": "Ist drin!"}, headers=client.als()).status_code == 200
     mein = client.get("/api/antraege", headers=client.als(PAUL)).json()
     assert mein[0]["status"] == "erledigt" and mein[0]["antwort"] == "Ist drin!"
@@ -170,3 +173,22 @@ def test_ansicht_gibt_keine_rechte(client):
     h = {**client.als(PAUL), "X-Ansicht": "entwickler"}
     assert client.get("/api/me", headers=h).json()["ansicht"] is None
     assert client.get("/api/admin/uebersicht", headers={**client.als(PAUL), "X-Ansicht": "admin"}).status_code == 403
+
+
+def test_simulation_hat_eigenes_leeres_konto(client, monkeypatch):
+    import savesvc.app as appmod
+    monkeypatch.setattr(appmod, "SCORE_ABSTAND", 0.0)
+    echt = client.als()
+    client.put("/api/save/seb/zaehler/stand", json={"data": {"zahl": 42}}, headers=echt)
+    client.put("/api/einstellungen", json={"favoriten": ["seb/zaehler"]}, headers=echt)
+    sim = {**echt, "X-Ansicht": "spieler"}
+    assert client.get("/api/meine/spielstaende", headers=sim).json() == []
+    assert client.get("/api/save/seb/zaehler/stand", headers=sim).status_code == 404
+    assert client.get("/api/einstellungen", headers=sim).json()["favoriten"] == []
+    # in der Simulation speichern geht – getrennt vom echten Stand
+    client.put("/api/save/seb/zaehler/stand", json={"data": {"zahl": 1}}, headers=sim)
+    assert client.get("/api/save/seb/zaehler/stand", headers=echt).json()["data"] == {"zahl": 42}
+    # Bestenliste und Anträge werden in der Simulation nicht gespeichert
+    assert client.post("/api/score/seb/zaehler", json={"score": 5}, headers=sim).status_code == 409
+    assert client.post("/api/antraege", json={"art": "fehler", "text": "Test aus der Simulation"}, headers=sim).status_code == 409
+    assert client.get("/api/antraege", headers=sim).json() == []
