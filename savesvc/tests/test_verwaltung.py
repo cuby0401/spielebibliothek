@@ -141,3 +141,32 @@ def test_admin_scores_und_spiel_loeschen(client, upload, monkeypatch):
 def test_uebersicht(client, upload):
     d = client.get("/api/admin/uebersicht", headers=client.als()).json()
     assert d["spiele"] == 4 and d["spieler"] == 2 and d["uploads"][0]["aktion"] == "hochgeladen"
+
+
+# ---------- „Ansicht als …“ ----------
+
+def test_ansicht_als_spieler(client, upload):
+    client.patch("/api/admin/spiele/paul/snake", json={"versteckt": True}, headers=client.als())
+    h = {**client.als(), "X-Ansicht": "spieler"}
+    me = client.get("/api/me", headers=h).json()
+    assert me == {"player": "seb", "uploader": False, "admin": False, "ansicht": "spieler", "echterAdmin": True}
+    assert "paul/snake" not in {s["id"] for s in client.get("/api/games", headers=h).json()}
+    r = client.get("/api/admin/uebersicht", headers=h)
+    assert r.status_code == 403 and "Ansicht als spieler" in r.text
+    assert client.get("/api/entwickler/spiele", headers=h).status_code == 403
+    assert client.get("/api/einstellungen", headers=h).status_code == 200      # eigenes Konto bleibt
+
+
+def test_ansicht_als_entwickler(client):
+    h = {**client.als(), "X-Ansicht": "entwickler"}
+    me = client.get("/api/me", headers=h).json()
+    assert me["admin"] is False and me["uploader"] is True and me["ansicht"] == "entwickler"
+    assert client.get("/api/entwickler/spiele", headers=h).status_code == 200
+    assert client.get("/api/admin/spiele", headers=h).status_code == 403
+
+
+def test_ansicht_gibt_keine_rechte(client):
+    # Ein Nicht-Admin kann sich mit dem Header nichts verschaffen – er wird ignoriert
+    h = {**client.als(PAUL), "X-Ansicht": "entwickler"}
+    assert client.get("/api/me", headers=h).json()["ansicht"] is None
+    assert client.get("/api/admin/uebersicht", headers={**client.als(PAUL), "X-Ansicht": "admin"}).status_code == 403

@@ -12,9 +12,9 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query
+from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 
-from . import games
+from . import games, rollen
 from .auth import BENUTZER_MUSTER, Benutzerliste
 
 log = logging.getLogger("savesvc.verwaltung")
@@ -65,13 +65,14 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def ist_entwickler(player: str) -> bool:
         return (e.spiele_dir / player).is_dir()
 
-    def admin(player: str = Depends(spieler)) -> str:
-        if player not in e.admins:
-            raise HTTPException(403, "nur für Admins")
+    def admin(request: Request, player: str = Depends(spieler)) -> str:
+        r = rollen.rolle(e, request, player)
+        if not r["admin"]:
+            raise HTTPException(403, f"Ansicht als {r['ansicht']} aktiv – Admin-Funktionen gesperrt" if r["ansicht"] else "nur für Admins")
         return player
 
-    def entwickler(player: str = Depends(spieler)) -> str:
-        if not ist_entwickler(player) and player not in e.admins:
+    def entwickler(request: Request, player: str = Depends(spieler)) -> str:
+        if not rollen.rolle(e, request, player)["entwickler"]:
             raise HTTPException(403, "nur für Entwickler")
         return player
 

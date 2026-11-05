@@ -271,9 +271,28 @@ function menueEinrichten() {
 	knopf.onclick = (e) => { e.stopPropagation(); menue.hidden = !menue.hidden; knopf.setAttribute("aria-expanded", String(!menue.hidden)); };
 	document.addEventListener("click", (e) => { if (!menue.contains(e.target)) { menue.hidden = true; knopf.setAttribute("aria-expanded", "false"); } });
 	document.addEventListener("keydown", (e) => { if (e.key === "Escape") menue.hidden = true; });
-	for (const a of menue.querySelectorAll("[data-rolle]")) {
-		a.hidden = !(a.dataset.rolle === "admin" ? ich.admin : (ich.uploader || ich.admin));
+	const darf = {
+		admin: ich.admin,
+		entwickler: ich.uploader || ich.admin,
+		echteradmin: ich.echterAdmin && !ich.ansicht,
+		simuliert: !!ich.ansicht,
+	};
+	for (const a of menue.querySelectorAll("[data-rolle]")) a.hidden = !darf[a.dataset.rolle];
+	for (const a of menue.querySelectorAll("[data-ansicht]")) {
+		a.onclick = (e) => { e.preventDefault(); ansichtWechseln(a.dataset.ansicht || null); };
 	}
+	// Band oben, solange eine Rolle simuliert wird
+	if (ich.ansicht) {
+		el("ansicht-text").textContent = `Du siehst die Bibliothek als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"} – so wie Kollegen mit dieser Rolle. Spielstände und Favoriten bleiben deine.`;
+		el("ansicht-band").hidden = false;
+		el("ansicht-ende").onclick = () => ansichtWechseln(null);
+	}
+}
+
+function ansichtWechseln(rolle) {
+	Bridge.ansicht = rolle;
+	location.hash = "#/";
+	location.reload();
 }
 
 async function start() {

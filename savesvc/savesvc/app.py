@@ -10,10 +10,10 @@ import threading
 import time
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query
+from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 from fastapi.responses import JSONResponse
 
-from . import games
+from . import games, rollen
 from .auth import Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 from .db import Datenbank, ZuGross
@@ -91,15 +91,18 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         return max(games.season(ordner), db.season_override(game_id) or 0)
 
     @app.get("/api/me")
-    def me(player: str = Depends(spieler)):
-        # Entwickler = hat einen eigenen Spielordner (wird beim Anlegen des Upload-Kontos erzeugt)
-        return {"player": player, "uploader": (e.spiele_dir / player).is_dir(), "admin": player in e.admins}
+    def me(request: Request, player: str = Depends(spieler)):
+        # Entwickler = hat einen eigenen Spielordner (wird beim Anlegen des Upload-Kontos erzeugt).
+        # „Ansicht als …“ (rollen.py): echte Admins können Spieler- oder Entwickler-Sicht simulieren.
+        r = rollen.rolle(e, request, player)
+        return {"player": player, "uploader": r["uploader"], "admin": r["admin"],
+                "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"]}
 
     @app.get("/api/games")
-    def spiele(player: str = Depends(spieler)):
+    def spiele(request: Request, player: str = Depends(spieler)):
         einst = db.spiel_einstellungen()
         zuletzt = db.zuletzt_gespielt(player)
-        ist_admin = player in e.admins
+        ist_admin = rollen.rolle(e, request, player)["admin"]
         ergebnis = []
         for s in games.alle(e.spiele_dir):
             ein = einst.get(s["id"], {})

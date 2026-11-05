@@ -194,7 +194,11 @@ async function zeigen() {
 	Bridge.beiAblauf = () => { $("abgelaufen").hidden = false; };
 	try {
 		const ich = await Bridge.json("GET", "/api/me");
-		if (!ich.admin) { $("reiter").hidden = true; return meldung("Kein Zugriff – das Admin-Panel ist nur für Admins.", true); }
+		if (!ich.admin) {
+			$("reiter").hidden = true;
+			return meldung(ich.ansicht ? `„Ansicht als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"}“ ist aktiv – das Admin-Panel ist gesperrt. Beenden über dein Menü in der Bibliothek.`
+				: "Kein Zugriff – das Admin-Panel ist nur für Admins.", true);
+		}
 	} catch (e) { return meldung(e.message, true); }
 	addEventListener("hashchange", () => { meldung(""); zeigen(); });
 	zeigen();

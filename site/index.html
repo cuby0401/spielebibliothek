@@ -22,12 +22,21 @@
           <a href="#/meine-spiele" data-rolle="entwickler" hidden>Meine Spiele</a>
           <a href="#/antraege" data-rolle="entwickler" hidden>Anträge</a>
           <a href="/admin/" data-rolle="admin" hidden>Admin-Panel</a>
+          <hr data-rolle="echteradmin" hidden>
+          <a href="#" data-ansicht="spieler" data-rolle="echteradmin" hidden>Ansicht als Spieler</a>
+          <a href="#" data-ansicht="entwickler" data-rolle="echteradmin" hidden>Ansicht als Entwickler</a>
+          <a href="#" data-ansicht="" data-rolle="simuliert" hidden>Ansicht beenden</a>
           <hr>
           <a href="/cdn-cgi/access/logout">Abmelden</a>
         </div>
       </div>
     </nav>
   </header>
+
+  <p id="ansicht-band" class="ansicht-band" hidden>
+    <span id="ansicht-text"></span>
+    <button id="ansicht-ende" class="knopf klein" type="button">Ansicht beenden</button>
+  </p>
 
   <p id="abgelaufen" class="abgelaufen" hidden>
     Deine Anmeldung ist abgelaufen – Spielstände werden gerade nicht gespeichert.
