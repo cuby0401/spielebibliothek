@@ -1,0 +1,16 @@
+{
+  "title": "Bestenlisten-Vorlage",
+  "description": "Beispiel für Entwickler: eigene Spalten in der Bestenliste und abgesicherte Spielstände (saveVersion + Migration).",
+  "saveVersion": 2,
+  "leaderboard": {
+    "enabled": true,
+    "rangiertNach": "level",
+    "order": "desc",
+    "spalten": [
+      { "key": "level", "label": "Level" },
+      { "key": "items", "label": "Gegenstände" },
+      { "key": "zeit", "label": "Spielzeit", "format": "zeit" },
+      { "key": "held", "label": "Held", "format": "text" }
+    ]
+  }
+}

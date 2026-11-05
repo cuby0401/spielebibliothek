@@ -39,8 +39,8 @@
         aber nur mit <code>GameSave</code> gibt es Bestenlisten und saubere Updates.</li>
       <li><strong>Updates immer in denselben Ordner</strong> – also beim Hochladen denselben Ordnernamen nehmen.
         Neuer Ordnername = neues Spiel, Spielstände und Bestenliste wären weg.</li>
-      <li><strong>Speicherstruktur nicht ohne Migration ändern:</strong> neue Felder mit Standardwerten, nichts umbenennen oder löschen;
-        bei Strukturänderung <code>saveVersion</code> in der <code>game.json</code> erhöhen und alte Stände beim Laden umwandeln.</li>
+      <li><strong>Spielstände bei Updates absichern:</strong> beim Laden <code>standard</code> und <code>migration</code> angeben
+        und bei jeder Änderung der Speicherstruktur <code>saveVersion</code> erhöhen – siehe <a href="#updates">Updates</a>.</li>
       <li><strong>Erlaubte Dateitypen:</strong> html, js, mjs, css, json, png, jpg, gif, webp, svg, ico, mp3, ogg, wav, m4a, mp4, webm,
         woff, woff2, ttf, otf, wasm, txt, glb, gltf, bin. Alles andere (z. B. <code>.exe</code>, Skripte, versteckte Dateien)
         wird beim Hochladen übersprungen.</li>
@@ -61,6 +61,66 @@ const ich = await GameSave.player();             // "paul"
 GameSave.available                               // false beim lokalen Testen</code></pre>
     <p>Alle Aufrufe können fehlschlagen (z. B. offline) – Fehler mit <code>try/catch</code> abfangen.
       Keys: Buchstaben, Ziffern, <code>. _ : -</code>, max. 100 Zeichen. Ein Spielstand darf höchstens 256 KB groß sein.</p>
+
+    <h2 id="updates">Updates: was mit Spielständen passiert</h2>
+    <ul>
+      <li><strong>Spielstände liegen nicht im Spielordner</strong>, sondern auf dem Server – getrennt nach Spieler und Spiel
+        (<code>dein-name/ordnername</code>). Ein Update (gleiches ZIP-Verfahren, gleicher Ordnername) ersetzt nur die Spieldateien;
+        Fortschritt und Bestenliste bleiben. Selbst nach Löschen und erneutem Hochladen unter demselben Namen sind sie wieder da.</li>
+      <li><strong>Das Problem:</strong> Dein neues Spiel liest Spielstände, die eine <em>alte</em> Version geschrieben hat.
+        Hatte das Inventar früher 2 Plätze und jetzt 5, oder heißt ein Feld jetzt anders, muss das neue Spiel damit umgehen können.</li>
+      <li><strong>Die Lösung:</strong> <code>saveVersion</code> in der <code>game.json</code> + Standardwerte + Umwandlungsschritte beim Laden.
+        Jeder Spielstand merkt sich, mit welcher <code>saveVersion</code> er geschrieben wurde.</li>
+    </ul>
+<pre><code>// game.json: "saveVersion": 3   ← bei jeder Strukturänderung um 1 erhöhen
+
+const { data, migriert } = await GameSave.load("spielstand", {
+  // für neue Spieler UND für Felder, die es früher noch nicht gab (wird automatisch ergänzt)
+  standard: { level: 1, inventar: ["", "", "", "", ""], einstellungen: { ton: true } },
+  // Umwandlung alter Stände, Schritt für Schritt – Schlüssel = saveVersion, zu der umgewandelt wird
+  migration: {
+    2: (alt) => ({ ...alt, inventar: [...alt.inventar, "", "", ""] }),            // 2 → 5 Plätze
+    3: (alt) => { const { punkte, ...rest } = alt; return { ...rest, gold: punkte ?? 0 }; },  // umbenannt
+  },
+});
+if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand gleich speichern</code></pre>
+    <ul>
+      <li>Fehlende Felder in <strong>Objekten</strong> werden automatisch aus <code>standard</code> ergänzt.
+        Arrays werden nicht verändert – Längenänderungen gehören in eine <code>migration</code>.</li>
+      <li>Ein alter Stand mit <code>saveVersion</code> 1 läuft durch Schritt 2 <em>und</em> 3. Schlägt ein Schritt fehl,
+        gibt <code>load</code> einen Fehler zurück – der Spielstand wird dabei nicht verändert.</li>
+      <li>Einfache Spiele ohne Strukturänderung brauchen nur <code>standard</code>. <code>load(key)</code> ohne Optionen funktioniert weiter wie bisher.</li>
+      <li>Die letzten 5 Stände jedes Spielstands sind gesichert – bei einem kaputten Update kann Seb zurückdrehen.</li>
+      <li>Eine vollständige Vorlage ist das Spiel <strong>„Bestenlisten-Vorlage“</strong> in der Bibliothek (Quelltext ansehen: Rechtsklick im Spiel → Rahmenquelltext).</li>
+    </ul>
+
+    <h2 id="bestenliste">Bestenliste gestalten</h2>
+    <p><strong>Fest (bestimmt die Bibliothek):</strong> Der Spielername kommt aus der Anmeldung, jeder Spieler steht einmal drin (mit seinem besten Eintrag),
+      bei Gleichstand gewinnt, wer es zuerst geschafft hat, höchstens ein Eintrag pro Sekunde, Seasons.
+      <strong>Frei (bestimmst du):</strong> ob es eine Bestenliste gibt, welcher Wert über den Platz entscheidet, Reihenfolge, Spalten und Formate –
+      und wie du sie im Spiel darstellst.</p>
+<pre><code>"leaderboard": {
+  "enabled": true,                 // false = keine Bestenliste
+  "rangiertNach": "level",         // dieser Wert entscheidet den Platz (Zahl-Spalte), sonst "score"
+  "order": "desc",                 // "desc" = mehr ist besser, "asc" = weniger ist besser
+  "spalten": [                     // bis zu 6 Spalten
+    { "key": "level", "label": "Level" },
+    { "key": "items", "label": "Gegenstände" },
+    { "key": "zeit",  "label": "Spielzeit", "format": "zeit" },
+    { "key": "held",  "label": "Held",      "format": "text" }
+  ]
+}</code></pre>
+<pre><code>await GameSave.submitScore({ level: 12, items: 48, zeit: 5430000, held: "Mira" });
+const top = await GameSave.leaderboard();
+// [{ rank: 1, player: "paul", score: 12, werte: { level: 12, items: 48, zeit: 5430000, held: "Mira" } }, …]</code></pre>
+    <ul>
+      <li><strong>Formate:</strong> <code>zahl</code> (Standard, 1.234), <code>dezimal</code> (12,50), <code>zeit</code> (Millisekunden → 1:23,4 bzw. 1:02:03),
+        <code>text</code> (höchstens 40 Zeichen, kann nicht rangieren).</li>
+      <li><strong>Einfach bleibt einfach:</strong> ohne <code>spalten</code> reicht <code>submitScore(1250)</code>; mit <code>"label"</code> und
+        <code>"format"</code> auf oberster Ebene gestaltest du die Score-Spalte.</li>
+      <li>Nur in der <code>game.json</code> eingetragene Spalten werden angenommen – ein Tippfehler im Schlüssel gibt eine Fehlermeldung.</li>
+      <li>Die Bibliothek zeigt die Spalten neben dem Spiel an. Im Spiel kannst du die Liste mit <code>GameSave.leaderboard()</code> beliebig selbst darstellen.</li>
+    </ul>
 
     <h2><code>game.json</code></h2>
 <pre><code>{
@@ -85,7 +145,8 @@ GameSave.available                               // false beim lokalen Testen</c
 <pre id="prompt-text">Baue das Spiel als statische Web-App für die Spielebibliothek:
 - index.html im Hauptordner, alle Pfade relativ (./…), keine CDNs, alle Bibliotheken als Datei mitliefern, kein Server-Code, keine Netzwerkaufrufe nach außen.
 - Binde &lt;script src="/lib/gamesave.js"&gt;&lt;/script&gt; als erstes Script ein und speichere Fortschritt mit await GameSave.save(key, data) / const {data, version} = await GameSave.load(key). Fange Fehler von GameSave ab. GameSave.available ist false beim lokalen Testen – das Spiel muss trotzdem laufen.
-- Für Highscores: await GameSave.submitScore(zahl) und await GameSave.leaderboard() (Liste von {player, score}).
+- Spielstände bei Updates absichern: lade mit await GameSave.load(key, { standard: {...alle Felder mit Startwerten...}, migration: { 2: (alt) => neu, ... } }), erhöhe "saveVersion" in der game.json bei jeder Änderung der Speicherstruktur und ergänze dann einen migration-Schritt für diese Version. Felder nie stillschweigend umbenennen oder anders verwenden.
+- Für Highscores: await GameSave.submitScore(zahl) – oder mit mehreren Werten: await GameSave.submitScore({ level, items, zeit }) und dazu in der game.json unter leaderboard "rangiertNach" (entscheidender Zahlenwert) und "spalten": [{ "key": "...", "label": "...", "format": "zahl|dezimal|zeit|text" }]. await GameSave.leaderboard() liefert [{rank, player, score, werte}].
 - Lege eine game.json an: {"title": "...", "description": "...", "thumbnail": "thumb.png", "saveVersion": 1, "leaderboard": {"enabled": true, "order": "desc", "label": "Punkte"}, "leaderboardSeason": 1} und erstelle ein Vorschaubild thumb.png oder thumb.svg im Format 16:9.
 - Wenn du Elemente mit dem hidden-Attribut ein- und ausblendest, ergänze im CSS [hidden] { display: none !important; } – sonst bleiben Overlays mit display:flex/grid sichtbar.
 - Ändere bei späteren Updates die Struktur gespeicherter Daten nie ohne Migration: neue Felder mit Standardwerten, nichts umbenennen oder löschen. Wenn sich die Struktur ändert, erhöhe saveVersion und wandle alte Stände beim Laden um.
@@ -97,8 +158,12 @@ GameSave.available                               // false beim lokalen Testen</c
       <dd>Meist ein absoluter Pfad (<code>/assets/…</code>) oder eine Bibliothek vom CDN. Beides geht hier nicht – siehe Regeln 2 und 4.</dd>
       <dt>Ein Overlay oder Menü verschwindet nicht.</dt>
       <dd>Siehe die <code>hidden</code>-Zeile im Prompt-Block.</dd>
-      <dt>Mein Spielstand ist nach einem Update weg.</dt>
-      <dd>Wurde ein anderer Ordnername verwendet? Sonst bei Seb melden – die letzten 5 Stände jedes Spielstands sind gesichert.</dd>
+      <dt>Mein Spielstand ist nach einem Update weg oder kaputt.</dt>
+      <dd>Wurde ein anderer Ordnername verwendet? Hat sich die Speicherstruktur geändert, ohne <code>saveVersion</code> zu erhöhen und einen
+        <code>migration</code>-Schritt zu ergänzen (siehe <a href="#updates">Updates</a>)? Sonst bei Seb melden – die letzten 5 Stände jedes Spielstands sind gesichert.</dd>
+      <dt>Mein Bestenlisten-Eintrag wird abgelehnt.</dt>
+      <dd>Steht jeder Schlüssel aus <code>submitScore({...})</code> in <code>leaderboard.spalten</code>? Ist der Wert aus <code>rangiertNach</code> dabei und eine Zahl?
+        Die Fehlermeldung von <code>submitScore</code> nennt den Grund.</dd>
       <dt>Die Seite sagt „Anmeldung abgelaufen“.</dt>
       <dd>Nach einer Woche ist ein neuer E-Mail-Code nötig – Seite neu laden.</dd>
     </dl>

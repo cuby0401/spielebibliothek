@@ -46,13 +46,39 @@ def season(ordner: Path) -> int:
     return s if isinstance(s, int) and not isinstance(s, bool) and 1 <= s <= 1_000_000 else 1
 
 
+FORMATE = ("zahl", "dezimal", "zeit", "text")
+SPALTEN_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,30}$")
+SPALTEN_MAX = 6
+
+
 def bestenliste_einstellungen(ordner: Path) -> dict:
+    """leaderboard aus game.json, bereinigt. Regeln (wer gewinnt, ein Eintrag pro Spieler) legt der
+    Server fest – der Entwickler bestimmt nur Rangwert, Reihenfolge und Darstellung."""
     lb = meta(ordner)[0].get("leaderboard")
     lb = lb if isinstance(lb, dict) else {}
+    spalten = []
+    for s in lb.get("spalten") if isinstance(lb.get("spalten"), list) else []:
+        if not isinstance(s, dict) or not isinstance(s.get("key"), str) or not SPALTEN_KEY.match(s["key"]):
+            continue
+        if s["key"] == "score" or any(x["key"] == s["key"] for x in spalten):
+            continue
+        spalten.append({
+            "key": s["key"],
+            "label": _text(s.get("label"), 30) or s["key"],
+            "format": s.get("format") if s.get("format") in FORMATE else "zahl",
+        })
+        if len(spalten) == SPALTEN_MAX:
+            break
+    rang = lb.get("rangiertNach")
+    if not any(s["key"] == rang and s["format"] != "text" for s in spalten):
+        rang = "score"
     return {
         "enabled": lb.get("enabled") is True,
         "order": "asc" if lb.get("order") == "asc" else "desc",
         "label": _text(lb.get("label"), 30) or "Punkte",
+        "format": lb.get("format") if lb.get("format") in FORMATE[:3] else "zahl",
+        "rangiertNach": rang,
+        "spalten": spalten,
     }
 
 

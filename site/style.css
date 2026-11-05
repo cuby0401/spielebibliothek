@@ -98,7 +98,14 @@ main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
 .bl-liste li:last-child { border-bottom: 0; }
 .bl-liste .platz { width: 1.6rem; color: var(--leise); font-variant-numeric: tabular-nums; }
 .bl-liste .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.bl-liste .wert { font-variant-numeric: tabular-nums; font-weight: 600; }
+.bl-liste .werte { display: flex; gap: 0.6rem; }
+.bl-liste .wert { font-variant-numeric: tabular-nums; text-align: right; min-width: 2.5rem; }
+.bl-liste .wert.rang { font-weight: 650; }
+.bl-liste.mehrspaltig li { flex-wrap: wrap; }
+.bl-liste.mehrspaltig .werte { width: 100%; justify-content: flex-end; color: var(--leise); }
+.bl-liste.mehrspaltig .wert.rang { color: var(--text); }
+.bl-liste .kopfzeile { font-size: 0.75rem; color: var(--leise); border-bottom: 1px solid var(--linie); }
+.bl-liste .kopfzeile .werte { color: var(--leise); }
 .bl-liste li.ich .name { font-weight: 650; color: var(--akzent); }
 .bestenliste p:empty { display: none; }
 

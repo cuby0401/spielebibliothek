@@ -24,6 +24,31 @@ SCORE_ABSTAND = 1.0       # Sekunden zwischen zwei Scores je Spieler und Spiel
 SCORE_MAX = 1e15          # Betrag; schützt nur vor Unsinn, nicht vor Schummeln (Kollegen-Vertrauen)
 
 
+def zahl_ok(x) -> bool:
+    return not isinstance(x, bool) and isinstance(x, (int, float)) and math.isfinite(x) and abs(x) <= SCORE_MAX
+
+
+def pruefe_werte(werte, lb: dict) -> dict:
+    """Zusatzwerte zum Score: nur in game.json deklarierte Spalten, Zahlen bzw. kurzer Text."""
+    if werte is None:
+        return {}
+    if not isinstance(werte, dict):
+        raise HTTPException(422, "werte muss ein Objekt sein")
+    erlaubt = {s["key"]: s["format"] for s in lb["spalten"]}
+    unbekannt = sorted(set(werte) - set(erlaubt))
+    if unbekannt:
+        raise HTTPException(422, f"unbekannte Spalten {unbekannt} – in game.json unter leaderboard.spalten eintragen")
+    sauber = {}
+    for k, v in werte.items():
+        if erlaubt[k] == "text":
+            if not isinstance(v, str) or len(v) > 40:
+                raise HTTPException(422, f"{k}: Text mit höchstens 40 Zeichen erwartet")
+        elif not zahl_ok(v):
+            raise HTTPException(422, f"{k}: Zahl erwartet")
+        sauber[k] = v
+    return sauber
+
+
 def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None) -> FastAPI:
     e = einstellungen or laden()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -99,16 +124,22 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         lb = games.bestenliste_einstellungen(sp[1])
         if not lb["enabled"]:
             raise HTTPException(409, "dieses Spiel hat keine Bestenliste")
-        wert = body.get("score")
-        if isinstance(wert, bool) or not isinstance(wert, (int, float)) or not math.isfinite(wert) or abs(wert) > SCORE_MAX:
-            raise HTTPException(422, "score muss eine endliche Zahl sein")
+        werte = pruefe_werte(body.get("werte"), lb)
+        if lb["rangiertNach"] == "score":
+            wert = body.get("score")
+            if not zahl_ok(wert):
+                raise HTTPException(422, "score muss eine endliche Zahl sein")
+        else:
+            wert = werte.get(lb["rangiertNach"])
+            if not zahl_ok(wert):
+                raise HTTPException(422, f"Wert {lb['rangiertNach']!r} (rangiertNach) fehlt oder ist keine Zahl")
         with score_sperre:
             jetzt = time.monotonic()
             if jetzt - letzter_score.get((player, sp[0]), -SCORE_ABSTAND) < SCORE_ABSTAND:
                 raise HTTPException(429, "höchstens ein Score pro Sekunde")
             letzter_score[(player, sp[0])] = jetzt
         season = games.season(sp[1])
-        db.score_eintragen(player, sp[0], season, float(wert))
+        db.score_eintragen(player, sp[0], season, float(wert), werte)
         return {"season": season}
 
     @app.get("/api/leaderboard/{user}/{game}")

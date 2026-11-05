@@ -46,6 +46,10 @@ class Datenbank:
         with self.verbindung() as v:
             v.execute("PRAGMA journal_mode=WAL")
             v.executescript(SCHEMA)
+            # Schema-Erweiterungen bestehender Datenbanken
+            spalten = {z["name"] for z in v.execute("PRAGMA table_info(scores)")}
+            if "werte" not in spalten:
+                v.execute("ALTER TABLE scores ADD COLUMN werte TEXT")
 
     @contextmanager
     def verbindung(self):
@@ -132,29 +136,29 @@ class Datenbank:
 
     # --- Bestenliste ---
 
-    def score_eintragen(self, player: str, game: str, season: int, score: float) -> None:
+    def score_eintragen(self, player: str, game: str, season: int, score: float, werte: dict | None = None) -> None:
         with self.verbindung() as v:
-            v.execute("INSERT INTO scores (player, game, season, score, created_at) VALUES (?,?,?,?,?)",
-                      (player, game, season, score, jetzt()))
+            v.execute("INSERT INTO scores (player, game, season, score, created_at, werte) VALUES (?,?,?,?,?,?)",
+                      (player, game, season, score, jetzt(),
+                       json.dumps(werte, ensure_ascii=False, separators=(",", ":")) if werte else None))
 
     def bestenliste(self, game: str, season: int, aufsteigend: bool, limit: int) -> list[dict]:
         """Bester Score je Spieler, sortiert. Bei Gleichstand gewinnt, wer ihn zuerst erreicht hat."""
-        best = "MIN" if aufsteigend else "MAX"
         richtung = "ASC" if aufsteigend else "DESC"
         with self.verbindung() as v:
+            # je Spieler der beste Eintrag (bei Gleichstand der früheste) – mit seinen Zusatzwerten
             zeilen = v.execute(
-                f"""SELECT s.player, s.score, MIN(s.created_at) AS erreicht
-                    FROM scores s
-                    JOIN (SELECT player, {best}(score) AS bester FROM scores
-                          WHERE game=? AND season=? GROUP BY player) b
-                      ON s.player = b.player AND s.score = b.bester
-                    WHERE s.game=? AND s.season=?
-                    GROUP BY s.player, s.score
-                    ORDER BY s.score {richtung}, erreicht ASC
+                f"""SELECT player, score, created_at AS erreicht, werte FROM (
+                        SELECT player, score, created_at, werte,
+                               ROW_NUMBER() OVER (PARTITION BY player ORDER BY score {richtung}, created_at ASC, id ASC) AS nr
+                        FROM scores WHERE game=? AND season=?)
+                    WHERE nr = 1
+                    ORDER BY score {richtung}, erreicht ASC
                     LIMIT ?""",
-                (game, season, game, season, limit),
+                (game, season, limit),
             ).fetchall()
-        return [{"rank": i + 1, "player": z["player"], "score": z["score"], "at": z["erreicht"]}
+        return [{"rank": i + 1, "player": z["player"], "score": z["score"], "at": z["erreicht"],
+                 "werte": json.loads(z["werte"]) if z["werte"] else {}}
                 for i, z in enumerate(zeilen)]
 
     def seasons(self, game: str) -> list[int]:

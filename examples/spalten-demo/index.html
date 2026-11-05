@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bestenlisten-Vorlage</title>
+  <script src="/lib/gamesave.js"></script>
+  <style>
+    [hidden] { display: none !important; }
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 16px; background: #fbfaf7; color: #222; }
+    button { font: inherit; padding: .35em .9em; margin: .2em .2em 0 0; }
+    pre { background: #eee; padding: .6em; border-radius: 6px; white-space: pre-wrap; }
+    table { border-collapse: collapse; } td, th { padding: 2px 10px; border-bottom: 1px solid #ddd; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Bestenlisten-Vorlage</h1>
+  <p>Level <b id="level">1</b> · Gegenstände <b id="items">0</b> · Held
+    <select id="held"><option>Mira</option><option>Tarek</option><option>Juno</option></select></p>
+  <button id="aufstieg" type="button">Level +1</button>
+  <button id="finden" type="button">Gegenstand finden</button>
+  <button id="einreichen" type="button">In Bestenliste eintragen</button>
+  <p id="status"></p>
+  <h2>Bestenliste (selbst dargestellt)</h2>
+  <table id="tabelle"></table>
+  <h2>Spielstand</h2>
+  <pre id="stand"></pre>
+
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const start = Date.now();
+    let stand;
+
+    // Spielstand mit Absicherung für Updates:
+    //  - standard: Werte für neue Spieler und für Felder, die es früher noch nicht gab
+    //  - migration: Schritt von saveVersion 1 auf 2 (früher hieß das Feld "gefunden" und war eine Zahl)
+    const OPTIONEN = {
+      standard: { level: 1, inventar: [], held: "Mira" },
+      migration: {
+        2: (alt) => ({ ...alt, inventar: Array.from({ length: alt.gefunden || 0 }, () => "Altfund") }),
+      },
+    };
+
+    function zeigen() {
+      $("level").textContent = stand.level;
+      $("items").textContent = stand.inventar.length;
+      $("held").value = stand.held;
+      $("stand").textContent = JSON.stringify(stand, null, 1);
+    }
+    async function speichern() {
+      try { await GameSave.save("spielstand", stand); } catch (e) { $("status").textContent = e.message; }
+    }
+    async function bestenliste() {
+      try {
+        const top = await GameSave.leaderboard();   // [{ rank, player, score, werte: {level, items, zeit, held} }]
+        const zeile = (zellen, tag = "td") => { const tr = document.createElement("tr"); zellen.forEach((z) => { const c = document.createElement(tag); c.textContent = z; tr.append(c); }); return tr; };
+        $("tabelle").replaceChildren(zeile(["#", "Spieler", "Level", "Gegenstände", "Held"], "th"),
+          ...top.map((e) => zeile([e.rank, e.player, e.werte.level, e.werte.items, e.werte.held ?? "–"])));
+      } catch (e) { $("tabelle").textContent = "Bestenliste nur in der Bibliothek."; }
+    }
+
+    $("aufstieg").onclick = () => { stand.level++; zeigen(); speichern(); };
+    $("finden").onclick = () => { stand.inventar.push("Fund " + (stand.inventar.length + 1)); zeigen(); speichern(); };
+    $("held").onchange = () => { stand.held = $("held").value; zeigen(); speichern(); };
+    $("einreichen").onclick = async () => {
+      try {
+        await GameSave.submitScore({ level: stand.level, items: stand.inventar.length, zeit: Date.now() - start, held: stand.held });
+        $("status").textContent = "Eingetragen.";
+        bestenliste();
+      } catch (e) { $("status").textContent = e.message; }
+    };
+
+    (async () => {
+      try {
+        const { data, migriert } = await GameSave.load("spielstand", OPTIONEN);
+        stand = data;
+        if (migriert) { $("status").textContent = "Alter Spielstand wurde auf die neue Version umgestellt."; speichern(); }
+      } catch (e) {
+        stand = structuredClone(OPTIONEN.standard);
+        $("status").textContent = e.message;
+      }
+      zeigen();
+      bestenliste();
+    })();
+  </script>
+</body>
+</html>

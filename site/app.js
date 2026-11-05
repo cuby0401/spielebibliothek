@@ -14,6 +14,22 @@ let aktuellesSpiel = null;
 let ichSelbst = null;
 
 const zahl = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 3 });
+const dezimal = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Formate für Bestenlisten-Werte (game.json: format "zahl" | "dezimal" | "zeit" | "text")
+function formatieren(wert, format) {
+	if (wert === undefined || wert === null) return "–";
+	if (format === "text") return String(wert);
+	if (typeof wert !== "number") return String(wert);
+	if (format === "dezimal") return dezimal.format(wert);
+	if (format === "zeit") { // Millisekunden → m:ss,z bzw. h:mm:ss
+		const ms = Math.max(0, Math.round(wert));
+		const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+		const zw = (n) => String(n).padStart(2, "0");
+		return h ? `${h}:${zw(m)}:${zw(s)}` : `${m}:${zw(s)},${Math.floor(ms / 100) % 10}`;
+	}
+	return zahl.format(wert);
+}
 
 async function bestenlisteZeigen(spiel, season) {
 	const liste = el("bl-liste");
@@ -34,7 +50,7 @@ async function bestenlisteZeigen(spiel, season) {
 	}
 	if (aktuellesSpiel !== spiel.id) return; // inzwischen anderes Spiel offen
 
-	el("bl-titel").textContent = "Bestenliste · " + d.label;
+	el("bl-titel").textContent = "Bestenliste" + (d.rangiertNach === "score" ? " · " + d.label : "");
 	if (d.seasons.length > 1) {
 		const wahl = el("bl-season");
 		wahl.replaceChildren(...d.seasons.slice().reverse().map((s) => {
@@ -46,15 +62,37 @@ async function bestenlisteZeigen(spiel, season) {
 		}));
 		el("bl-season-wahl").hidden = false;
 	}
+	// Spalten: eigener Rangwert/Zusatzwerte aus der game.json, sonst nur der Score
+	const spalten = d.rangiertNach === "score"
+		? [{ key: "score", label: d.label, format: d.format }, ...d.spalten]
+		: d.spalten;
+	liste.classList.toggle("mehrspaltig", spalten.length > 1);
 	liste.replaceChildren(...d.entries.map((e) => {
 		const li = document.createElement("li");
 		if (e.player === ichSelbst) li.className = "ich";
 		const platz = document.createElement("span"); platz.className = "platz"; platz.textContent = e.rank + ".";
 		const name = document.createElement("span"); name.className = "name"; name.textContent = e.player;
-		const wert = document.createElement("span"); wert.className = "wert"; wert.textContent = zahl.format(e.score);
-		li.append(platz, name, wert);
+		li.append(platz, name);
+		const werte = document.createElement("span"); werte.className = "werte";
+		for (const s of spalten) {
+			const w = document.createElement("span");
+			w.className = s.key === (d.rangiertNach === "score" ? "score" : d.rangiertNach) ? "wert rang" : "wert";
+			w.title = s.label;
+			w.textContent = formatieren(s.key === "score" ? e.score : e.werte?.[s.key], s.format);
+			werte.append(w);
+		}
+		li.append(werte);
 		return li;
 	}));
+	if (spalten.length > 1) {
+		const kopf = document.createElement("li"); kopf.className = "kopfzeile";
+		const leer1 = document.createElement("span"); leer1.className = "platz";
+		const leer2 = document.createElement("span"); leer2.className = "name";
+		const titel = document.createElement("span"); titel.className = "werte";
+		for (const s of spalten) { const t = document.createElement("span"); t.className = "wert"; t.textContent = s.label; titel.append(t); }
+		kopf.append(leer1, leer2, titel);
+		liste.prepend(kopf);
+	}
 	hinweis.textContent = d.entries.length ? "" : (d.season === d.currentSeason ? "Noch keine Einträge – sei die oder der Erste!" : "In dieser Season gab es keine Einträge.");
 }
 
