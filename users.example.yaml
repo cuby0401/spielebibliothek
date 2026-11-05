@@ -1,0 +1,6 @@
+# Zuordnung Login-E-Mail (Cloudflare Access) → Benutzername in der Spielebibliothek.
+# Auf der NAS als users.yaml neben compose.yaml ablegen. NICHT ins Git (enthält E-Mail-Adressen).
+# Benutzername: klein, a–z, 0–9, _ und -, wird Ordnername und Spiel-ID-Präfix – danach nie mehr ändern.
+# Änderungen werden ohne Neustart übernommen.
+
+seb@example.com: seb

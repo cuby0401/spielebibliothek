@@ -53,6 +53,12 @@ main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
 .knopf[disabled], .knopf[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 .leise { color: var(--leise); }
 
+.abgelaufen {
+  margin: 0; padding: 0.6rem 1.25rem; text-align: center;
+  background: var(--warn); color: #fff; font-weight: 600;
+}
+.abgelaufen a { color: inherit; }
+
 .meldung { padding: 0.75rem 1rem; border: 1px solid var(--linie); border-radius: 8px; background: var(--flaeche); }
 
 .kacheln {

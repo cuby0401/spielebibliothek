@@ -11,7 +11,7 @@ const param = params.get("spiel");
 const spielName = SPIELE[param] ? param : "spike";
 // Modus A: abgeschottetes iframe ohne Origin, Spiel unter games.cuby0401.uk/play (Stand Phase 1)
 // Modus B: Spiel unter play.cuby0401.uk, iframe MIT allow-same-origin (eigener, fremder Origin)
-const modus = params.get("modus") === "a" ? "a" : "b";
+const modus = "b"; // Modus A ist seit E14 entschieden und unter games nicht mehr erreichbar
 const spielId = SPIELE[spielName];
 const ablage = "spike-saves:" + spielId;
 const $ = (id) => document.getElementById(id);
@@ -149,8 +149,6 @@ for (const [id, wert] of [["k-test", null], ["k-keks", "legacy-localstorage"]]) 
 	if (modus === "a") q.set("modus", "a");
 	$(id).href = "?" + q;
 }
-$("k-modus").href = "?" + new URLSearchParams({ ...(param ? { spiel: param } : {}), ...(modus === "b" ? { modus: "a" } : {}) });
-$("k-modus").textContent = modus === "b" ? "Zu Modus A (abgeschottet, alt)" : "Zu Modus B (play.cuby0401.uk)";
 $("neu").onclick = starten;
 $("loeschen").onclick = () => { try { localStorage.removeItem(ablage); } catch { /* egal */ } zeigeGespeichert(); starten(); };
 zeigeGespeichert();

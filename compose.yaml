@@ -2,8 +2,8 @@
 # Liegt auf der NAS unter /volume1/docker/spielebibliothek/compose.yaml
 # Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
 #
-# Stand: Phase 2 (caddy + cloudflared, kein Port am Host). Weitere Dienste:
-#   Phase 4 savesvc · Phase 6 filebrowser
+# Stand: Phase 4 (caddy, cloudflared, savesvc; kein Port am Host). Es fehlt noch:
+#   Phase 6 filebrowser
 
 name: spielebibliothek
 
@@ -36,6 +36,29 @@ services:
     # Für Tests im LAN vorübergehend wieder einkommentieren:
     # ports:
     #   - "8088:8080"
+    networks: [intern]
+
+  savesvc:
+    build: ./savesvc
+    image: spielebibliothek-savesvc
+    container_name: spielebibliothek-savesvc
+    restart: unless-stopped
+    # UID 10022 ist im Image gesetzt: rwX auf data/, r-X auf spiele/ (scripts/nas-setup.sh)
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      # nicht geheim: Team-Domain und AUD-Tag der Access-Anwendung "games"
+      ACCESS_TEAM_DOMAIN: cold-glitter-fc3b.cloudflareaccess.com
+      ACCESS_AUD: 16a18e7f5f0f0cf8060c0c274276a4f5f895aa0a38abdb90c6c75575d902a2b1
+      # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
+    volumes:
+      - /volume1/games/data:/data
+      - /volume1/games/spiele:/spiele:ro
+      # E-Mail → Benutzername; liegt nur auf der NAS, nicht im Git (Vorlage: users.example.yaml)
+      - ./users.yaml:/config/users.yaml:ro
     networks: [intern]
 
   cloudflared:

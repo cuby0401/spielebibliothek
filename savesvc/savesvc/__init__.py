@@ -1,0 +1,1 @@
+"""Speicher-Dienst der Spielebibliothek."""

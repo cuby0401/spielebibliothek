@@ -63,20 +63,15 @@
 		file_server
 	}
 
-	# Spiele unter games: nur noch für Spike-Modus A und die Bibliothek bis zur Umstellung
-	handle_path /play/* {
-		# SPIKE Phase 3: mit ?cors=1 testweise CORS-Header für den opaken Origin des Sandbox-iframes
-		@cors query cors=1
-		header @cors {
-			Access-Control-Allow-Origin "null"
-			Access-Control-Allow-Credentials "true"
-			Vary "Origin"
-		}
-		root * /srv/spiele
-		file_server
+	# Speicher-Dienst. Den Header Cf-Access-Jwt-Assertion setzt Cloudflare Access, Caddy reicht ihn durch.
+	handle /api/* {
+		reverse_proxy savesvc:8000
 	}
 
-	# /api/* → savesvc folgt in Phase 4
+	# Spiele gibt es nur unter play.cuby0401.uk (E14)
+	handle /play/* {
+		respond 404
+	}
 
 	# Bibliotheksseite
 	handle {
