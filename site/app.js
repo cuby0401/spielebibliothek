@@ -10,6 +10,53 @@
 const ID_MUSTER = /^[a-z0-9][a-z0-9_-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const el = (id) => document.getElementById(id);
 let spiele = [];
+let aktuellesSpiel = null;
+let ichSelbst = null;
+
+const zahl = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 3 });
+
+async function bestenlisteZeigen(spiel, season) {
+	const liste = el("bl-liste");
+	const hinweis = el("bl-hinweis");
+	el("bl-titel").textContent = "Bestenliste";
+	el("bl-season-wahl").hidden = true;
+	if (!spiel.leaderboard || !spiel.leaderboard.enabled) {
+		liste.replaceChildren();
+		hinweis.textContent = "Dieses Spiel hat keine Bestenliste.";
+		return;
+	}
+	let d;
+	try {
+		d = await Bridge.bestenliste(spiel.id, season);
+	} catch (e) {
+		if (!(e instanceof Bridge.SitzungAbgelaufen)) hinweis.textContent = "Bestenliste nicht verfügbar.";
+		return;
+	}
+	if (aktuellesSpiel !== spiel.id) return; // inzwischen anderes Spiel offen
+
+	el("bl-titel").textContent = "Bestenliste · " + d.label;
+	if (d.seasons.length > 1) {
+		const wahl = el("bl-season");
+		wahl.replaceChildren(...d.seasons.slice().reverse().map((s) => {
+			const o = document.createElement("option");
+			o.value = String(s);
+			o.textContent = s === d.currentSeason ? s + " (aktuell)" : String(s);
+			o.selected = s === d.season;
+			return o;
+		}));
+		el("bl-season-wahl").hidden = false;
+	}
+	liste.replaceChildren(...d.entries.map((e) => {
+		const li = document.createElement("li");
+		if (e.player === ichSelbst) li.className = "ich";
+		const platz = document.createElement("span"); platz.className = "platz"; platz.textContent = e.rank + ".";
+		const name = document.createElement("span"); name.className = "name"; name.textContent = e.player;
+		const wert = document.createElement("span"); wert.className = "wert"; wert.textContent = zahl.format(e.score);
+		li.append(platz, name, wert);
+		return li;
+	}));
+	hinweis.textContent = d.entries.length ? "" : (d.season === d.currentSeason ? "Noch keine Einträge – sei die oder der Erste!" : "In dieser Season gab es keine Einträge.");
+}
 
 function meldung(text) {
 	el("meldung").textContent = text;
@@ -73,6 +120,7 @@ function kachel(spiel) {
 }
 
 function zeigeUebersicht() {
+	aktuellesSpiel = null;
 	Bridge.beenden();
 	el("rahmen").replaceChildren(); // laufendes Spiel beenden
 	el("spielansicht").hidden = true;
@@ -86,6 +134,8 @@ async function zeigeSpiel(id) {
 		location.hash = "#/";
 		return;
 	}
+	aktuellesSpiel = spiel.id;
+	bestenlisteZeigen(spiel);
 	el("spieltitel").textContent = spiel.title;
 	el("uebersicht").hidden = true;
 	el("spielansicht").hidden = false;
@@ -110,6 +160,14 @@ function route() {
 
 async function start() {
 	Bridge.beiAblauf = () => { el("abgelaufen").hidden = false; };
+	Bridge.beiScore = (id) => {
+		const spiel = spiele.find((s) => s.id === id);
+		if (spiel && aktuellesSpiel === id) bestenlisteZeigen(spiel);
+	};
+	el("bl-season").addEventListener("change", (e) => {
+		const spiel = spiele.find((s) => s.id === aktuellesSpiel);
+		if (spiel) bestenlisteZeigen(spiel, +e.target.value);
+	});
 	el("vollbild").addEventListener("click", () => {
 		const r = el("rahmen");
 		if (r.requestFullscreen) r.requestFullscreen().catch(() => {});
@@ -124,6 +182,7 @@ async function start() {
 	try {
 		const [ich, liste] = await Promise.all([Bridge.json("GET", "/api/me"), Bridge.json("GET", "/api/games")]);
 		Bridge.spieler = ich.player;
+		ichSelbst = ich.player;
 		el("benutzer").textContent = ich.player;
 		el("benutzer").hidden = false;
 		spiele = liste.filter((s) => typeof s.id === "string" && ID_MUSTER.test(s.id));

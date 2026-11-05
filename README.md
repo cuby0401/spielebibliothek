@@ -27,7 +27,8 @@ docs/          Betriebsnotizen
 | 2 | Tunnel und Access | ✓ abgenommen 05.11.2026 |
 | 3 | Sandbox-Spike → Spiele auf `play.cuby0401.uk`, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (Mac/Safari; iPad/Windows offen) |
 | 4 | Speicher-Dienst, GameSave, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (zweites Gerät/Konto offen) |
-| 5–9 | Bestenliste, Upload, Härtung, Backup, Anleitung | offen |
+| 5 | Bestenliste mit Seasons | deployt 05.11.2026, Abnahme mit zweitem Konto offen |
+| 6–9 | Upload, Härtung, Backup, Anleitung | offen |
 
 ## Deploy
 

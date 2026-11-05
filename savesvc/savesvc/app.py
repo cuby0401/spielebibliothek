@@ -5,9 +5,12 @@ Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Speicher-Dien
 """
 
 import logging
+import math
+import threading
+import time
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Path as P
+from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query
 from fastapi.responses import JSONResponse
 
 from . import games
@@ -17,6 +20,8 @@ from .db import Datenbank, ZuGross
 
 KEY_MUSTER = r"^[A-Za-z0-9_][A-Za-z0-9._:-]{0,99}$"
 BODY_MAX = 300 * 1024
+SCORE_ABSTAND = 1.0       # Sekunden zwischen zwei Scores je Spieler und Spiel
+SCORE_MAX = 1e15          # Betrag; schützt nur vor Unsinn, nicht vor Schummeln (Kollegen-Vertrauen)
 
 
 def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None) -> FastAPI:
@@ -80,6 +85,46 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     @app.delete("/api/save/{user}/{game}/{key}", status_code=204)
     def loeschen(player: str = Depends(spieler), sp=Depends(spiel), key: str = P(..., pattern=KEY_MUSTER)):
         db.loeschen(player, sp[0], key)
+
+    # --- Bestenliste ---
+    letzter_score: dict[tuple[str, str], float] = {}
+    score_sperre = threading.Lock()
+
+    @app.post("/api/score/{user}/{game}", status_code=201)
+    def score(player: str = Depends(spieler), sp=Depends(spiel), body: dict[str, Any] = Body(...)):
+        lb = games.bestenliste_einstellungen(sp[1])
+        if not lb["enabled"]:
+            raise HTTPException(409, "dieses Spiel hat keine Bestenliste")
+        wert = body.get("score")
+        if isinstance(wert, bool) or not isinstance(wert, (int, float)) or not math.isfinite(wert) or abs(wert) > SCORE_MAX:
+            raise HTTPException(422, "score muss eine endliche Zahl sein")
+        with score_sperre:
+            jetzt = time.monotonic()
+            if jetzt - letzter_score.get((player, sp[0]), -SCORE_ABSTAND) < SCORE_ABSTAND:
+                raise HTTPException(429, "höchstens ein Score pro Sekunde")
+            letzter_score[(player, sp[0])] = jetzt
+        season = games.season(sp[1])
+        db.score_eintragen(player, sp[0], season, float(wert))
+        return {"season": season}
+
+    @app.get("/api/leaderboard/{user}/{game}")
+    def bestenliste(
+        player: str = Depends(spieler),
+        sp=Depends(spiel),
+        season: int | None = Query(None, ge=1, le=1_000_000),
+        limit: int = Query(10, ge=1, le=100),
+    ):
+        lb = games.bestenliste_einstellungen(sp[1])
+        aktuell = games.season(sp[1])
+        gewaehlt = season or aktuell
+        eintraege = db.bestenliste(sp[0], gewaehlt, lb["order"] == "asc", limit) if lb["enabled"] else []
+        return {
+            **lb,
+            "season": gewaehlt,
+            "currentSeason": aktuell,
+            "seasons": sorted(set(db.seasons(sp[0])) | {aktuell}),
+            "entries": eintraege,
+        }
 
     return app
 

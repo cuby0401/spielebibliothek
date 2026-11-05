@@ -1,4 +1,4 @@
-"""SQLite: Spielstände und Verlauf (Bestenliste folgt in Phase 5)."""
+"""SQLite: Spielstände, Verlauf und Bestenliste."""
 
 import json
 import sqlite3
@@ -22,6 +22,12 @@ CREATE TABLE IF NOT EXISTS save_history (
     data TEXT, save_version INTEGER, saved_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS save_history_wer ON save_history (player, game, key, id);
+CREATE TABLE IF NOT EXISTS scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player TEXT NOT NULL, game TEXT NOT NULL, season INTEGER NOT NULL,
+    score REAL NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS scores_liste ON scores (game, season, player, score);
 """
 
 
@@ -123,6 +129,44 @@ class Datenbank:
                 v.execute("ROLLBACK")
                 raise
         return vorhanden
+
+    # --- Bestenliste ---
+
+    def score_eintragen(self, player: str, game: str, season: int, score: float) -> None:
+        with self.verbindung() as v:
+            v.execute("INSERT INTO scores (player, game, season, score, created_at) VALUES (?,?,?,?,?)",
+                      (player, game, season, score, jetzt()))
+
+    def bestenliste(self, game: str, season: int, aufsteigend: bool, limit: int) -> list[dict]:
+        """Bester Score je Spieler, sortiert. Bei Gleichstand gewinnt, wer ihn zuerst erreicht hat."""
+        best = "MIN" if aufsteigend else "MAX"
+        richtung = "ASC" if aufsteigend else "DESC"
+        with self.verbindung() as v:
+            zeilen = v.execute(
+                f"""SELECT s.player, s.score, MIN(s.created_at) AS erreicht
+                    FROM scores s
+                    JOIN (SELECT player, {best}(score) AS bester FROM scores
+                          WHERE game=? AND season=? GROUP BY player) b
+                      ON s.player = b.player AND s.score = b.bester
+                    WHERE s.game=? AND s.season=?
+                    GROUP BY s.player, s.score
+                    ORDER BY s.score {richtung}, erreicht ASC
+                    LIMIT ?""",
+                (game, season, game, season, limit),
+            ).fetchall()
+        return [{"rank": i + 1, "player": z["player"], "score": z["score"], "at": z["erreicht"]}
+                for i, z in enumerate(zeilen)]
+
+    def seasons(self, game: str) -> list[int]:
+        with self.verbindung() as v:
+            return [z[0] for z in v.execute(
+                "SELECT DISTINCT season FROM scores WHERE game=? ORDER BY season", (game,))]
+
+    def bestenliste_loeschen(self, game: str, season: int | None) -> int:
+        with self.verbindung() as v:
+            if season is None:
+                return v.execute("DELETE FROM scores WHERE game=?", (game,)).rowcount
+            return v.execute("DELETE FROM scores WHERE game=? AND season=?", (game, season)).rowcount
 
     # --- Admin ---
 

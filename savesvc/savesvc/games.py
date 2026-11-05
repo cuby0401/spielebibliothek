@@ -41,6 +41,21 @@ def save_version(ordner: Path) -> int:
     return v if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= 1_000_000 else 1
 
 
+def season(ordner: Path) -> int:
+    s = meta(ordner)[0].get("leaderboardSeason", 1)
+    return s if isinstance(s, int) and not isinstance(s, bool) and 1 <= s <= 1_000_000 else 1
+
+
+def bestenliste_einstellungen(ordner: Path) -> dict:
+    lb = meta(ordner)[0].get("leaderboard")
+    lb = lb if isinstance(lb, dict) else {}
+    return {
+        "enabled": lb.get("enabled") is True,
+        "order": "asc" if lb.get("order") == "asc" else "desc",
+        "label": _text(lb.get("label"), 30) or "Punkte",
+    }
+
+
 def _text(wert, laenge: int) -> str | None:
     return wert.strip()[:laenge] if isinstance(wert, str) and wert.strip() else None
 
@@ -51,7 +66,6 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
     bild = daten.get("thumbnail")
     if not (isinstance(bild, str) and DATEI_MUSTER.match(bild) and ".." not in bild and (ordner / bild).is_file()):
         bild = None
-    lb = daten.get("leaderboard") if isinstance(daten.get("leaderboard"), dict) else {}
     return {
         "id": f"{benutzer}/{ordner_name}",
         "author": benutzer,                       # immer aus dem Ordner, nie aus game.json
@@ -59,11 +73,8 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         "description": _text(daten.get("description"), 300) or "",
         "thumbnail": bild,
         "saveVersion": save_version(ordner),
-        "leaderboard": {
-            "enabled": lb.get("enabled") is True,
-            "order": "asc" if lb.get("order") == "asc" else "desc",
-            "label": _text(lb.get("label"), 30) or "Punkte",
-        },
+        "leaderboard": bestenliste_einstellungen(ordner),
+        "leaderboardSeason": season(ordner),
         "complete": (ordner / "index.html").is_file(),
         "warning": warnung,
     }

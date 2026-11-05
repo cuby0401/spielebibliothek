@@ -3,6 +3,7 @@
   python -m savesvc history <player> <game> <key>
   python -m savesvc restore <history-id>
   python -m savesvc backup /data/backup/saves-latest.db
+  python -m savesvc reset-leaderboard <benutzer>/<spiel> [--season N]
 """
 
 import argparse
@@ -22,6 +23,9 @@ def main(argv=None) -> int:
     r.add_argument("history_id", type=int)
     b = sub.add_parser("backup", help="konsistente Kopie der Datenbank")
     b.add_argument("ziel", type=Path)
+    lb = sub.add_parser("reset-leaderboard", help="Bestenliste eines Spiels löschen (alle Seasons oder eine)")
+    lb.add_argument("game", help="<benutzer>/<spiel>")
+    lb.add_argument("--season", type=int)
     a = p.parse_args(argv)
 
     db = Datenbank(laden().db_path)
@@ -38,6 +42,10 @@ def main(argv=None) -> int:
             print(f"Verlauf-ID {a.history_id} gibt es nicht", file=sys.stderr)
             return 1
         print(f"wiederhergestellt: {ziel['player']} · {ziel['game']} · {ziel['key']} (aktueller Stand liegt jetzt im Verlauf)")
+    elif a.befehl == "reset-leaderboard":
+        n = db.bestenliste_loeschen(a.game, a.season)
+        welche = f"Season {a.season}" if a.season else "alle Seasons"
+        print(f"{n} Scores gelöscht ({a.game}, {welche})")
     elif a.befehl == "backup":
         db.sichern(a.ziel)
         print(f"gesichert nach {a.ziel}")
