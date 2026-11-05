@@ -34,8 +34,8 @@ def test_unbekannte_email_403(client):
 
 
 def test_me_und_grossschreibung(client):
-    assert client.get("/api/me", headers=client.als()).json() == {"player": "seb"}
-    assert client.get("/api/me", headers=client.als("PAUL@example.COM")).json() == {"player": "paul"}
+    assert client.get("/api/me", headers=client.als()).json() == {"player": "seb", "uploader": True}
+    assert client.get("/api/me", headers=client.als("PAUL@example.COM")).json()["player"] == "paul"
 
 
 def test_users_yaml_wird_neu_gelesen(client, umgebung):
@@ -43,7 +43,8 @@ def test_users_yaml_wird_neu_gelesen(client, umgebung):
     import os, time
     umgebung.users.write_text("seb@example.com: seb\nneu@example.com: neu\n")
     os.utime(umgebung.users, (time.time() + 5, time.time() + 5))
-    assert client.get("/api/me", headers=client.als("neu@example.com")).json() == {"player": "neu"}
+    # nur spielen: kein eigener Spielordner → kein Upload-Link
+    assert client.get("/api/me", headers=client.als("neu@example.com")).json() == {"player": "neu", "uploader": False}
 
 
 def test_ohne_login_kein_404_leck(client):

@@ -54,7 +54,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
 
     @app.get("/api/me")
     def me(player: str = Depends(spieler)):
-        return {"player": player}
+        # Entwickler = hat einen eigenen Spielordner (wird mit scripts/filebrowser.sh anlegen erzeugt)
+        return {"player": player, "uploader": (e.spiele_dir / player).is_dir()}
 
     @app.get("/api/games")
     def spiele(player: str = Depends(spieler)):

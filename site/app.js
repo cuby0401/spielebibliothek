@@ -185,6 +185,7 @@ async function start() {
 		ichSelbst = ich.player;
 		el("benutzer").textContent = ich.player;
 		el("benutzer").hidden = false;
+		el("upload-link").hidden = !ich.uploader;
 		spiele = liste.filter((s) => typeof s.id === "string" && ID_MUSTER.test(s.id));
 	} catch (e) {
 		if (!(e instanceof Bridge.SitzungAbgelaufen)) {

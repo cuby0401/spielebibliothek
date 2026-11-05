@@ -28,7 +28,8 @@ docs/          Betriebsnotizen
 | 3 | Sandbox-Spike → Spiele auf `play.cuby0401.uk`, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (Mac/Safari; iPad/Windows offen) |
 | 4 | Speicher-Dienst, GameSave, localStorage-Ersatz | ✓ abgenommen 05.11.2026 (zweites Gerät/Konto offen) |
 | 5 | Bestenliste mit Seasons | deployt 05.11.2026, Abnahme mit zweitem Konto offen |
-| 6–9 | Upload, Härtung, Backup, Anleitung | offen |
+| 6 | Upload (File Browser) | deployt 05.11.2026, Abnahme offen |
+| 7–9 | Härtung, Backup, Anleitung | offen |
 
 ## Deploy
 
@@ -44,3 +45,4 @@ Für LAN-Tests den Port in `compose.yaml` vorübergehend einkommentieren.
 
 - `.env`: `TUNNEL_TOKEN`
 - `config/users.yaml`: Login-E-Mail → Benutzername (Vorlage `users.example.yaml`), wirkt ohne Neustart
+- File-Browser-Benutzer: nur über `scripts/filebrowser.sh` (einrichten · anlegen · passwort · sperren · liste)
