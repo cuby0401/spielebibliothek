@@ -140,6 +140,37 @@ function alsGesehenMerken(spiel) {
 		.catch(() => { /* nur eine Marke – nicht schlimm */ });
 }
 
+// Versionsnummer neben dem Titel, Klick zeigt den Versionsverlauf (E35)
+const ART_TEXT = { major: "Großes Update", minor: "Kleines Update", patch: "Patch / Hotfix", rollback: "Zurückgesetzt" };
+function versionZeigen(spiel, entwurf) {
+	const k = el("version-knopf"), panel = el("versionen-panel");
+	panel.hidden = true;
+	k.hidden = !!entwurf || !spiel.version;
+	if (k.hidden) return;
+	k.textContent = "v" + spiel.version;
+	k.onclick = async () => {
+		if (!panel.hidden) { panel.hidden = true; return; }
+		panel.replaceChildren(Object.assign(document.createElement("span"), { className: "leise", textContent: "Lade …" }));
+		panel.hidden = false;
+		try {
+			const d = await Bridge.json("GET", "/api/versionen/" + spiel.id.split("/").map(encodeURIComponent).join("/"));
+			const titel = document.createElement("h3"); titel.textContent = "Versionsverlauf";
+			const ul = document.createElement("ul");
+			for (const r of d.releases) {
+				const li = document.createElement("li");
+				const kopf = document.createElement("strong"); kopf.textContent = r.version;
+				const info = document.createElement("span"); info.className = "leise";
+				info.textContent = ` · ${ART_TEXT[r.art] || ""} · ${new Date(r.zeit).toLocaleDateString("de-DE")} – `;
+				li.append(kopf, info, document.createTextNode(r.aenderungen.join(" · ")));
+				ul.append(li);
+			}
+			panel.replaceChildren(titel, d.releases.length ? ul : Object.assign(document.createElement("span"), { className: "leise", textContent: "Noch kein Verlauf." }));
+		} catch (e) {
+			if (!(e instanceof Bridge.SitzungAbgelaufen)) panel.textContent = "Versionsverlauf nicht verfügbar.";
+		}
+	};
+}
+
 function daumenZeigen(spiel, entwurf) {
 	const k = el("daumen");
 	k.hidden = !!entwurf;
@@ -165,7 +196,8 @@ function daumenZeigen(spiel, entwurf) {
 
 function kachelnZeigen() {
 	el("sortierung").value = einstellungen.sortierung;
-	el("kacheln").replaceChildren(...sortiert(spiele).map(kachel));
+	// Testspiele (Admin-Panel) erscheinen nie in der Übersicht – Admins öffnen sie über das Admin-Panel
+	el("kacheln").replaceChildren(...sortiert(spiele.filter((s) => !s.testspiel)).map(kachel));
 }
 
 function spielPfad(id) {
@@ -312,11 +344,12 @@ async function zeigeSpiel(id, entwurfSpiel) {
 	const zeigeNeu = !entwurfSpiel && aktualisiert(spiel) && spiel.neu;
 	el("neu-hinweis").hidden = !zeigeNeu;
 	if (zeigeNeu) {
-		el("neu-text").textContent = "Neu in dieser Version: " + spiel.neu.text;
+		el("neu-text").textContent = (spiel.version ? `Neu in Version ${spiel.version}: ` : "Neu in dieser Version: ") + spiel.neu.text;
 		el("neu-zu").onclick = () => { el("neu-hinweis").hidden = true; };
 	}
 	if (!entwurfSpiel) alsGesehenMerken(spiel);
 	daumenZeigen(spiel, entwurfSpiel);
+	versionZeigen(spiel, entwurfSpiel);
 	aktuellesSpiel = spiel.id;
 	bestenlisteZeigen(spiel);
 	el("spieltitel").textContent = spiel.title;

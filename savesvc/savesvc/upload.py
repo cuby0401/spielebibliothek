@@ -25,7 +25,7 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Path as P, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 
-from . import games, versionen, zipinstall
+from . import games, release, versionen, zipinstall
 from .auth import BENUTZER_MUSTER, Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 
@@ -161,7 +161,35 @@ def cookie_gueltig(geheim: bytes, wert: str, player: str) -> bool:
             and name == player and ablauf.isdigit() and int(ablauf) > time.time())
 
 
-def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Path | None = None) -> FastAPI:
+ENTWURF_INFO = ".entwurf.json"   # Zeitpunkt des Entwurfs-Uploads (versteckt, nur im Entwurf)
+
+
+class SpeicherDienst:
+    """Interne Aufrufe an den Speicher-Dienst (Testergebnisse, Season, Spielstände beim Rollback)."""
+
+    def __init__(self, url: str, token: str):
+        self.url, self.token = url.rstrip("/"), token
+
+    def __call__(self, methode: str, pfad: str, body: dict | None = None) -> Any:
+        import urllib.error
+        import urllib.request
+        if not self.token:
+            raise HTTPException(503, "INTERN_TOKEN fehlt – Speicher-Dienst nicht erreichbar")
+        anfrage = urllib.request.Request(self.url + pfad, method=methode,
+                                         data=json.dumps(body).encode() if body is not None else None,
+                                         headers={"X-Intern-Token": self.token, "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(anfrage, timeout=15) as r:
+                inhalt = r.read()
+                return json.loads(inhalt) if inhalt else None
+        except urllib.error.HTTPError as f:
+            raise HTTPException(502, f"Speicher-Dienst: Fehler {f.code}") from None
+        except OSError as f:
+            raise HTTPException(502, f"Speicher-Dienst nicht erreichbar: {f}") from None
+
+
+def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Path | None = None,
+              speicher: SpeicherDienst | None = None) -> FastAPI:
     e = e or laden()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     daten = daten or Path(os.environ.get("UPLOAD_DATA", "/data"))
@@ -169,6 +197,15 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     store = Entwickler(daten / "upload.db")
     geheim = geheimnis(daten / "geheimnis")
     spieler = Pruefer(e, Benutzerliste(e.users_file), schluessel_quelle)
+    speicher = speicher or SpeicherDienst(os.environ.get("SAVESVC_URL", "http://savesvc:8000"), os.environ.get("INTERN_TOKEN", ""))
+
+    def speicher_still(methode: str, pfad: str, body: dict | None = None) -> None:
+        """Aufräumen im Speicher-Dienst – ein Fehler darf den Upload nicht scheitern lassen."""
+        try:
+            speicher(methode, pfad, body)
+        except HTTPException as f:
+            log.warning("Speicher-Dienst %s %s: %s", methode, pfad, f.detail)
+
     app = FastAPI(title="Spielebibliothek – Upload", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.middleware("http")
@@ -242,13 +279,15 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
             live = basis / name
             entw = versionen.entwurf_info(basis, name)
             b = games.beschreibung(e.spiele_dir, player, name if live.is_dir() else name + versionen.ENTWURF)
+            vl = release.verlauf(basis, name)
             ergebnis.append({
                 "ordner": name,
                 "title": b["title"],
                 "complete": b["complete"],
                 "warning": b["warning"],
-                "neu": games.was_ist_neu(live) if live.is_dir() else None,
-                "neuEntwurf": games.was_ist_neu(versionen.entwurf(basis, name)) if entw else None,
+                "version": (release.ordner_version(live) or {}).get("version") if live.is_dir() else None,
+                "aenderungen": vl["aenderungen"],               # gesammelt seit der letzten Veröffentlichung
+                "releases": list(reversed(vl["releases"]))[:10],
                 "live": versionen._info(live) if live.is_dir() else None,
                 "entwurf": entw,
                 "versionen": versionen.versionen(basis, name),
@@ -257,61 +296,156 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
 
     @app.post("/api/upload/spiele/{ordner}")
     def hochladen(player: str = Depends(angemeldet), ordner: str = P(...), datei: UploadFile = File(...),
-                  entwurf: bool = Query(False), neu: str = Form("")):
+                  neu: str = Form("")):
+        """Jeder Upload landet als Entwurf (E35). Veröffentlicht wird nur über das Update-Fenster."""
         ziel = ordnerpfad(player, ordner)
         basis = ziel.parent
-        neu = " ".join(neu.split())[: games.NEU_MAX]   # eine Zeile „Was ist neu“
+        entwurf = versionen.entwurf(basis, ordner)
         try:
-            if entwurf:
-                ergebnis = zipinstall.installieren(datei.file, versionen.entwurf(basis, ordner))
-            else:
-                ergebnis = zipinstall.installieren(datei.file, ziel, wegraeumen=lambda: versionen.archivieren(basis, ordner))
+            ergebnis = zipinstall.installieren(datei.file, entwurf)
         except zipinstall.UngueltigesZip as fehler:
             raise HTTPException(422, str(fehler)) from None
-        if neu:   # wandert mit dem Ordner (Veröffentlichen, Versionen); versteckt → unter play nie ausgeliefert
-            installiert = versionen.entwurf(basis, ordner) if entwurf else ziel
-            (installiert / games.NEU_DATEI).write_text(
-                json.dumps({"text": neu, "zeit": datetime.now(timezone.utc).isoformat(timespec="seconds")}, ensure_ascii=False),
-                encoding="utf-8")
-        art = "als Entwurf hochgeladen" if entwurf else "hochgeladen"
-        log.info("%s hat %s %s (%d Dateien)", player, ordner, art, ergebnis.dateien)
-        store.ereignis(player, art, ordner, ergebnis.dateien)
-        return {"ordner": ordner, "entwurf": entwurf, "dateien": ergebnis.dateien, "bytes": ergebnis.bytes,
+        (entwurf / ENTWURF_INFO).write_text(json.dumps({"zeit": release.jetzt(), "von": player}), encoding="utf-8")
+        release.aenderung_merken(basis, ordner, neu, player)
+        speicher_still("POST", f"/intern/entwurf/{player}/{ordner}/zuruecksetzen")   # frischer Test mit echtem Spielstand
+        log.info("%s hat %s als Entwurf hochgeladen (%d Dateien)", player, ordner, ergebnis.dateien)
+        store.ereignis(player, "als Entwurf hochgeladen", ordner, ergebnis.dateien)
+        return {"ordner": ordner, "entwurf": True, "dateien": ergebnis.dateien, "bytes": ergebnis.bytes,
                 "uebersprungen": ergebnis.uebersprungen[:50]}
 
-    @app.post("/api/upload/spiele/{ordner}/veroeffentlichen")
-    def veroeffentlichen(player: str = Depends(angemeldet), ordner: str = P(...)):
+    def pruefung(player: str, ordner: str) -> dict:
+        """Prüfung vor dem Veröffentlichen (E36): Dateien + Testergebnisse aus dem Speicher-Dienst."""
         basis = ordnerpfad(player, ordner).parent
+        entwurf = versionen.entwurf(basis, ordner)
+        if not entwurf.is_dir():
+            raise HTTPException(404, "kein Entwurf vorhanden")
+        live = basis / ordner
+        er = release.pruefen(live if live.is_dir() else None, entwurf)
+        punkte = er["punkte"]
+        try:
+            seit = json.loads((entwurf / ENTWURF_INFO).read_text(encoding="utf-8"))["zeit"]
+        except (OSError, ValueError, KeyError):
+            seit = versionen.entwurf_info(basis, ordner)["geaendert"]
+        try:
+            from urllib.parse import quote
+            t = speicher("GET", f"/intern/entwurf/{player}/{ordner}?seit={quote(seit)}")
+        except HTTPException as f:
+            t = None
+            punkte.append({"stufe": "warnung", "text": f"Testergebnisse nicht abrufbar ({f.detail}). Bitte selbst sicher sein, dass der Entwurf läuft."})
+        if t is not None:
+            if t["geoeffnet"]:
+                punkte.append({"stufe": "ok", "text": "Entwurf wurde in der Bibliothek getestet."})
+            else:
+                punkte.append({"stufe": "warnung", "text": "Entwurf wurde noch nicht getestet – auf „Testen“ klicken und kurz spielen."})
+            sv_alt, sv_neu = er["saveVersionAlt"], er["saveVersionNeu"]
+            if t["migrationFehler"]:
+                punkte.append({"stufe": "fehler", "text": "Umwandlung des Spielstands ist beim Testen fehlgeschlagen: "
+                                                          + "; ".join(t["migrationFehler"])})
+            elif sv_alt is not None and sv_neu > sv_alt:
+                if t["migrationOk"]:
+                    punkte.append({"stufe": "ok", "text": f"Umwandlung auf saveVersion {sv_neu} mit deinem Spielstand getestet."})
+                else:
+                    punkte.append({"stufe": "warnung", "text": f"Umwandlung auf saveVersion {sv_neu} noch nicht getestet. Im Entwurf "
+                                                               "ein Spiel laden, zu dem du einen alten Spielstand hast."})
+            if t["fehler"]:
+                punkte.append({"stufe": "warnung", "text": f"{t['fehler']} JavaScript-Fehler beim Testen des Entwurfs – siehe Menü → Meine Spiele → Fehlerberichte."})
+        version = (release.ordner_version(live) or {}).get("version") if live.is_dir() else None
+        return {"ordner": ordner, "version": version, "erstveroeffentlichung": not live.is_dir(),
+                "vorschlaege": release.vorschlaege(version), "arten": release.ARTEN,
+                "aenderungen": [a["text"] for a in release.verlauf(basis, ordner)["aenderungen"]],
+                "punkte": punkte, "seasonEmpfohlen": er["seasonEmpfohlen"],
+                "fehler": sum(1 for x in punkte if x["stufe"] == "fehler"),
+                "warnungen": sum(1 for x in punkte if x["stufe"] == "warnung")}
+
+    @app.get("/api/upload/spiele/{ordner}/pruefung")
+    def pruefung_abrufen(player: str = Depends(angemeldet), ordner: str = P(...)):
+        return pruefung(player, ordner)
+
+    @app.post("/api/upload/spiele/{ordner}/veroeffentlichen")
+    def veroeffentlichen(player: str = Depends(angemeldet), ordner: str = P(...), body: dict[str, Any] = Body(...)):
+        """Update-Fenster abschicken: Prüfung läuft hier noch einmal – dem Browser wird nicht geglaubt."""
+        art = body.get("art")
+        if art not in release.ARTEN:
+            raise HTTPException(422, "art: patch, minor oder major")
+        aenderungen = body.get("aenderungen")
+        if not isinstance(aenderungen, list) or not all(isinstance(a, str) for a in aenderungen):
+            raise HTTPException(422, "aenderungen: Liste von Texten")
+        aenderungen = [z for z in (release.zeile(a) for a in aenderungen) if z]
+        if not aenderungen:
+            raise HTTPException(422, "Bitte mindestens eine Zeile angeben, was sich geändert hat.")
+        pr = pruefung(player, ordner)
+        if pr["fehler"]:
+            raise HTTPException(409, "Die Prüfung hat Fehler gefunden – erst beheben, dann neu hochladen.")
+        if pr["warnungen"] and body.get("warnungenGelesen") is not True:
+            raise HTTPException(409, "Bitte die Warnungen lesen und bestätigen.")
+        version = release.naechste(pr["version"], art) if not pr["erstveroeffentlichung"] else "1.0.0"
+        basis = ordnerpfad(player, ordner).parent
+        sv = release._save_version(release._meta(versionen.entwurf(basis, ordner))[0] or {})
+        (versionen.entwurf(basis, ordner) / ENTWURF_INFO).unlink(missing_ok=True)
         try:
             versionen.veroeffentlichen(basis, ordner)
         except FileNotFoundError as f:
             raise HTTPException(404, str(f)) from None
-        store.ereignis(player, "Entwurf veröffentlicht", ordner)
-        return {"ok": True}
+        eintrag = release.veroeffentlicht(basis, ordner, version, art, sv, aenderungen, player)
+        speicher_still("POST", f"/intern/entwurf/{player}/{ordner}/zuruecksetzen")
+        season = None
+        if body.get("neueSeason") is True:
+            try:
+                season = speicher("POST", f"/intern/season/{player}/{ordner}")["season"]
+            except HTTPException as f:
+                log.warning("Neue Season für %s/%s nicht gesetzt: %s", player, ordner, f.detail)
+        store.ereignis(player, f"Version {version} veröffentlicht", ordner)
+        return {"version": version, "eintrag": eintrag, "season": season}
 
     @app.delete("/api/upload/spiele/{ordner}/entwurf", status_code=204)
     def entwurf_verwerfen(player: str = Depends(angemeldet), ordner: str = P(...)):
-        e_pfad = versionen.entwurf(ordnerpfad(player, ordner).parent, ordner)
+        basis = ordnerpfad(player, ordner).parent
+        e_pfad = versionen.entwurf(basis, ordner)
         if not e_pfad.is_dir():
             raise HTTPException(404, "kein Entwurf vorhanden")
         shutil.rmtree(e_pfad)
+        release.aenderungen_verwerfen(basis, ordner)
+        speicher_still("POST", f"/intern/entwurf/{player}/{ordner}/zuruecksetzen")
         store.ereignis(player, "Entwurf verworfen", ordner)
 
     @app.post("/api/upload/spiele/{ordner}/zuruecksetzen")
     def zuruecksetzen(player: str = Depends(angemeldet), ordner: str = P(...), body: dict[str, Any] = Body(...)):
+        """Rollback auf eine ältere Version. Liegt die alte Version vor einer saveVersion-Erhöhung, wird gefragt,
+        was mit den Spielständen passieren soll (E37): zurückholen oder behalten."""
         basis = ordnerpfad(player, ordner).parent
+        vid = str(body.get("version", ""))
+        ziel = basis / f"{ordner}{versionen.VERSION}{vid}"
+        live = basis / ordner
+        if not (versionen.VERSION_ID.match(vid) and ziel.is_dir()):
+            raise HTTPException(404, "Version nicht gefunden")
+        sv_ziel = release._save_version(release._meta(ziel)[0] or {})
+        sv_live = release._save_version(release._meta(live)[0] or {}) if live.is_dir() else sv_ziel
+        wahl = body.get("spielstaende")
+        ergebnis = None
+        if sv_ziel < sv_live:
+            if wahl not in ("zuruecksetzen", "behalten"):
+                nummer = (release.ordner_version(ziel) or {}).get("version") or "der alten Version"
+                raise HTTPException(409, {
+                    "frage": "spielstaende",
+                    "text": f"Seit Version {nummer} wurden die Spielstände auf saveVersion {sv_live} umgewandelt. "
+                            f"Version {nummer} kennt nur saveVersion {sv_ziel} und versteht die neuen Stände vermutlich nicht.",
+                    "saveVersionZiel": sv_ziel, "saveVersionAktuell": sv_live})
+            if wahl == "zuruecksetzen":
+                ergebnis = speicher("POST", f"/intern/spielstaende-zurueck/{player}/{ordner}", {"bisSaveVersion": sv_ziel})
         try:
-            versionen.zuruecksetzen(basis, ordner, str(body.get("version", "")))
+            versionen.zuruecksetzen(basis, ordner, vid)
         except FileNotFoundError as f:
             raise HTTPException(404, str(f)) from None
-        store.ereignis(player, f"auf Version {body.get('version')} zurückgesetzt", ordner)
-        return {"ok": True}
+        release.zurueckgesetzt(basis, ordner, player, wahl if sv_ziel < sv_live else None)
+        store.ereignis(player, f"auf Version {vid} zurückgesetzt", ordner)
+        return {"ok": True, "spielstaende": ergebnis}
 
     @app.delete("/api/upload/spiele/{ordner}", status_code=204)
     def loeschen(player: str = Depends(angemeldet), ordner: str = P(...)):
         ziel = ordnerpfad(player, ordner)
         if not versionen.alles_loeschen(ziel.parent, ordner):
             raise HTTPException(404, "Spiel nicht gefunden")
+        release.verlauf_loeschen(ziel.parent, ordner)
         log.info("%s hat %s gelöscht (inkl. Entwurf und Versionen)", player, ordner)
         store.ereignis(player, "gelöscht", ordner)
 
@@ -361,6 +495,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         ziel = ordnerpfad(user, ordner)
         if not versionen.alles_loeschen(ziel.parent, ordner):
             raise HTTPException(404, "Spiel nicht gefunden")
+        release.verlauf_loeschen(ziel.parent, ordner)
         store.ereignis(user, "gelöscht (Admin)", ordner)
 
     @app.get("/intern/ereignisse", dependencies=[Depends(intern)])

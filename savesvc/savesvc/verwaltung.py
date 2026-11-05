@@ -217,7 +217,22 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         except OSError:
             raise HTTPException(503, "Entwurf ist gerade nicht lesbar – Rechte auf der NAS prüfen") from None
         kopiert = db.spielstaende_kopieren(rollen.daten_id(e, request, player), f"{user}/{game}", f"{user}/{game}{versionen.ENTWURF}")
+        db.entwurf_test(f"{user}/{game}{versionen.ENTWURF}", player, "geoeffnet", True, None)   # für die Prüfung (E36)
         return {**b, "id": f"{user}/{game}{versionen.ENTWURF}", "entwurfVon": f"{user}/{game}", "spielstaendeKopiert": kopiert}
+
+    @app.post("/api/entwickler/migration/{user}/{game}", status_code=204)
+    def migration_melden(request: Request, player: str = Depends(spieler), user: str = P(...), game: str = P(...),
+                         body: dict[str, Any] = Body(...)):
+        """gamesave.js meldet beim Testen eines Entwurfs, ob die Umwandlung eines Spielstands geklappt hat (E36)."""
+        ordner = e.spiele_dir / user / game
+        basis = game[: -len(versionen.ENTWURF)] if game.endswith(versionen.ENTWURF) else ""
+        darf = player == user or rollen.rolle(e, request, player)["echterAdmin"]
+        if not (basis and darf and games.gueltige_id(user, basis) and ordner.is_dir()):
+            raise HTTPException(404, "Entwurf nicht gefunden")
+        ok = body.get("ok") is True
+        von, nach = body.get("von"), body.get("nach")
+        text = f"{str(body.get('key'))[:100]}: saveVersion {von} → {nach}" + ("" if ok else f" – {str(body.get('fehler'))[:200]}")
+        db.entwurf_test(f"{user}/{game}", player, "migration", ok, text)
 
     # ---------- Fehlerberichte (Idee „Automatische Fehlerberichte“) ----------
     fehler_takt: dict[tuple[str, str], list[float]] = {}
@@ -337,7 +352,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         daumen = db.daumen_zahlen()
         einst = db.spiel_einstellungen()
         fehler = db.fehler_zahlen()
-        return [{**s, **{"versteckt": False, "hervorgehoben": False}, **{k: v for k, v in einst.get(s["id"], {}).items() if k != "season"},
+        return [{**s, **{"versteckt": False, "hervorgehoben": False, "testspiel": False}, **{k: v for k, v in einst.get(s["id"], {}).items() if k != "season"},
                  "leaderboardSeason": aktuelle_season(s["id"]), **statistik.get(s["id"], {"spieler": 0, "zuletzt": None, "scores": 0}),
                  "fehler": fehler.get(s["id"], {}), "daumen": daumen.get(s["id"], 0)}
                 for s in games.alle(e.spiele_dir)]
@@ -345,7 +360,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.patch("/api/admin/spiele/{user}/{game}")
     def spiel_einstellen(_: str = Depends(admin), user: str = P(...), game: str = P(...), body: dict[str, Any] = Body(...)):
         sid, _o = spiel_id(user, game)
-        felder = {k: int(bool(body[k])) for k in ("versteckt", "hervorgehoben") if k in body}
+        felder = {k: int(bool(body[k])) for k in ("versteckt", "hervorgehoben", "testspiel") if k in body}
         db.spiel_setzen(sid, **felder)
         return {"ok": True}
 

@@ -72,7 +72,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 	c.append(h("h1", { text: "Meine Spiele" }),
 		h("p", {}, "Hochladen, Entwürfe veröffentlichen, alte Versionen zurückholen: ",
 			h("a", { href: "https://upload.cuby0401.uk", target: "_blank", rel: "noopener", text: "upload.cuby0401.uk" }),
-			" · Anleitung: ", h("a", { href: "/hilfe/", text: "Hilfe" })));
+			" · Anleitung: ", h("a", { href: "/handbuch/", text: "Entwickler-Handbuch" })));
 	const [liste, fehler] = await Promise.all([Bridge.json("GET", "/api/entwickler/spiele"), Bridge.json("GET", "/api/entwickler/fehler")]);
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
 	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;

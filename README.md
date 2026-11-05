@@ -11,11 +11,16 @@ Die **Spezifikation** steht im Obsidian-Vault `seb-brain` unter `Projekte/Spiele
 ```
 compose.yaml  Caddyfile  .env.example
 site/          Bibliotheksseite (statisch, ohne Build-Schritt)
-lib/           gamesave.js (für Spiele, inkl. localStorage-Ersatz), bridge.js (Bibliothek)
-savesvc/       Speicher-Dienst (FastAPI + SQLite); Tests: docker build --target test savesvc
-examples/      Testspiele: zaehler, legacy-localstorage (localStorage-Ersatz), boese (Sicherheitstest: alles muss ✓ zeigen), spike
-scripts/       nas-setup.sh (Ordner + ACLs), deploy.sh (rsync vom Mac)
-docs/          Betriebsnotizen
+  hilfe/       Hilfe für Spieler
+  handbuch/    Entwickler-Handbuch, prompt.txt (Prompt-Block, einzige Quelle), startvorlage.zip
+  upload/      Upload-Seite mit Update-Fenster
+  admin/       Admin-Panel
+lib/           gamesave.js (für Spiele, inkl. localStorage-Ersatz), bridge.js (Bibliothek, Zwischenspeicher)
+savesvc/       Speicher-Dienst und Upload-Dienst (ein Image, FastAPI + SQLite); Tests: docker build --target test savesvc
+vorlage/       Startvorlage für neue Spiele → scripts/startvorlage.sh baut daraus site/handbuch/startvorlage.zip
+examples/      Testspiele: zaehler, legacy-localstorage, boese (Sicherheitstest), spike, spalten-demo, wortjagd
+scripts/       nas-setup.sh, deploy.sh, teststand.sh, startvorlage.sh
+docs/          betrieb.md (NAS, Backup), entwicklung.md (Aufbau, Regeln, Tests – vor Änderungen lesen)
 ```
 
 ## Stand
@@ -33,13 +38,16 @@ docs/          Betriebsnotizen
 | 6b | Eigener ZIP-Upload ersetzt File Browser (archiviert) | ✓ 05.11.2026 |
 | 8 | Backup über borgmatic, Wiederherstellung getestet | ✓ 05.11.2026 |
 | 10 | GameSave-Migration, Bestenliste mit Spalten, Kontextmenü, Anträge, Admin-Panel, Ansicht als …, Entwürfe, Versionen, Fehlerberichte | ✓ 05.11.2026 |
-| 9 | Anleitung, erster Kollege | offen |
+| 9 | Anleitung, erster Kollege | Paul und Emil freigeschaltet, Abnahme offen |
+| 11 | Zwischenspeicher bei Sitzungsablauf, Was ist neu, Daumen, Testspiele | ✓ 05.11.2026 |
+| 12 | Versionierung: Entwurf → Update-Fenster mit Prüfung → Versionsnummer, Rollback mit Spielständen, Handbuch, Startvorlage | 05.11.2026 |
 
 ## Deploy
 
 ```sh
 scripts/deploy.sh             # Stack übertragen (git-verfolgte Dateien) und starten
 scripts/deploy.sh --examples  # zusätzlich Testspiele nach spiele/seb/
+scripts/startvorlage.sh       # nach Änderungen an vorlage/ oder site/handbuch/prompt.txt – ZIP mit committen
 ```
 
 Erreichbar nur über `https://games.cuby0401.uk` (Cloudflare Tunnel + Access).

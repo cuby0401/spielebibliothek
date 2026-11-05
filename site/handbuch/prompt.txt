@@ -1,0 +1,33 @@
+Baue das Spiel als statische Web-App für die Spielebibliothek. Halte dich genau an diese Regeln:
+
+DATEIEN
+- index.html liegt im Hauptordner. Alle Pfade relativ (./bilder/held.png), nie mit / am Anfang. Einzige Ausnahme: /lib/gamesave.js.
+- Keine CDNs und keine Aufrufe ins Internet: Jede Bibliothek (z. B. three.js, Phaser) als Datei mitliefern. Kein Server-Code.
+- Nur diese Dateitypen: html, js, mjs, css, json, png, jpg, gif, webp, svg, ico, mp3, ogg, wav, m4a, mp4, webm, woff, woff2, ttf, otf, wasm, txt, glb, gltf, bin.
+- Mit Vite/React: base: './' setzen und nur den Ordner dist/ ausliefern.
+- Wenn du Elemente mit dem hidden-Attribut ein- und ausblendest, ergänze im CSS: [hidden] { display: none !important; }
+
+SPEICHERN (GameSave)
+- <script src="/lib/gamesave.js"></script> ist das ERSTE Script im <head>.
+- Speichern: await GameSave.save(key, daten). Laden: const { data, migriert } = await GameSave.load(key, { standard: {...}, migration: {...} }).
+- standard enthält ALLE Felder des Spielstands mit Startwerten. Fehlende Felder werden daraus automatisch ergänzt.
+- Jeden GameSave-Aufruf mit try/catch absichern. GameSave.available ist false beim lokalen Testen – das Spiel muss trotzdem laufen.
+- Fortschritt sofort nach jeder wichtigen Änderung speichern, nicht erst beim Beenden.
+
+UPDATES UND VERSIONEN
+- Die Versionsnummer (z. B. 1.2.0) vergibt die Bibliothek beim Veröffentlichen. Trage KEINE "version" in die game.json ein. Im Spiel kann sie mit GameSave.version angezeigt werden (kann null sein).
+- "saveVersion" in der game.json steigt NUR, wenn sich die Struktur des Spielstands ändert (Feld umbenannt, Bedeutung geändert, Liste anders aufgebaut). Dann einen migration-Schritt ergänzen: migration: { 2: (alt) => ({ ...alt, neuesFeld: ... }) } – Schlüssel = die neue saveVersion. saveVersion nie senken.
+- Neue Felder mit Startwert in standard brauchen keine neue saveVersion.
+- Felder nie stillschweigend umbenennen, löschen oder anders verwenden.
+- Nenne mir am Ende jeder Änderung in einer Zeile pro Punkt, was sich für Spieler geändert hat – das trage ich beim Hochladen als „Was ist neu“ ein.
+
+BESTENLISTE (optional)
+- Einfach: await GameSave.submitScore(zahl). Mit mehreren Werten: await GameSave.submitScore({ level, zeit }) und in der game.json unter "leaderboard": "rangiertNach" (der Zahlenwert, der den Platz bestimmt) und "spalten": [{ "key": "level", "label": "Level", "format": "zahl" }] (format: zahl | dezimal | zeit (Millisekunden) | text).
+- Ändere rangiertNach, order oder die Spalten später nur, wenn es nötig ist – dann wird eine neue Season empfohlen.
+
+GAME.JSON (Pflicht)
+{ "title": "...", "description": "ein Satz", "thumbnail": "thumb.svg", "saveVersion": 1,
+  "leaderboard": { "enabled": true, "order": "desc", "label": "Punkte" } }
+Dazu ein Vorschaubild thumb.svg oder thumb.png im Format 16:9.
+
+Nutze die beigefügte Startvorlage (index.html, game.json) als Grundgerüst und behalte ihren Aufbau für Laden, Speichern und Bestenliste bei.

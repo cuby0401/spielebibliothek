@@ -86,7 +86,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
             return JSONResponse({"detail": "Anfrage zu groß"}, status_code=413)
         # CSRF: Cloudflare hängt die Anmeldung an jede Anfrage an games – auch an eine, die eine fremde
         # Seite auslöst. Ändernde Anfragen brauchen deshalb diesen Header (fremde Seiten können ihn nicht setzen).
-        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.headers.get("x-bibliothek") != "1":
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.headers.get("x-bibliothek") != "1" \
+                and not request.url.path.startswith("/intern/"):   # /intern: nur Docker-Netz + eigenes Token
             return JSONResponse({"detail": "Header X-Bibliothek fehlt"}, status_code=403)
         return await weiter(request)
 
@@ -121,10 +122,11 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         ergebnis = []
         for s in games.alle(e.spiele_dir):
             ein = einst.get(s["id"], {})
-            if ein.get("versteckt") and not ist_admin:
-                continue   # ausgeblendet (nur Anzeige – die Dateien bleiben unter play erreichbar)
+            if (ein.get("versteckt") or ein.get("testspiel")) and not ist_admin:
+                continue   # ausgeblendet bzw. Testspiel (nur Anzeige – die Dateien bleiben unter play erreichbar)
             ergebnis.append({**s, "leaderboardSeason": aktuelle_season(s["id"]),
                              "versteckt": bool(ein.get("versteckt")), "hervorgehoben": bool(ein.get("hervorgehoben")),
+                             "testspiel": bool(ein.get("testspiel")),
                              "zuletztGespielt": zuletzt.get(s["id"]),
                              "daumen": daumen.get(s["id"], 0), "meinDaumen": s["id"] in meine})
         return ergebnis
@@ -201,6 +203,15 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         db.daumen_setzen(player, sp[0], an)
         return {"an": an, "daumen": db.daumen_zahlen().get(sp[0], 0)}
 
+    # --- Versionsverlauf (E35) ---
+    @app.get("/api/versionen/{user}/{game}")
+    def versionsverlauf(user: str = P(...), sp=Depends(spiel)):
+        from . import release
+        basis = sp[1].parent
+        rel = release.verlauf(basis, sp[1].name)["releases"]
+        return {"aktuell": (release.ordner_version(sp[1]) or {}).get("version"),
+                "releases": [{k: r.get(k) for k in ("version", "art", "zeit", "von", "aenderungen")} for r in reversed(rel)]}
+
     @app.get("/api/leaderboard/{user}/{game}")
     def bestenliste(
         player: str = Depends(spieler),
@@ -222,6 +233,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
 
     from . import verwaltung
     verwaltung.registrieren(app, e, db, spieler, benutzerliste, aktuelle_season)
+    from . import intern
+    intern.registrieren(app, e, db, aktuelle_season)
 
     return app
 

@@ -114,6 +114,17 @@ def was_ist_neu(ordner: Path) -> dict | None:
     return {"text": text, "zeit": zeit} if text else None
 
 
+def _version_und_neu(basis: Path, ordner_name: str, ordner: Path) -> dict:
+    """Versionsnummer (E35) und „Was ist neu“ (E32) – aus dem Versionsverlauf, sonst aus der alten .was-ist-neu.json."""
+    from . import release
+    akt = release.aktuell(basis, ordner_name)
+    if akt and akt["aenderungen"]:
+        neu = {"text": " · ".join(akt["aenderungen"])[:NEU_MAX * 2], "zeit": akt["zeit"], "aenderungen": akt["aenderungen"]}
+    else:
+        neu = was_ist_neu(ordner)
+    return {"version": akt["version"] if akt else None, "neu": neu}
+
+
 def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
     ordner = spiele_dir / benutzer / ordner_name
     daten, warnung = meta(ordner)
@@ -131,7 +142,7 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         "leaderboardSeason": season(ordner),
         "complete": (ordner / "index.html").is_file(),
         "geaendert": _geaendert(ordner),
-        "neu": was_ist_neu(ordner),
+        **_version_und_neu(spiele_dir / benutzer, ordner_name, ordner),
         "warning": warnung,
     }
 

@@ -21,230 +21,28 @@
       <li><strong>Spielen:</strong> Spiel auf der Startseite auswählen → „Spielen“. Mit „Vollbild“ füllt es den ganzen Bildschirm.</li>
       <li><strong>Speichern passiert automatisch</strong> auf dem Server – du kannst auf jedem Gerät weiterspielen, auf dem du angemeldet bist.</li>
       <li><strong>Bestenliste:</strong> steht rechts neben dem Spiel, dein Eintrag ist hervorgehoben. Bei manchen Spielen gibt es ältere „Seasons“ zum Nachschauen.</li>
+      <li><strong>Versionen:</strong> Neben dem Spieltitel steht die Version (z. B. <code>v1.2.0</code>). Ein Klick darauf zeigt, was sich in jedem Update geändert hat.
+        Auf der Kachel zeigt „Aktualisiert“, dass es seit deinem letzten Besuch eine neue Version gibt.</li>
+      <li><strong>👍 neben dem Spieltitel:</strong> zeigt dem Entwickler, dass dir das Spiel gefällt. Nochmal klicken nimmt den Daumen zurück.</li>
       <li><strong>Anmeldung:</strong> per E-Mail-Code, gilt eine Woche pro Gerät.</li>
       <li><strong>Etwas geht nicht oder du hast eine Idee?</strong> Menü (oben rechts auf deinen Namen) → <strong>Anträge</strong> → „Fehler melden“ oder „Wunsch / Idee“.</li>
     </ul>
-
-    <div data-rolle="entwickler">
-    <h2>So kommt dein Spiel in die Bibliothek</h2>
-    <ol class="schritte">
-      <li><strong>Spiel bauen</strong> – am einfachsten mit KI. Kopiere den <a href="#prompt">Prompt-Block</a> unten in deinen Prompt.</li>
-      <li><strong>Testen</strong> – <code>index.html</code> lokal im Browser öffnen. Speichern geht dort nur bis zum Neuladen, das ist normal.</li>
-      <li><strong>Als ZIP packen</strong> – den Spielordner komprimieren.
-        Mac: Rechtsklick → „Komprimieren“. Windows: Rechtsklick → „Senden an“ → „ZIP-komprimierter Ordner“.</li>
-      <li><strong>Hochladen</strong> – <a href="https://upload.cuby0401.uk" target="_blank" rel="noopener">upload.cuby0401.uk</a> öffnen,
-        mit dem E-Mail-Code anmelden, dann mit deinem <strong>Upload-Passwort</strong> (bitte nicht im Browser speichern).
-        ZIP auswählen, Ordnernamen prüfen, <strong>„Als Entwurf“</strong> lassen, „Hochladen“.</li>
-      <li><strong>Entwurf testen</strong> – auf der Upload-Seite „Testen“ (oder Menü → Meine Spiele → „Entwurf testen“).
-        Nur du siehst den Entwurf; er startet mit einer <em>Kopie</em> deines Spielstands, Bestenlisten-Einträge zählen noch nicht.</li>
-      <li><strong>Veröffentlichen</strong> – auf der Upload-Seite. Jetzt sehen es alle; die bisherige Version wird aufgehoben.</li>
-    </ol>
-    <p class="hinweis">Hochladen können nur Entwickler mit Upload-Konto. Wenn du auch Spiele bauen willst, melde dich bei Seb.</p>
-    </div>
 
     <h2 id="menue">Dein Menü (oben rechts auf deinen Namen klicken)</h2>
     <ul>
       <li><strong>Einstellungen:</strong> Sortierung der Übersicht (alphabetisch, zuletzt gespielt, neueste), Großansicht (Spiel füllt das Fenster),
         Bestenliste neben dem Spiel ein/aus. Gilt auf allen deinen Geräten. Mit dem <strong>★</strong> auf einer Kachel heftest du Lieblingsspiele oben an.</li>
       <li><strong>Meine Spielstände:</strong> alle deine Spielstände je Spiel – mit „Neu anfangen“ löschst du sie für ein Spiel
-        (Bestenlisten-Einträge bleiben; Seb kann die letzten 5 Stände wiederherstellen).</li>
+        (Bestenlisten-Einträge bleiben; Seb kann frühere Stände wiederherstellen).</li>
       <li><strong>Anträge:</strong> Fehler melden, Wunsch / Idee, Spielstand wiederherstellen lassen oder Sonstiges.
         Seb bekommt den Antrag direkt; Status und seine Antwort siehst du unter „Anträge“.</li>
-      <li><strong>👍 neben dem Spieltitel:</strong> zeigt dem Entwickler, dass dir das Spiel gefällt. Nochmal klicken nimmt den Daumen zurück.</li>
       <li><strong>Abmelden:</strong> z. B. an einem fremden Rechner. Danach ist ein neuer E-Mail-Code nötig.</li>
     </ul>
-    <div data-rolle="entwickler">
-    <p><strong>Zusätzlich für Entwickler:</strong></p>
-    <ul>
-      <li><strong>Meine Spiele:</strong> deine Spiele mit Statistik – wie viele Spieler, wann zuletzt gespielt, Bestenlisten-Einträge,
-        Fehlerberichte und „Entwurf testen“.
-        Mit <strong>„Neue Season“</strong> startest du eine leere Bestenliste (die alte bleibt abrufbar) – ohne neue <code>game.json</code>.</li>
-      <li><strong>Anträge</strong> zusätzlich für deine Spiele: Bestenliste zurücksetzen, Spiel löschen oder umbenennen.</li>
-    </ul>
-    </div>
 
-    <div data-rolle="entwickler">
-    <h2 id="selbst">Was du selbst einstellen kannst – und was nicht</h2>
-    <div class="tabelle-rahmen"><table class="tabelle">
-      <thead><tr><th>Selbst (im Spiel oder in der <code>game.json</code>)</th><th>Nur über Antrag an Seb</th></tr></thead>
-      <tbody><tr>
-        <td><ul>
-          <li>Titel, Beschreibung, Vorschaubild</li>
-          <li>Bestenliste an/aus, Rangwert, Reihenfolge, Spalten, Formate</li>
-          <li>Eigene Darstellung der Bestenliste im Spiel</li>
-          <li>Neue Season (Menü → Meine Spiele oder <code>leaderboardSeason</code>)</li>
-          <li>Speicherstruktur und Migrationen (<code>saveVersion</code>)</li>
-          <li>Update, neues Spiel, eigenes Spiel löschen (Upload-Seite)</li>
-        </ul></td>
-        <td><ul>
-          <li>Einzelne Bestenlisten-Einträge löschen</li>
-          <li>Spielstand eines Spielers wiederherstellen</li>
-          <li>Spiel umbenennen (Ordnername = Spiel-ID)</li>
-          <li>Neue Funktionen der Bibliothek</li>
-          <li>Neue Kollegen freischalten</li>
-        </ul></td>
-      </tr></tbody>
-    </table></div>
-    <p class="leise">Fest bleibt immer: Wer angemeldet ist, steht mit seinem Namen in der Bestenliste – einmal, mit seinem besten Eintrag.
-      Spiele können nicht auf andere Spiele, die Anmeldung oder fremde Server zugreifen.</p>
-
-    <h2>Regeln</h2>
-    <ol class="regeln">
-      <li><strong>Ein Ordner pro Spiel</strong>, <code>index.html</code> direkt darin. Im ZIP darf der Ordner drumherum sein – das wird erkannt.</li>
-      <li><strong>Nur relative Pfade:</strong> <code>./sprites/held.png</code>, nicht <code>/sprites/held.png</code>.
-        Einzige Ausnahme: <code>/lib/gamesave.js</code>.</li>
-      <li><strong>Nur fertige Dateien.</strong> Mit Vite/React: den Ordner <code>dist/</code> hochladen, vorher <code>base: './'</code> setzen.</li>
-      <li><strong>Keine externen Server.</strong> Keine CDNs – Bibliotheken wie three.js oder Phaser als Datei mitliefern.
-        Keine Aufrufe ins Internet, kein eigener Server-Code. Die Bibliothek blockiert das sonst.</li>
-      <li><strong>Speichern mit <code>GameSave</code>.</strong> <code>localStorage</code> funktioniert auch (wird automatisch auf dem Server gespeichert),
-        aber nur mit <code>GameSave</code> gibt es Bestenlisten und saubere Updates.</li>
-      <li><strong>Updates immer in denselben Ordner</strong> – also beim Hochladen denselben Ordnernamen nehmen.
-        Neuer Ordnername = neues Spiel, Spielstände und Bestenliste wären weg.</li>
-      <li><strong>Spielstände bei Updates absichern:</strong> beim Laden <code>standard</code> und <code>migration</code> angeben
-        und bei jeder Änderung der Speicherstruktur <code>saveVersion</code> erhöhen – siehe <a href="#updates">Updates</a>.</li>
-      <li><strong>Erlaubte Dateitypen:</strong> html, js, mjs, css, json, png, jpg, gif, webp, svg, ico, mp3, ogg, wav, m4a, mp4, webm,
-        woff, woff2, ttf, otf, wasm, txt, glb, gltf, bin. Alles andere (z. B. <code>.exe</code>, Skripte, versteckte Dateien)
-        wird beim Hochladen übersprungen.</li>
-      <li><strong>Größe:</strong> höchstens 100 MB pro ZIP.</li>
-      <li><strong>Nach Logins fragen nur Cloudflare (E-Mail-Code) und die Upload-Seite.</strong>
-        Fragt ein Spiel nach einem Passwort, ist etwas faul – bitte Seb Bescheid geben.</li>
-    </ol>
-
-    <h2>GameSave – Speichern und Bestenliste</h2>
-<pre><code>&lt;script src="/lib/gamesave.js"&gt;&lt;/script&gt;   &lt;!-- als ERSTES Script --&gt;
-
-await GameSave.save("spielstand", { level: 3, punkte: 500 });
-const { data, version } = await GameSave.load("spielstand");  // data = null, wenn nichts da
-await GameSave.remove("spielstand");
-await GameSave.submitScore(1250);                // nur mit Bestenliste in game.json
-const top = await GameSave.leaderboard();        // [{ player: "paul", score: 1250 }, …]
-const ich = await GameSave.player();             // "paul"
-GameSave.available                               // false beim lokalen Testen</code></pre>
-    <p>Alle Aufrufe können fehlschlagen (z. B. offline) – Fehler mit <code>try/catch</code> abfangen.
-      Keys: Buchstaben, Ziffern, <code>. _ : -</code>, max. 100 Zeichen. Ein Spielstand darf höchstens 256 KB groß sein.</p>
-
-    <h2 id="versionen">Entwürfe, Versionen und Fehlerberichte</h2>
-    <ul>
-      <li><strong>Entwurf:</strong> Jeder Upload kann erst als Entwurf landen. Testen in der Bibliothek, dann veröffentlichen oder verwerfen.
-        Ideal für Updates: Mit der Kopie deines Spielstands siehst du sofort, ob deine Migration funktioniert – ohne den echten Stand zu gefährden.</li>
-      <li><strong>Versionen:</strong> Beim Veröffentlichen (oder „Sofort veröffentlichen“) wird die bisherige Version aufgehoben – die letzten 5.
-        Auf der Upload-Seite unter „Ältere Versionen“ → „Zurücksetzen“ ist ein kaputtes Update in Sekunden rückgängig gemacht.
-        Spielstände und Bestenliste bleiben davon unberührt.</li>
-      <li><strong>Fehlerberichte:</strong> JavaScript-Fehler, die beim Spielen auftreten, werden automatisch gemeldet – gleiche Fehler zusammengefasst,
-        ohne Spielernamen, nur mit Browser und Gerätetyp. Du findest sie unter Menü → Meine Spiele → „Fehlerberichte“ mit Datei, Zeile und Stacktrace.
-        Fehler aus dem Entwurf sind extra gekennzeichnet.</li>
-      <li><strong>Was ist neu:</strong> Beim Hochladen kannst du eine Zeile schreiben, was sich geändert hat („Neues Level 4, Sprung-Fehler behoben“).
-        Wer das Spiel schon kennt, sieht dann auf der Kachel „Aktualisiert“ und beim nächsten Öffnen einmal deinen Text.</li>
-      <li><strong>Daumen hoch:</strong> Spieler können dein Spiel mit 👍 bewerten. Die Zahl siehst du unter Menü → Meine Spiele.</li>
-    </ul>
-
-    <h2 id="werkzeuge">Fehler suchen mit den Entwicklerwerkzeugen</h2>
-    <p>Dein Spiel läuft in einem eigenen Rahmen von <code>play.cuby0401.uk</code>. Die Entwicklerwerkzeuge des Browsers zeigen trotzdem alles –
-      du musst nur auf den Rahmen umschalten:</p>
-    <ol>
-      <li><strong>Öffnen:</strong> Chrome/Edge: <kbd>F12</kbd> bzw. <kbd>⌥⌘I</kbd> am Mac. Safari: zuerst Einstellungen → Erweitert →
-        „Funktionen für Webentwickler anzeigen“, dann <kbd>⌥⌘C</kbd>. Firefox: <kbd>F12</kbd>.</li>
-      <li><strong>Auf das Spiel umschalten:</strong> Im Reiter <em>Konsole</em> oben links die Auswahl „top“ auf <code>play.cuby0401.uk</code> stellen
-        (Safari: Auswahl über der Konsole, Firefox: Symbol mit dem Rahmen oben rechts). Jetzt siehst du <code>console.log</code> und Fehler deines Spiels
-        und kannst Befehle direkt im Spiel ausführen, z. B. <code>await GameSave.load("spielstand")</code>.</li>
-      <li><strong>Weiße Fläche?</strong> In der Konsole stehen dann meist rote Zeilen:
-        <em>„Refused to load … Content Security Policy“</em> = etwas von einem CDN oder anderen Server (Regel 4),
-        <em>404</em> = Datei fehlt oder absoluter Pfad <code>/…</code> (Regel 2). Der Reiter <em>Netzwerk</em> zeigt, welche Datei fehlt.</li>
-      <li><strong>Speichern prüfen:</strong> Jeder <code>GameSave</code>-Aufruf liefert bei Ablehnung eine Fehlermeldung mit Grund –
-        mit <code>try/catch</code> abfangen und in die Konsole schreiben.</li>
-    </ol>
-    <p class="hinweis">Am besten im <strong>Entwurf</strong> testen: Dort kannst du ausprobieren, ohne Spieler oder Bestenliste zu stören.</p>
-
-    <h2 id="updates">Updates: was mit Spielständen passiert</h2>
-    <ul>
-      <li><strong>Spielstände liegen nicht im Spielordner</strong>, sondern auf dem Server – getrennt nach Spieler und Spiel
-        (<code>dein-name/ordnername</code>). Ein Update (gleiches ZIP-Verfahren, gleicher Ordnername) ersetzt nur die Spieldateien;
-        Fortschritt und Bestenliste bleiben. Selbst nach Löschen und erneutem Hochladen unter demselben Namen sind sie wieder da.</li>
-      <li><strong>Das Problem:</strong> Dein neues Spiel liest Spielstände, die eine <em>alte</em> Version geschrieben hat.
-        Hatte das Inventar früher 2 Plätze und jetzt 5, oder heißt ein Feld jetzt anders, muss das neue Spiel damit umgehen können.</li>
-      <li><strong>Die Lösung:</strong> <code>saveVersion</code> in der <code>game.json</code> + Standardwerte + Umwandlungsschritte beim Laden.
-        Jeder Spielstand merkt sich, mit welcher <code>saveVersion</code> er geschrieben wurde.</li>
-    </ul>
-<pre><code>// game.json: "saveVersion": 3   ← bei jeder Strukturänderung um 1 erhöhen
-
-const { data, migriert } = await GameSave.load("spielstand", {
-  // für neue Spieler UND für Felder, die es früher noch nicht gab (wird automatisch ergänzt)
-  standard: { level: 1, inventar: ["", "", "", "", ""], einstellungen: { ton: true } },
-  // Umwandlung alter Stände, Schritt für Schritt – Schlüssel = saveVersion, zu der umgewandelt wird
-  migration: {
-    2: (alt) => ({ ...alt, inventar: [...alt.inventar, "", "", ""] }),            // 2 → 5 Plätze
-    3: (alt) => { const { punkte, ...rest } = alt; return { ...rest, gold: punkte ?? 0 }; },  // umbenannt
-  },
-});
-if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand gleich speichern</code></pre>
-    <ul>
-      <li>Fehlende Felder in <strong>Objekten</strong> werden automatisch aus <code>standard</code> ergänzt.
-        Arrays werden nicht verändert – Längenänderungen gehören in eine <code>migration</code>.</li>
-      <li>Ein alter Stand mit <code>saveVersion</code> 1 läuft durch Schritt 2 <em>und</em> 3. Schlägt ein Schritt fehl,
-        gibt <code>load</code> einen Fehler zurück – der Spielstand wird dabei nicht verändert.</li>
-      <li>Einfache Spiele ohne Strukturänderung brauchen nur <code>standard</code>. <code>load(key)</code> ohne Optionen funktioniert weiter wie bisher.</li>
-      <li>Die letzten 5 Stände jedes Spielstands sind gesichert – bei einem kaputten Update kann Seb zurückdrehen.</li>
-      <li>Eine vollständige Vorlage ist das Spiel <strong>„Bestenlisten-Vorlage“</strong> in der Bibliothek (Quelltext ansehen: Rechtsklick im Spiel → Rahmenquelltext).</li>
-    </ul>
-
-    <h2 id="bestenliste">Bestenliste gestalten</h2>
-    <p><strong>Fest (bestimmt die Bibliothek):</strong> Der Spielername kommt aus der Anmeldung, jeder Spieler steht einmal drin (mit seinem besten Eintrag),
-      bei Gleichstand gewinnt, wer es zuerst geschafft hat, höchstens ein Eintrag pro Sekunde, Seasons.
-      <strong>Frei (bestimmst du):</strong> ob es eine Bestenliste gibt, welcher Wert über den Platz entscheidet, Reihenfolge, Spalten und Formate –
-      und wie du sie im Spiel darstellst.</p>
-<pre><code>"leaderboard": {
-  "enabled": true,                 // false = keine Bestenliste
-  "rangiertNach": "level",         // dieser Wert entscheidet den Platz (Zahl-Spalte), sonst "score"
-  "order": "desc",                 // "desc" = mehr ist besser, "asc" = weniger ist besser
-  "spalten": [                     // bis zu 6 Spalten
-    { "key": "level", "label": "Level" },
-    { "key": "items", "label": "Gegenstände" },
-    { "key": "zeit",  "label": "Spielzeit", "format": "zeit" },
-    { "key": "held",  "label": "Held",      "format": "text" }
-  ]
-}</code></pre>
-<pre><code>await GameSave.submitScore({ level: 12, items: 48, zeit: 5430000, held: "Mira" });
-const top = await GameSave.leaderboard();
-// [{ rank: 1, player: "paul", score: 12, werte: { level: 12, items: 48, zeit: 5430000, held: "Mira" } }, …]</code></pre>
-    <ul>
-      <li><strong>Formate:</strong> <code>zahl</code> (Standard, 1.234), <code>dezimal</code> (12,50), <code>zeit</code> (Millisekunden → 1:23,4 bzw. 1:02:03),
-        <code>text</code> (höchstens 40 Zeichen, kann nicht rangieren).</li>
-      <li><strong>Einfach bleibt einfach:</strong> ohne <code>spalten</code> reicht <code>submitScore(1250)</code>; mit <code>"label"</code> und
-        <code>"format"</code> auf oberster Ebene gestaltest du die Score-Spalte.</li>
-      <li>Nur in der <code>game.json</code> eingetragene Spalten werden angenommen – ein Tippfehler im Schlüssel gibt eine Fehlermeldung.</li>
-      <li>Die Bibliothek zeigt die Spalten neben dem Spiel an. Im Spiel kannst du die Liste mit <code>GameSave.leaderboard()</code> beliebig selbst darstellen.</li>
-    </ul>
-
-    <h2><code>game.json</code></h2>
-<pre><code>{
-  "title": "Snake",
-  "description": "Klassisches Snake mit Power-ups",
-  "thumbnail": "thumb.png",
-  "saveVersion": 1,
-  "leaderboard": { "enabled": true, "order": "desc", "label": "Punkte" },
-  "leaderboardSeason": 1
-}</code></pre>
-    <ul>
-      <li><code>order</code>: <code>"desc"</code> = mehr ist besser, <code>"asc"</code> = weniger ist besser (z. B. Zeit).</li>
-      <li><code>leaderboardSeason</code> erhöhen, wenn ein Update das Spiel deutlich leichter oder schwerer macht – dann beginnt eine neue Bestenliste, die alte bleibt abrufbar.</li>
-      <li>Der Autor kommt immer aus deinem Benutzernamen, nicht aus der <code>game.json</code>.</li>
-    </ul>
-
-    <h2 id="prompt">Prompt-Block zum Kopieren</h2>
-    <div class="prompt-kopf">
-      <span class="leise">In deinen KI-Prompt einfügen, zusätzlich zur Beschreibung deines Spiels.</span>
-      <button id="kopieren" class="knopf" type="button">Kopieren</button>
-    </div>
-<pre id="prompt-text">Baue das Spiel als statische Web-App für die Spielebibliothek:
-- index.html im Hauptordner, alle Pfade relativ (./…), keine CDNs, alle Bibliotheken als Datei mitliefern, kein Server-Code, keine Netzwerkaufrufe nach außen.
-- Binde &lt;script src="/lib/gamesave.js"&gt;&lt;/script&gt; als erstes Script ein und speichere Fortschritt mit await GameSave.save(key, data) / const {data, version} = await GameSave.load(key). Fange Fehler von GameSave ab. GameSave.available ist false beim lokalen Testen – das Spiel muss trotzdem laufen.
-- Spielstände bei Updates absichern: lade mit await GameSave.load(key, { standard: {...alle Felder mit Startwerten...}, migration: { 2: (alt) => neu, ... } }), erhöhe "saveVersion" in der game.json bei jeder Änderung der Speicherstruktur und ergänze dann einen migration-Schritt für diese Version. Felder nie stillschweigend umbenennen oder anders verwenden.
-- Für Highscores: await GameSave.submitScore(zahl) – oder mit mehreren Werten: await GameSave.submitScore({ level, items, zeit }) und dazu in der game.json unter leaderboard "rangiertNach" (entscheidender Zahlenwert) und "spalten": [{ "key": "...", "label": "...", "format": "zahl|dezimal|zeit|text" }]. await GameSave.leaderboard() liefert [{rank, player, score, werte}].
-- Lege eine game.json an: {"title": "...", "description": "...", "thumbnail": "thumb.png", "saveVersion": 1, "leaderboard": {"enabled": true, "order": "desc", "label": "Punkte"}, "leaderboardSeason": 1} und erstelle ein Vorschaubild thumb.png oder thumb.svg im Format 16:9.
-- Wenn du Elemente mit dem hidden-Attribut ein- und ausblendest, ergänze im CSS [hidden] { display: none !important; } – sonst bleiben Overlays mit display:flex/grid sichtbar.
-- Ändere bei späteren Updates die Struktur gespeicherter Daten nie ohne Migration: neue Felder mit Standardwerten, nichts umbenennen oder löschen. Wenn sich die Struktur ändert, erhöhe saveVersion und wandle alte Stände beim Laden um.
-- Nur diese Dateitypen verwenden: html, js, css, json, png, jpg, gif, webp, svg, mp3, ogg, wav, woff2, wasm, glb, gltf.</pre>
-
+    <div class="hilfe-box" data-rolle="entwickler">
+      <strong>Du baust selbst Spiele?</strong> Alles dazu – Startvorlage, Prompt-Block für die KI, Updates und Versionen, Bestenliste,
+      Fehlersuche – steht im <a href="/handbuch/">Entwickler-Handbuch</a>. Im Menü findest du zusätzlich „Meine Spiele“ mit Statistik,
+      Fehlerberichten und „Neue Season“.
     </div>
 
     <h2>Häufige Fragen</h2>
@@ -252,37 +50,19 @@ const top = await GameSave.leaderboard();
       <dt>Ein Spiel lädt nicht, hängt oder hat einen Fehler.</dt>
       <dd>Seite neu laden. Hilft das nicht: Menü → Anträge → „Fehler melden“ und kurz beschreiben, was passiert.</dd>
       <dt>Mein Spielstand ist weg.</dt>
-      <dd>Menü → Anträge → „Spielstand wiederherstellen“ – die letzten 5 Stände jedes Spielstands sind gesichert.</dd>
-      <div data-rolle="entwickler">
-      <dt>Mein Spiel zeigt nur eine weiße Fläche.</dt>
-      <dd>Meist ein absoluter Pfad (<code>/assets/…</code>) oder eine Bibliothek vom CDN. Beides geht hier nicht – siehe Regeln 2 und 4. Die genaue Ursache zeigen die <a href="#werkzeuge">Entwicklerwerkzeuge</a>.</dd>
-      <dt>Ein Overlay oder Menü verschwindet nicht.</dt>
-      <dd>Siehe die <code>hidden</code>-Zeile im Prompt-Block.</dd>
-      <dt>Mein Spielstand ist nach einem Update weg oder kaputt.</dt>
-      <dd>Wurde ein anderer Ordnername verwendet? Hat sich die Speicherstruktur geändert, ohne <code>saveVersion</code> zu erhöhen und einen
-        <code>migration</code>-Schritt zu ergänzen (siehe <a href="#updates">Updates</a>)? Sonst bei Seb melden – die letzten 5 Stände jedes Spielstands sind gesichert.</dd>
-      <dt>Mein Bestenlisten-Eintrag wird abgelehnt.</dt>
-      <dd>Steht jeder Schlüssel aus <code>submitScore({...})</code> in <code>leaderboard.spalten</code>? Ist der Wert aus <code>rangiertNach</code> dabei und eine Zahl?
-        Die Fehlermeldung von <code>submitScore</code> nennt den Grund.</dd>
-      <dt>Mein Update ist kaputt.</dt>
-      <dd>Upload-Seite → beim Spiel „Ältere Versionen“ → „Zurücksetzen“. Nächstes Mal erst als Entwurf hochladen und testen.</dd>
-      <dt>Woher weiß ich, ob mein Spiel bei anderen Fehler wirft?</dt>
-      <dd>Menü → Meine Spiele → „Fehlerberichte“ – dort landet jeder JavaScript-Fehler automatisch.</dd>
-      <dt>Ich habe ein Update gemacht, das Spiel ist jetzt viel leichter.</dt>
-      <dd>Menü → Meine Spiele → „Neue Season“ – dann vergleichen sich alle wieder fair.</dd>
-      </div>
+      <dd>Menü → Anträge → „Spielstand wiederherstellen“ – frühere Stände jedes Spielstands sind gesichert.</dd>
       <dt>Ich will in einem Spiel von vorn anfangen.</dt>
       <dd>Menü → Meine Spielstände → „Neu anfangen“ beim Spiel.</dd>
-      <dt>Ich habe eine Idee für ein Spiel oder die Bibliothek.</dt>
-      <dd>Menü → Anträge → „Wunsch / Idee“.</dd>
-      <dt>Ich möchte selbst Spiele bauen.</dt>
-      <dd>Sag Seb Bescheid – dann bekommst du ein Upload-Konto, und diese Hilfe zeigt dir alles für Entwickler.</dd>
       <dt>Die Seite sagt „Anmeldung abgelaufen“.</dt>
       <dd>Nach einer Woche ist ein neuer E-Mail-Code nötig. Du kannst trotzdem weiterspielen: Dein Fortschritt wird so lange auf diesem Gerät
         gesichert und nach der nächsten Anmeldung automatisch übertragen – auch wenn du den Tab vorher schließt.
         Bei „Jetzt neu anmelden“ geht ebenfalls nichts verloren.</dd>
       <dt>Was bedeutet „Aktualisiert“ auf einer Kachel?</dt>
-      <dd>Das Spiel hat seit deinem letzten Besuch eine neue Version. Was sich geändert hat, siehst du beim Öffnen.</dd>
+      <dd>Das Spiel hat seit deinem letzten Besuch eine neue Version. Was sich geändert hat, siehst du beim Öffnen und mit Klick auf die Versionsnummer.</dd>
+      <dt>Ich habe eine Idee für ein Spiel oder die Bibliothek.</dt>
+      <dd>Menü → Anträge → „Wunsch / Idee“.</dd>
+      <dt>Ich möchte selbst Spiele bauen.</dt>
+      <dd>Sag Seb Bescheid – dann bekommst du ein Upload-Konto. Wie es geht, steht im <a href="/handbuch/">Entwickler-Handbuch</a>.</dd>
     </dl>
   </main>
   <script src="/hilfe/hilfe.js?v=__VERSION__"></script>

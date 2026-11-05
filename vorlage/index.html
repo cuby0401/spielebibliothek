@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mein Spiel</title>
+  <!-- 1) IMMER das erste Script: Speichern und Bestenliste der Spielebibliothek -->
+  <script src="/lib/gamesave.js"></script>
+  <style>
+    /* 2) Pflicht, sonst bleiben Overlays mit display:flex/grid trotz hidden sichtbar */
+    [hidden] { display: none !important; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 16px/1.5 system-ui, sans-serif;
+           background: #fdfbf6; color: #222; }
+    main { text-align: center; }
+    #punkte { font-size: 4rem; font-weight: 700; }
+    button { font: inherit; padding: 0.5em 1em; margin: 0.2em; border-radius: 6px; border: 1px solid #999; background: #fff; cursor: pointer; }
+    #version, #status { color: #777; font-size: 0.85rem; min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Mein Spiel</h1>
+    <div id="punkte">0</div>
+    <button id="klick" type="button">+1</button>
+    <button id="einreichen" type="button">In die Bestenliste</button>
+    <p id="status"></p>
+    <p id="version"></p>
+  </main>
+
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+
+    // 3) Spielstand: ALLE Felder mit Startwerten. Neue Felder einfach hier ergänzen (keine neue saveVersion nötig).
+    const STANDARD = { punkte: 0, rekord: 0 };
+
+    // 4) Nur wenn sich die STRUKTUR ändert: saveVersion in der game.json erhöhen und hier einen Schritt ergänzen.
+    //    Schlüssel = die neue saveVersion. Beispiel für später:
+    //    2: (alt) => ({ ...alt, muenzen: alt.punkte, punkte: undefined }),
+    const MIGRATION = {};
+
+    let stand = structuredClone(STANDARD);
+
+    function zeigen() {
+      $("punkte").textContent = stand.punkte;
+    }
+
+    async function speichern() {
+      try { await GameSave.save("stand", stand); }
+      catch (e) { $("status").textContent = "Nicht gespeichert: " + e.message; }
+    }
+
+    $("klick").onclick = () => {
+      stand.punkte++;
+      stand.rekord = Math.max(stand.rekord, stand.punkte);
+      zeigen();
+      speichern();                 // 5) sofort speichern, nicht erst beim Beenden
+    };
+
+    $("einreichen").onclick = async () => {
+      try {
+        await GameSave.submitScore(stand.punkte);
+        $("status").textContent = "Eingetragen!";
+      } catch (e) {
+        $("status").textContent = e.message;   // z. B. „höchstens ein Score pro Sekunde“
+      }
+    };
+
+    (async () => {
+      try {
+        const { data, migriert } = await GameSave.load("stand", { standard: STANDARD, migration: MIGRATION });
+        stand = data;
+        if (migriert) speichern();   // umgewandelten Stand gleich sichern
+      } catch (e) {
+        $("status").textContent = "Spielstand nicht geladen: " + e.message;
+      }
+      // 6) Versionsnummer vergibt die Bibliothek beim Veröffentlichen (lokal und im Entwurf: null)
+      $("version").textContent = GameSave.version ? "Version " + GameSave.version : (GameSave.available ? "Entwurf" : "lokal");
+      zeigen();
+    })();
+  </script>
+</body>
+</html>

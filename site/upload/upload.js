@@ -27,8 +27,9 @@ async function api(methode, pfad, body) {
 	}
 	const d = r.status === 204 ? null : await r.json().catch(() => ({}));
 	if (!r.ok) {
-		const e = new Error(d && typeof d.detail === "string" ? d.detail : "Fehler " + r.status);
+		const e = new Error(d && typeof d.detail === "string" ? d.detail : d && d.detail && d.detail.text ? d.detail.text : "Fehler " + r.status);
 		e.status = r.status;
+		e.detail = d && d.detail;
 		throw e;
 	}
 	return d;
@@ -66,54 +67,130 @@ async function liste() {
 	$("liste").replaceChildren(...spiele.map((s) => {
 		const pfad = "/spiele/" + encodeURIComponent(s.ordner);
 		const bereich = div("bereich",
-			div("titel", s.title),
+			div("titel", s.title + (s.version ? `  ·  Version ${s.version}` : "")),
 			div("info", s.live ? `Live · Ordner ${s.ordner} · ${s.live.dateien} Dateien · ${groesse(s.live.bytes)} · geändert ${datum(s.live.geaendert)}`
 				: `Ordner ${s.ordner} · noch nicht veröffentlicht`));
-		if (s.neu) bereich.append(div("info", "Was ist neu: " + s.neu.text));
 		if (s.warning || (s.live && !s.complete)) bereich.append(div("warnung", "⚠ " + (s.warning || "index.html fehlt")));
 
 		if (s.entwurf) {
 			const testen = document.createElement("a");
 			testen.href = `${GAMES}/#/entwurf/${encodeURIComponent($("benutzer").textContent)}/${encodeURIComponent(s.ordner)}`;
 			testen.target = "_blank"; testen.rel = "noopener"; testen.className = "knopf klein leise"; testen.textContent = "Testen";
-			bereich.append(div("entwurf-box",
-				span(`Entwurf vom ${datum(s.entwurf.geaendert)} · ${s.entwurf.dateien} Dateien` + (s.neuEntwurf ? ` · Was ist neu: ${s.neuEntwurf.text}` : "")),
+			const box = div("entwurf-box",
+				span(`Entwurf vom ${datum(s.entwurf.geaendert)} · ${s.entwurf.dateien} Dateien`),
 				div("zeile-klein", testen,
-					knopfK("Veröffentlichen", () => {
-						if (!confirm(`Entwurf von „${s.title}“ veröffentlichen? Er ist dann für alle sichtbar; die bisherige Version wird aufgehoben.`)) return;
-						aktion(() => api("POST", pfad + "/veroeffentlichen"), `${s.ordner}: Entwurf veröffentlicht.`);
-					}, ""),
+					knopfK("Veröffentlichen …", () => updateFenster(s), ""),
 					knopfK("Verwerfen", () => {
-						if (!confirm("Entwurf verwerfen?")) return;
+						if (!confirm("Entwurf verwerfen? Die gesammelten Änderungen werden ebenfalls verworfen.")) return;
 						aktion(() => api("DELETE", pfad + "/entwurf"), `${s.ordner}: Entwurf verworfen.`);
-					}, "gefahr"))));
+					}, "gefahr")));
+			if (s.aenderungen.length) {
+				const ul = document.createElement("ul");
+				ul.className = "verlauf";
+				for (const a of s.aenderungen) { const li = document.createElement("li"); li.textContent = a.text; ul.append(li); }
+				box.append(span("Gesammelte Änderungen fürs nächste Update:", "info"), ul);
+			}
+			bereich.append(box);
 		}
 		if (s.versionen.length) {
 			const wahl = document.createElement("select");
 			for (const v of s.versionen) {
 				const o = document.createElement("option");
-				o.value = v.id; o.textContent = `Version bis ${datum(v.archiviert)} (${v.dateien} Dateien)`;
+				o.value = v.id;
+				o.textContent = (v.version ? `Version ${v.version} – ` : "") + `bis ${datum(v.archiviert)} (${v.dateien} Dateien)`;
 				wahl.append(o);
 			}
 			bereich.append(div("zeile-klein", span("Ältere Versionen:", "leise"), wahl,
-				knopfK("Zurücksetzen", () => {
-					if (!confirm(`„${s.title}“ auf die gewählte Version zurücksetzen? Die aktuelle Version wird dabei aufgehoben.`)) return;
-					aktion(() => api("POST", pfad + "/zuruecksetzen", { version: wahl.value }), `${s.ordner}: zurückgesetzt.`);
-				})));
+				knopfK("Zurücksetzen", () => zuruecksetzen(s, wahl.value, wahl.selectedOptions[0].textContent))));
+		}
+		if (s.releases.length) {
+			const d = document.createElement("details");
+			d.className = "verlauf";
+			const sum = document.createElement("summary"); sum.textContent = "Versionsverlauf";
+			const ul = document.createElement("ul");
+			for (const r of s.releases) {
+				const li = document.createElement("li");
+				li.textContent = `${r.version} (${datum(r.zeit)})${r.art === "rollback" ? " ↩" : ""}: ${r.aenderungen.join(" · ")}`;
+				ul.append(li);
+			}
+			d.append(sum, ul);
+			bereich.append(d);
 		}
 		const weg = knopfK("Löschen", () => {
-			if (!confirm(`„${s.title}“ (${s.ordner}) komplett löschen – inklusive Entwurf und älterer Versionen? Spielstände und Bestenliste bleiben erhalten.`)) return;
+			if (!confirm(`„${s.title}“ (${s.ordner}) komplett löschen – inklusive Entwurf, älterer Versionen und Versionsverlauf? Spielstände und Bestenliste bleiben erhalten.`)) return;
 			aktion(() => api("DELETE", pfad), `${s.ordner} gelöscht.`);
 		}, "gefahr");
 		return div("eintrag", bereich, weg);
 	}));
 }
 
+// ---------- Update-Fenster (E35/E36) ----------
+async function updateFenster(s) {
+	let pr;
+	try { pr = await api("GET", "/spiele/" + encodeURIComponent(s.ordner) + "/pruefung"); }
+	catch (e) { if (e.status === 401) return start(); return meldung(e.message, "fehler"); }
+	const f = $("update-fenster");
+	$("uf-titel").textContent = `„${s.title}“ veröffentlichen`;
+	$("uf-version").textContent = pr.erstveroeffentlichung
+		? "Erste Veröffentlichung – das Spiel bekommt Version 1.0.0."
+		: `Aktuell live: ${pr.version ? "Version " + pr.version : "noch ohne Versionsnummer"}`;
+	for (const el of f.querySelectorAll("[data-v]")) el.textContent = pr.erstveroeffentlichung ? "" : "→ " + pr.vorschlaege[el.dataset.v];
+	for (const r of f.querySelectorAll('input[name="uf-art"]')) r.disabled = pr.erstveroeffentlichung;
+	$("uf-aenderungen").value = pr.aenderungen.join("\n") || (pr.erstveroeffentlichung ? "Erste Version" : "");
+	$("uf-punkte").replaceChildren(...pr.punkte.map((p) => { const li = document.createElement("li"); li.className = p.stufe; li.textContent = p.text; return li; }));
+	$("uf-season-zeile").hidden = !pr.seasonEmpfohlen; $("uf-season").checked = pr.seasonEmpfohlen;
+	$("uf-gelesen-zeile").hidden = !pr.warnungen || !!pr.fehler; $("uf-gelesen").checked = false;
+	$("uf-los").disabled = !!pr.fehler;
+	$("uf-los").textContent = pr.fehler ? "Erst die Fehler beheben (neu hochladen)" : "Veröffentlichen";
+	$("uf-los").onclick = async () => {
+		if (pr.warnungen && !$("uf-gelesen").checked) return alert("Bitte erst die Warnungen lesen und das Häkchen setzen.");
+		const art = f.querySelector('input[name="uf-art"]:checked').value;
+		const aenderungen = $("uf-aenderungen").value.split("\n").map((z) => z.trim()).filter(Boolean);
+		if (!aenderungen.length) return alert("Bitte mindestens eine Zeile schreiben, was neu ist.");
+		try {
+			const d = await api("POST", "/spiele/" + encodeURIComponent(s.ordner) + "/veroeffentlichen",
+				{ art, aenderungen, neueSeason: $("uf-season").checked, warnungenGelesen: $("uf-gelesen").checked });
+			f.close();
+			meldung(`✓ „${s.title}“ ist als Version ${d.version} veröffentlicht.` + (d.season ? ` Neue Season ${d.season} gestartet.` : ""), "ok");
+		} catch (e) {
+			if (e.status === 401) { f.close(); return start(); }
+			alert(e.message);
+		}
+		liste();
+	};
+	f.showModal();
+}
+
+// ---------- Rollback mit Rückfrage (E37) ----------
+async function zuruecksetzen(s, vid, beschriftung) {
+	if (!confirm(`„${s.title}“ zurücksetzen auf: ${beschriftung}?\nDie aktuelle Version wird dabei aufgehoben.`)) return;
+	const pfad = "/spiele/" + encodeURIComponent(s.ordner) + "/zuruecksetzen";
+	try {
+		await api("POST", pfad, { version: vid });
+		meldung(`${s.ordner}: zurückgesetzt.`, "ok");
+	} catch (e) {
+		if (e.status === 401) return start();
+		if (e.status !== 409 || !e.detail || e.detail.frage !== "spielstaende") { meldung(e.message, "fehler"); return liste(); }
+		const f = $("rollback-fenster");
+		$("rb-text").textContent = e.detail.text;
+		f.returnValue = "";
+		f.showModal();
+		const wahl = await new Promise((ok) => f.addEventListener("close", () => ok(f.returnValue), { once: true }));
+		if (wahl !== "zuruecksetzen" && wahl !== "behalten") { meldung("Nicht zurückgesetzt."); return liste(); }
+		try {
+			const d = await api("POST", pfad, { version: vid, spielstaende: wahl });
+			const sp = d.spielstaende;
+			meldung(`${s.ordner}: zurückgesetzt.` + (sp ? ` ${sp.zurueckgeholt} Spielstände zurückgeholt` +
+				(sp.ohneAltenStand ? `, ${sp.ohneAltenStand} ohne alten Stand unverändert.` : ".") : " Spielstände behalten."), "ok");
+		} catch (e2) { meldung(e2.message, "fehler"); }
+	}
+	liste();
+}
+
 function hochladen(datei, ordner) {
 	return new Promise((ja, nein) => {
 		const x = new XMLHttpRequest();
-		const entwurf = document.querySelector('input[name="art"]:checked').value === "entwurf";
-		x.open("POST", API + "/spiele/" + encodeURIComponent(ordner) + (entwurf ? "?entwurf=true" : ""));
+		x.open("POST", API + "/spiele/" + encodeURIComponent(ordner));
 		x.setRequestHeader("X-Upload", "1");
 		x.upload.onprogress = (e) => { if (e.lengthComputable) $("fortschritt").value = (e.loaded / e.total) * 100; };
 		x.onload = () => {
@@ -147,9 +224,9 @@ $("uploadform").addEventListener("submit", async (ev) => {
 	meldung("Lade hoch …");
 	try {
 		const d = await hochladen(datei, ordner);
-		let text = `✓ ${d.ordner}: ${d.dateien} Dateien ${d.entwurf ? "als Entwurf" : "veröffentlicht"}.`;
+		let text = `✓ ${d.ordner}: ${d.dateien} Dateien als Entwurf hochgeladen.`;
 		if (d.uebersprungen && d.uebersprungen.length) text += ` Übersprungen (nicht erlaubt): ${d.uebersprungen.join(", ")}.`;
-		meldung(text + (d.entwurf ? " Unten auf „Testen“ klicken, dann veröffentlichen." : " In der Bibliothek neu laden, dann ist es da."), "ok");
+		meldung(text + " Unten auf „Testen“ klicken, kurz spielen, dann „Veröffentlichen …“.", "ok");
 		$("uploadform").reset();
 	} catch (e) {
 		if (e.status === 401) { meldung("Sitzung abgelaufen – bitte neu anmelden.", "fehler"); return start(); }

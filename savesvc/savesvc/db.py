@@ -41,6 +41,15 @@ CREATE TABLE IF NOT EXISTS fehler (
 CREATE TABLE IF NOT EXISTS antraege (
     id INTEGER PRIMARY KEY AUTOINCREMENT, player TEXT NOT NULL, art TEXT NOT NULL, spiel TEXT, text TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'offen', antwort TEXT, erstellt TEXT NOT NULL, geaendert TEXT NOT NULL);
+-- Stand vor einer Umwandlung auf eine höhere saveVersion – dauerhaft, für Rollbacks (E37)
+CREATE TABLE IF NOT EXISTS save_vor_update (
+    player TEXT NOT NULL, game TEXT NOT NULL, key TEXT NOT NULL, save_version INTEGER NOT NULL,
+    data TEXT NOT NULL, gesichert TEXT NOT NULL, PRIMARY KEY (player, game, key, save_version));
+-- Testergebnisse von Entwürfen (geöffnet, Migration ok/fehlgeschlagen) für die Prüfung vor dem Veröffentlichen
+CREATE TABLE IF NOT EXISTS entwurf_tests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT NOT NULL, player TEXT NOT NULL, art TEXT NOT NULL,
+    ok INTEGER NOT NULL DEFAULT 1, text TEXT, zeit TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS entwurf_tests_spiel ON entwurf_tests (game, zeit);
 -- Daumen hoch je Spieler und Spiel (Idee „Bewertung“, 05.11.2026)
 CREATE TABLE IF NOT EXISTS daumen (
     player TEXT NOT NULL, game TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game));
@@ -71,6 +80,8 @@ class Datenbank:
             spalten = {z["name"] for z in v.execute("PRAGMA table_info(scores)")}
             if "werte" not in spalten:
                 v.execute("ALTER TABLE scores ADD COLUMN werte TEXT")
+            if "testspiel" not in {z["name"] for z in v.execute("PRAGMA table_info(spiel_einstellungen)")}:
+                v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN testspiel INTEGER NOT NULL DEFAULT 0")
 
     @contextmanager
     def verbindung(self):
@@ -124,6 +135,12 @@ class Datenbank:
         with self.verbindung() as v:
             v.execute("BEGIN IMMEDIATE")
             try:
+                alt = v.execute("SELECT data, save_version FROM saves WHERE player=? AND game=? AND key=?",
+                                (player, game, key)).fetchone()
+                if alt and alt["save_version"] < save_version:
+                    # Umwandlung auf eine neue saveVersion: alten Stand dauerhaft aufheben (Rollback, E37)
+                    v.execute("INSERT OR IGNORE INTO save_vor_update (player, game, key, save_version, data, gesichert) "
+                              "VALUES (?,?,?,?,?,?)", (player, game, key, alt["save_version"], alt["data"], zeit))
                 vorhanden = self._in_verlauf(v, player, game, key)
                 if not vorhanden:
                     anzahl = v.execute(
@@ -193,6 +210,61 @@ class Datenbank:
                 return v.execute("DELETE FROM scores WHERE game=?", (game,)).rowcount
             return v.execute("DELETE FROM scores WHERE game=? AND season=?", (game, season)).rowcount
 
+    # --- Rollback über eine saveVersion-Grenze (E37) ---
+
+    def spielstaende_zurueckholen(self, game: str, bis_save_version: int) -> dict:
+        """Alle Spielstände eines Spiels, die neuer als bis_save_version sind, auf den letzten Stand mit
+        saveVersion <= bis_save_version zurücksetzen. Der aktuelle Stand landet im Verlauf."""
+        zurueck = ohne = 0
+        with self.verbindung() as v:
+            zeilen = v.execute("SELECT player, key FROM saves WHERE game=? AND save_version > ?",
+                               (game, bis_save_version)).fetchall()
+        for z in zeilen:
+            with self.verbindung() as v:
+                alt = v.execute(
+                    "SELECT data, save_version FROM save_vor_update WHERE player=? AND game=? AND key=? AND save_version <= ? "
+                    "ORDER BY save_version DESC LIMIT 1", (z["player"], game, z["key"], bis_save_version)).fetchone() \
+                    or v.execute(
+                    "SELECT data, save_version FROM save_history WHERE player=? AND game=? AND key=? AND save_version <= ? "
+                    "AND data IS NOT NULL ORDER BY id DESC LIMIT 1", (z["player"], game, z["key"], bis_save_version)).fetchone()
+                if not alt:
+                    ohne += 1
+                    continue
+                v.execute("BEGIN IMMEDIATE")
+                self._in_verlauf(v, z["player"], game, z["key"])
+                v.execute("UPDATE saves SET data=?, save_version=?, updated_at=? WHERE player=? AND game=? AND key=?",
+                          (alt["data"], alt["save_version"], jetzt(), z["player"], game, z["key"]))
+                v.execute("COMMIT")
+                zurueck += 1
+        return {"zurueckgeholt": zurueck, "ohneAltenStand": ohne}
+
+    # --- Entwürfe: Testergebnisse ---
+
+    def entwurf_test(self, game: str, player: str, art: str, ok: bool, text: str | None) -> None:
+        with self.verbindung() as v:
+            v.execute("INSERT INTO entwurf_tests (game, player, art, ok, text, zeit) VALUES (?,?,?,?,?,?)",
+                      (game, player, art, int(ok), (text or "")[:300], jetzt()))
+            v.execute("DELETE FROM entwurf_tests WHERE game=? AND id NOT IN "
+                      "(SELECT id FROM entwurf_tests WHERE game=? ORDER BY id DESC LIMIT 200)", (game, game))
+
+    def entwurf_tests(self, game: str, seit: str) -> list[dict]:
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute(
+                "SELECT player, art, ok, text, zeit FROM entwurf_tests WHERE game=? AND zeit >= ? ORDER BY id", (game, seit))]
+
+    def entwurf_zuruecksetzen(self, game: str) -> None:
+        """Neuer Entwurf hochgeladen, veröffentlicht oder verworfen: Test-Spielstände und Testergebnisse weg,
+        damit der nächste Test wieder mit einer frischen Kopie des echten Spielstands beginnt."""
+        with self.verbindung() as v:
+            v.execute("DELETE FROM saves WHERE game=?", (game,))
+            v.execute("DELETE FROM save_history WHERE game=?", (game,))
+            v.execute("DELETE FROM entwurf_tests WHERE game=?", (game,))
+            v.execute("DELETE FROM save_vor_update WHERE game=?", (game,))
+
+    def fehler_seit(self, game: str, seit: str) -> int:
+        with self.verbindung() as v:
+            return v.execute("SELECT COALESCE(SUM(anzahl), 0) FROM fehler WHERE game=? AND letztes >= ?", (game, seit)).fetchone()[0]
+
     # --- Daumen hoch ---
 
     def daumen_setzen(self, player: str, game: str, an: bool) -> None:
@@ -226,11 +298,12 @@ class Datenbank:
 
     def spiel_einstellungen(self) -> dict[str, dict]:
         with self.verbindung() as v:
-            return {z["game"]: {"versteckt": bool(z["versteckt"]), "hervorgehoben": bool(z["hervorgehoben"]), "season": z["season"]}
+            return {z["game"]: {"versteckt": bool(z["versteckt"]), "hervorgehoben": bool(z["hervorgehoben"]), "season": z["season"],
+                                "testspiel": bool(z["testspiel"])}
                     for z in v.execute("SELECT * FROM spiel_einstellungen")}
 
     def spiel_setzen(self, game: str, **felder) -> None:
-        erlaubt = {"versteckt", "hervorgehoben", "season"}
+        erlaubt = {"versteckt", "hervorgehoben", "season", "testspiel"}
         felder = {k: v for k, v in felder.items() if k in erlaubt}
         if not felder:
             return

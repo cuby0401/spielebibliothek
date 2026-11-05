@@ -1,0 +1,11 @@
+{
+  "title": "Mein Spiel",
+  "description": "Ein Satz, worum es geht.",
+  "thumbnail": "thumb.svg",
+  "saveVersion": 1,
+  "leaderboard": {
+    "enabled": true,
+    "order": "desc",
+    "label": "Punkte"
+  }
+}

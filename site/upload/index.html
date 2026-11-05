@@ -12,7 +12,7 @@
     <a class="marke" href="https://games.cuby0401.uk">Spielebibliothek · Upload</a>
     <nav>
       <span id="benutzer" class="benutzer" hidden></span>
-      <a class="knopf leise" href="https://games.cuby0401.uk/hilfe/" target="_blank" rel="noopener">Hilfe</a>
+      <a class="knopf leise" href="https://games.cuby0401.uk/handbuch/" target="_blank" rel="noopener">Handbuch</a>
       <button id="abmelden" class="knopf leise" type="button" hidden>Abmelden</button>
     </nav>
   </header>
@@ -38,21 +38,19 @@
         <label>Ordnername (bleibt immer gleich – Updates gehen in denselben Ordner)
           <input id="ordner" type="text" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" placeholder="z. B. snake">
         </label>
-        <label>Was ist neu? (optional, eine Zeile – sehen alle Spieler beim nächsten Öffnen)
-          <input id="neu" type="text" maxlength="200" placeholder="z. B. Neues Level 4, Sprung-Fehler behoben">
+        <label>Was hast du geändert? (eine Zeile, wird gesammelt bis zum nächsten Update)
+          <input id="neu" type="text" maxlength="200" placeholder="z. B. Neues Level 4 · Sprung-Fehler behoben">
         </label>
         <p class="leise klein">
           Im ZIP muss <code>index.html</code> ganz oben liegen (oder in genau einem Ordner).
           Mac: Ordner rechtsklicken → „Komprimieren“. Windows: Rechtsklick → „Senden an“ → „ZIP-komprimierter Ordner“.
           Max. 100 MB. <code>.exe</code>, Skripte und versteckte Dateien werden übersprungen.
         </p>
-        <fieldset class="art">
-          <legend>Wie hochladen?</legend>
-          <label class="haken"><input type="radio" name="art" value="entwurf" checked>
-            <span><strong>Als Entwurf</strong> – nur du siehst ihn, testen in der Bibliothek, dann veröffentlichen</span></label>
-          <label class="haken"><input type="radio" name="art" value="live">
-            <span><strong>Sofort veröffentlichen</strong> – für alle sichtbar; die bisherige Version wird aufgehoben</span></label>
-        </fieldset>
+        <p class="hinweis-box klein">
+          Jeder Upload landet zuerst als <strong>Entwurf</strong> – nur du siehst ihn. Testen, dann über
+          <strong>„Veröffentlichen …“</strong> das Update-Fenster öffnen: Dort wird geprüft, ob alles passt,
+          und dein Spiel bekommt seine Versionsnummer. <a href="https://games.cuby0401.uk/handbuch/#updates" target="_blank" rel="noopener">So funktionieren Updates</a>
+        </p>
         <div class="zeile">
           <button class="knopf" type="submit">Hochladen</button>
           <progress id="fortschritt" max="100" value="0" hidden></progress>
@@ -63,6 +61,45 @@
       <div id="liste" class="liste"></div>
     </section>
   </main>
+
+  <!-- Update-Fenster (E35/E36) -->
+  <dialog id="update-fenster" class="fenster">
+    <form method="dialog" id="update-form">
+      <h2 id="uf-titel">Update veröffentlichen</h2>
+      <p id="uf-version" class="leise"></p>
+      <fieldset class="art">
+        <legend>Art des Updates</legend>
+        <label class="haken"><input type="radio" name="uf-art" value="patch"> <span><strong>Patch / Hotfix</strong> – Fehler behoben, sonst nichts Neues <span class="leise" data-v="patch"></span></span></label>
+        <label class="haken"><input type="radio" name="uf-art" value="minor" checked> <span><strong>Kleines Update</strong> – neue Inhalte, Verbesserungen <span class="leise" data-v="minor"></span></span></label>
+        <label class="haken"><input type="radio" name="uf-art" value="major"> <span><strong>Großes Update</strong> – vieles neu oder grundlegend anders <span class="leise" data-v="major"></span></span></label>
+      </fieldset>
+      <label class="block">Was ist neu? (eine Zeile pro Änderung – sehen alle Spieler)
+        <textarea id="uf-aenderungen" rows="4" maxlength="5000"></textarea>
+      </label>
+      <h3>Prüfung</h3>
+      <ul id="uf-punkte" class="pruefliste"></ul>
+      <label class="haken" id="uf-season-zeile" hidden><input type="checkbox" id="uf-season"> <span>Neue Season der Bestenliste starten (empfohlen)</span></label>
+      <label class="haken" id="uf-gelesen-zeile" hidden><input type="checkbox" id="uf-gelesen"> <span>Ich habe die Warnungen gelesen und will trotzdem veröffentlichen.</span></label>
+      <div class="zeile">
+        <button class="knopf" id="uf-los" type="button">Veröffentlichen</button>
+        <button class="knopf leise" value="abbrechen">Abbrechen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Rückfrage beim Zurücksetzen über eine saveVersion-Grenze (E37) -->
+  <dialog id="rollback-fenster" class="fenster">
+    <form method="dialog">
+      <h2>Spielstände beim Zurücksetzen</h2>
+      <p id="rb-text"></p>
+      <p class="leise klein">Die Stände vor dem Update hat die Bibliothek aufgehoben. Was soll mit den Spielständen der Spieler passieren?</p>
+      <div class="auswahl">
+        <button class="knopf" value="zuruecksetzen"><strong>Spielstände zurückholen</strong><br><span class="klein">auf den Stand vor dem Update – Fortschritt seitdem geht verloren (liegt im Verlauf)</span></button>
+        <button class="knopf leise" value="behalten"><strong>Spielstände behalten</strong><br><span class="klein">nur, wenn die alte Version mit den neuen Ständen umgehen kann</span></button>
+        <button class="knopf leise" value="abbrechen">Abbrechen</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="/upload/upload.js?v=__VERSION__"></script>
 </body>

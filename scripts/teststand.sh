@@ -39,7 +39,7 @@ up)
 		-e ADMINS=seb -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://sbtest-upload:8000 \
 		-v "$T/data:/data" -v "$T/spiele:/spiele:ro" -v "$T/config:/config" spielebibliothek-savesvc:test >/dev/null
 	docker run -d --name sbtest-upload --network sbtest --user 10021:10021 -e DEV_USER=seb -e DEV_ALLOW=1 -e UPLOAD_DATA=/data \
-		-e UPLOAD_COOKIE_SECURE=0 -e INTERN_TOKEN=test-token -v "$T/udata:/data" -v "$T/config:/config:ro" -v "$T/spiele:/spiele" spielebibliothek-savesvc:test \
+		-e UPLOAD_COOKIE_SECURE=0 -e INTERN_TOKEN=test-token -e SAVESVC_URL=http://sbtest-savesvc:8000 -v "$T/udata:/data" -v "$T/config:/config:ro" -v "$T/spiele:/spiele" spielebibliothek-savesvc:test \
 		uvicorn savesvc.upload:app_factory --factory --host 0.0.0.0 --port 8000 >/dev/null
 	docker run -d --name sbtest-caddy --network sbtest --user 10020:10020 -e XDG_CONFIG_HOME=/tmp -e XDG_DATA_HOME=/tmp \
 		-p 18088:8080 -p 18089:8080 -p 18090:8080 \

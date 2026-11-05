@@ -44,7 +44,9 @@ def versionen(basis: Path, ordner: str) -> list[dict]:
             vid = p.name[len(ordner) + len(VERSION):]
             if VERSION_ID.match(vid):
                 zeit = datetime.strptime(vid[:14], "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
-                ergebnis.append({"id": vid, "archiviert": zeit.isoformat(timespec="seconds"), **_info(p)})
+                from .release import ordner_version
+                nummer = (ordner_version(p) or {}).get("version")   # Versionsnummer (E35), None bei alten Versionen
+                ergebnis.append({"id": vid, "archiviert": zeit.isoformat(timespec="seconds"), "version": nummer, **_info(p)})
     return sorted(ergebnis, key=lambda v: v["id"], reverse=True)
 
 

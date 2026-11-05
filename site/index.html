@@ -23,6 +23,7 @@
           <a href="#/spielstaende">Meine Spielstände</a>
           <a href="#/meine-spiele" data-rolle="entwickler" hidden>Meine Spiele</a>
           <a href="#/antraege">Anträge</a>
+          <a href="/handbuch/" data-rolle="entwickler" hidden>Entwickler-Handbuch</a>
           <a href="/admin/" data-rolle="admin" hidden>Admin-Panel</a>
           <hr>
           <a href="/cdn-cgi/access/logout">Abmelden</a>
@@ -69,9 +70,11 @@
       <div class="spielleiste">
         <a class="knopf leise" href="#/">← Übersicht</a>
         <h1 id="spieltitel"></h1>
+        <button id="version-knopf" class="version-knopf" type="button" hidden title="Versionsverlauf anzeigen"></button>
         <button id="daumen" class="knopf leise daumen" type="button" hidden>👍 <span id="daumen-zahl"></span></button>
         <button id="vollbild" class="knopf" type="button">Vollbild</button>
       </div>
+      <div id="versionen-panel" class="versionen-panel" hidden></div>
       <div class="spielbereich">
         <div id="rahmen" class="rahmen"></div>
         <aside class="bestenliste">

@@ -298,3 +298,83 @@ def test_simulation_zaehlt_nicht_in_statistiken(client):
     # echter Spieler zählt
     client.put("/api/save/seb/zaehler/stand", json={"data": {"zahl": 2}}, headers=client.als(PAUL))
     assert {s["id"]: s for s in client.get("/api/admin/spiele", headers=client.als()).json()}["seb/zaehler"]["spieler"] == 1
+
+
+# ---------- Versionierung: interne Schnittstelle, Testergebnisse, Rollback (E35–E37) ----------
+
+@pytest.fixture
+def iclient(umgebung, rsa_schluessel, token):
+    from fastapi.testclient import TestClient
+    from savesvc.app import erstellen
+    from savesvc.config import Einstellungen
+    from .conftest import AUD, TEAM, Schluessel
+    e = Einstellungen(team_domain=TEAM, audience=AUD, users_file=umgebung.users, spiele_dir=umgebung.spiele,
+                      db_path=umgebung.db, dev_user=None, intern_token="geheim")
+    c = TestClient(erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key())))
+    c.als = lambda email=SEB, **kw: {"Cf-Access-Jwt-Assertion": token(email=email, **kw), "X-Bibliothek": "1"}
+    return c
+
+
+T = {"X-Intern-Token": "geheim"}
+
+
+def test_intern_nur_mit_token(iclient):
+    assert iclient.get("/intern/entwurf/paul/snake?seit=2000-01-01").status_code == 403
+    assert iclient.get("/intern/entwurf/paul/snake?seit=2000-01-01", headers={"X-Intern-Token": "falsch"}).status_code == 403
+    assert iclient.get("/intern/entwurf/paul/snake?seit=2000-01-01", headers=T).status_code == 200
+
+
+def test_entwurf_testergebnisse(iclient, umgebung):
+    entwurf_anlegen(umgebung, '{"title": "Snake 2", "saveVersion": 2}')
+    p = iclient.als(PAUL)
+    assert iclient.post("/api/entwickler/entwurf/paul/snake", headers=p).status_code == 200
+    r = iclient.post("/api/entwickler/migration/paul/snake~entwurf", json={"key": "stand", "von": 1, "nach": 2, "ok": True}, headers=p)
+    assert r.status_code == 204
+    iclient.post("/api/entwickler/migration/paul/snake~entwurf", json={"key": "x", "von": 1, "nach": 2, "ok": False, "fehler": "TypeError"}, headers=p)
+    d = iclient.get("/intern/entwurf/paul/snake?seit=2000-01-01", headers=T).json()
+    assert d["geoeffnet"] and d["migrationOk"] == 1 and "TypeError" in d["migrationFehler"][0]
+    # nur für Entwürfe und nur der Entwickler selbst (oder Admin)
+    assert iclient.post("/api/entwickler/migration/paul/snake", json={"ok": True}, headers=p).status_code == 404
+    assert iclient.post("/api/entwickler/migration/paul/snake~entwurf", json={"ok": True}, headers=iclient.als("emil@example.com")).status_code in (403, 404)
+    # neuer Entwurf → Tests und Test-Spielstände weg
+    iclient.put("/api/save/paul/snake~entwurf/stand", json={"data": 1}, headers=p)
+    assert iclient.post("/intern/entwurf/paul/snake/zuruecksetzen", headers=T).status_code == 204
+    assert iclient.get("/intern/entwurf/paul/snake?seit=2000-01-01", headers=T).json()["geoeffnet"] is False
+    assert iclient.get("/api/save/paul/snake~entwurf/stand", headers=p).status_code == 404
+
+
+def test_umwandlung_wird_dauerhaft_gesichert_und_zurueckgeholt(iclient, umgebung):
+    p = iclient.als(PAUL)
+    ordner = umgebung.spiele / "seb" / "zaehler"
+    (ordner / "game.json").write_text('{"saveVersion": 1}')
+    iclient.put("/api/save/seb/zaehler/stand", json={"data": {"alt": 1}}, headers=p)
+    (ordner / "game.json").write_text('{"saveVersion": 2}')
+    for i in range(10):     # mehr Speicherungen als der Verlauf (5) aufhebt
+        iclient.put("/api/save/seb/zaehler/stand", json={"data": {"neu": i}}, headers=p)
+    r = iclient.post("/intern/spielstaende-zurueck/seb/zaehler", json={"bisSaveVersion": 1}, headers=T).json()
+    assert r == {"zurueckgeholt": 1, "ohneAltenStand": 0}
+    d = iclient.get("/api/save/seb/zaehler/stand", headers=p).json()
+    assert d["data"] == {"alt": 1} and d["version"] == 1
+    assert iclient.post("/intern/spielstaende-zurueck/seb/zaehler", json={"bisSaveVersion": 0}, headers=T).status_code == 422
+
+
+def test_intern_season_und_versionsverlauf(iclient, umgebung):
+    assert iclient.post("/intern/season/seb/zaehler", headers=T).json() == {"season": 2}
+    from savesvc import release
+    basis = umgebung.spiele / "seb"
+    release.aenderung_merken(basis, "zaehler", "Neu: Knopf", "seb")
+    release.veroeffentlicht(basis, "zaehler", "1.0.0", "major", 1, ["Erste Version"], "seb")
+    d = iclient.get("/api/versionen/seb/zaehler", headers=iclient.als()).json()
+    assert d["aktuell"] == "1.0.0" and d["releases"][0]["aenderungen"] == ["Erste Version"]
+    spiel = {s["id"]: s for s in iclient.get("/api/games", headers=iclient.als()).json()}["seb/zaehler"]
+    assert spiel["version"] == "1.0.0" and spiel["neu"]["aenderungen"] == ["Erste Version"]
+
+
+def test_testspiel_nie_in_der_uebersicht_fuer_andere(client):
+    assert client.patch("/api/admin/spiele/paul/snake", json={"testspiel": True}, headers=client.als()).status_code == 200
+    assert "paul/snake" not in {s["id"] for s in client.get("/api/games", headers=client.als(PAUL)).json()}
+    admin = {s["id"]: s for s in client.get("/api/games", headers=client.als()).json()}
+    assert admin["paul/snake"]["testspiel"] is True          # Admin bekommt es (zum Öffnen), die Seite zeigt es nicht als Kachel
+    assert {s["id"]: s for s in client.get("/api/admin/spiele", headers=client.als()).json()}["paul/snake"]["testspiel"] is True
+    sim = {**client.als(), "X-Ansicht": "spieler"}
+    assert "paul/snake" not in {s["id"] for s in client.get("/api/games", headers=sim).json()}

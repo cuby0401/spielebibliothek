@@ -1,3 +1,4 @@
+import json
 import io
 import zipfile
 
@@ -92,6 +93,28 @@ def test_bombe_mit_falscher_groessenangabe(tmp_path, monkeypatch):
 
 # ---------- Upload-API ----------
 
+class FalscherSpeicher:
+    """Ersatz für den Speicher-Dienst (interne Schnittstelle)."""
+
+    def __init__(self):
+        self.aufrufe = []
+        self.tests = {"geoeffnet": True, "migrationOk": 1, "migrationFehler": [], "fehler": 0}
+        self.weg = False
+
+    def __call__(self, methode, pfad, body=None):
+        from fastapi import HTTPException
+        self.aufrufe.append((methode, pfad.split("?")[0], body))
+        if self.weg:
+            raise HTTPException(502, "Speicher-Dienst nicht erreichbar")
+        if pfad.startswith("/intern/entwurf/") and methode == "GET":
+            return self.tests
+        if pfad.startswith("/intern/season/"):
+            return {"season": 2}
+        if pfad.startswith("/intern/spielstaende-zurueck/"):
+            return {"zurueckgeholt": 3, "ohneAltenStand": 0}
+        return None
+
+
 @pytest.fixture
 def uclient(umgebung, rsa_schluessel, token, tmp_path, monkeypatch):
     monkeypatch.setenv("UPLOAD_COOKIE_SECURE", "1")
@@ -99,10 +122,12 @@ def uclient(umgebung, rsa_schluessel, token, tmp_path, monkeypatch):
                       spiele_dir=umgebung.spiele, db_path=tmp_path / "unbenutzt.db", dev_user=None)
     daten = tmp_path / "upload-daten"
     daten.mkdir()
-    app = up.erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key()), daten=daten)
+    speicher = FalscherSpeicher()
+    app = up.erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key()), daten=daten, speicher=speicher)
     c = TestClient(app, base_url="https://testserver")
     c.als = lambda email="paul@example.com", **kw: {"Cf-Access-Jwt-Assertion": token(email=email, **{"aud": AUD_UPLOAD, **kw}), **H}
     c.store = up.Entwickler(daten / "upload.db")
+    c.speicher = speicher
     return c
 
 
@@ -136,11 +161,11 @@ def test_anmelden_hochladen_listen_loeschen(uclient, umgebung):
     r = uclient.post("/api/upload/spiele/neues-spiel", files=datei, headers=uclient.als())
     assert r.status_code == 200, r.text
     assert r.json()["dateien"] == 3 and sorted(r.json()["uebersprungen"]) == [".env", "virus.exe"]
-    assert (umgebung.spiele / "paul" / "neues-spiel" / "index.html").is_file()
+    assert (umgebung.spiele / "paul" / "neues-spiel~entwurf" / "index.html").is_file()   # immer erst Entwurf (E35)
     liste = {s["ordner"]: s for s in uclient.get("/api/upload/spiele", headers=uclient.als()).json()}
     assert liste["neues-spiel"]["title"] == "Neu" and liste["neues-spiel"]["complete"] is True
     assert uclient.delete("/api/upload/spiele/neues-spiel", headers=uclient.als()).status_code == 204
-    assert not (umgebung.spiele / "paul" / "neues-spiel").exists()
+    assert not [p for p in (umgebung.spiele / "paul").iterdir() if "neues-spiel" in p.name]
 
 
 def test_nur_eigener_ordner(uclient, umgebung):
@@ -216,7 +241,7 @@ def test_intern_mit_token(umgebung, rsa_schluessel, token, tmp_path, monkeypatch
     assert {x["aktion"] for x in c.get("/intern/ereignisse", headers=t).json()} >= {"Upload-Konto angelegt", "gelöscht (Admin)"}
 
 
-# ---------- Entwürfe und Versionen ----------
+# ---------- Entwürfe, Versionen, Update-Fenster (E28, E35–E37) ----------
 
 def angemeldeter(uclient):
     uclient.store.setzen("paul", "richtiges-passwort-123")
@@ -224,31 +249,134 @@ def angemeldeter(uclient):
     return uclient
 
 
-def hoch(c, ordner, inhalt, entwurf=False):
-    return c.post(f"/api/upload/spiele/{ordner}" + ("?entwurf=true" if entwurf else ""),
-                  files={"datei": ("s.zip", zip_bytes({"index.html": inhalt}), "application/zip")}, headers=c.als())
+GS = '<!doctype html><script src="/lib/gamesave.js"></script>'
 
 
-def test_entwurf_veroeffentlichen_und_versionen(uclient, umgebung, monkeypatch):
+def hoch(c, ordner, inhalt=GS, neu="", game=None):
+    dateien = {"index.html": inhalt}
+    if game is not None:
+        dateien["game.json"] = game if isinstance(game, str) else json.dumps(game)
+    return c.post(f"/api/upload/spiele/{ordner}", data={"neu": neu},
+                  files={"datei": ("s.zip", zip_bytes(dateien), "application/zip")}, headers=c.als())
+
+
+def veroeff(c, ordner, art="minor", aenderungen=("Test",), **kw):
+    return c.post(f"/api/upload/spiele/{ordner}/veroeffentlichen", json={"art": art, "aenderungen": list(aenderungen), **kw},
+                  headers=c.als())
+
+
+def liste(c):
+    return {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}
+
+
+def test_upload_ist_immer_entwurf_und_versionsnummern(uclient, umgebung):
     c = angemeldeter(uclient)
     basis = umgebung.spiele / "paul"
-    assert hoch(c, "rennen", "v1").status_code == 200                       # neu, direkt live
-    assert hoch(c, "rennen", "v2-entwurf", entwurf=True).status_code == 200
-    assert (basis / "rennen" / "index.html").read_text() == "v1"           # live unverändert
-    assert (basis / "rennen~entwurf" / "index.html").read_text() == "v2-entwurf"
-    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
-    assert s["entwurf"]["dateien"] == 1 and s["versionen"] == []
-    assert c.post("/api/upload/spiele/rennen/veroeffentlichen", headers=c.als()).status_code == 200
-    assert (basis / "rennen" / "index.html").read_text() == "v2-entwurf" and not (basis / "rennen~entwurf").exists()
-    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
-    assert len(s["versionen"]) == 1 and s["entwurf"] is None
-    # Zurücksetzen auf v1 – die aktuelle Version bleibt dabei erhalten
-    vid = s["versionen"][0]["id"]
-    assert c.post("/api/upload/spiele/rennen/zuruecksetzen", json={"version": vid}, headers=c.als()).status_code == 200
-    assert (basis / "rennen" / "index.html").read_text() == "v1"
-    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
-    assert len(s["versionen"]) == 1 and s["versionen"][0]["id"] != vid
-    assert c.post("/api/upload/spiele/rennen/zuruecksetzen", json={"version": "../../etc"}, headers=c.als()).status_code == 404
+    assert hoch(c, "rennen", neu="Erste Version").status_code == 200
+    assert not (basis / "rennen").exists() and (basis / "rennen~entwurf").is_dir()
+    assert ("POST", "/intern/entwurf/paul/rennen/zuruecksetzen", None) in c.speicher.aufrufe
+    pr = c.get("/api/upload/spiele/rennen/pruefung", headers=c.als()).json()
+    assert pr["erstveroeffentlichung"] and pr["aenderungen"] == ["Erste Version"] and pr["fehler"] == 0
+    r = veroeff(c, "rennen", "major", ["Erste Version"])
+    assert r.status_code == 200, r.text
+    assert r.json()["version"] == "1.0.0"                                   # erste Veröffentlichung immer 1.0.0
+    assert not (basis / "rennen" / ".entwurf.json").exists()
+    hoch(c, "rennen", GS + "v2", neu="Neues Level 4")
+    hoch(c, "rennen", GS + "v2b", neu="Sprung-Fehler behoben")
+    s = liste(c)["rennen"]
+    assert s["version"] == "1.0.0" and [a["text"] for a in s["aenderungen"]] == ["Neues Level 4", "Sprung-Fehler behoben"]
+    assert veroeff(c, "rennen", "minor", ["Neues Level 4", "Sprung-Fehler behoben"]).json()["version"] == "1.1.0"
+    assert hoch(c, "rennen", GS + "v3").status_code == 200
+    assert veroeff(c, "rennen", "patch", ["Hotfix"]).json()["version"] == "1.1.1"
+    s = liste(c)["rennen"]
+    assert s["version"] == "1.1.1" and s["aenderungen"] == [] and [r["version"] for r in s["releases"]] == ["1.1.1", "1.1.0", "1.0.0"]
+    from savesvc import games
+    b = games.beschreibung(umgebung.spiele, "paul", "rennen")
+    assert b["version"] == "1.1.1" and b["neu"]["aenderungen"] == ["Hotfix"]
+    # Ohne Änderungstext oder mit falscher Art geht es nicht
+    hoch(c, "rennen", GS + "v4")
+    assert veroeff(c, "rennen", "patch", []).status_code == 422
+    assert veroeff(c, "rennen", "riesig").status_code == 422
+
+
+def test_pruefung_blockiert_bei_fehlern(uclient, umgebung):
+    c = angemeldeter(uclient)
+    hoch(c, "spiel", game={"saveVersion": 2})
+    assert veroeff(c, "spiel").status_code == 200
+    hoch(c, "spiel", game={"saveVersion": 1})                              # saveVersion gesunken
+    pr = c.get("/api/upload/spiele/spiel/pruefung", headers=c.als()).json()
+    assert pr["fehler"] == 1 and any("gesunken" in x["text"] for x in pr["punkte"])
+    assert veroeff(c, "spiel", warnungenGelesen=True).status_code == 409
+    hoch(c, "spiel", game="{ kaputt")
+    assert c.get("/api/upload/spiele/spiel/pruefung", headers=c.als()).json()["fehler"] >= 1
+    # ohne index.html lehnt schon der Upload ab (die Prüfung fängt es zusätzlich ab)
+    assert c.post("/api/upload/spiele/spiel", files={"datei": ("s.zip", zip_bytes({"spiel.html": GS}), "application/zip")},
+                  headers=c.als()).status_code == 422
+
+
+def test_pruefung_warnungen_muessen_bestaetigt_werden(uclient):
+    c = angemeldeter(uclient)
+    hoch(c, "w", '<script src="https://cdn.example.com/three.js"></script><img src="/bild.png">')
+    pr = c.get("/api/upload/spiele/w/pruefung", headers=c.als()).json()
+    texte = " ".join(x["text"] for x in pr["punkte"] if x["stufe"] == "warnung")
+    assert "gamesave.js" in texte and "Absolute Pfade" in texte and "fremden Servern" in texte
+    assert veroeff(c, "w").status_code == 409
+    assert veroeff(c, "w", warnungenGelesen=True).status_code == 200
+
+
+def test_pruefung_nutzt_testergebnisse(uclient):
+    c = angemeldeter(uclient)
+    hoch(c, "m", game={"saveVersion": 1}); veroeff(c, "m")
+    hoch(c, "m", game={"saveVersion": 2})
+    c.speicher.tests = {"geoeffnet": False, "migrationOk": 0, "migrationFehler": [], "fehler": 2}
+    texte = [x["text"] for x in c.get("/api/upload/spiele/m/pruefung", headers=c.als()).json()["punkte"] if x["stufe"] == "warnung"]
+    assert any("noch nicht getestet" in t for t in texte) and any("Umwandlung" in t for t in texte) and any("2 JavaScript-Fehler" in t for t in texte)
+    c.speicher.tests = {"geoeffnet": True, "migrationOk": 0, "migrationFehler": ["stand: saveVersion 1 → 2 – TypeError"], "fehler": 0}
+    assert c.get("/api/upload/spiele/m/pruefung", headers=c.als()).json()["fehler"] == 1
+    c.speicher.weg = True          # Speicher-Dienst weg: nur Warnung, Upload selbst klappt trotzdem
+    assert hoch(c, "m", game={"saveVersion": 2}).status_code == 200
+    assert any("nicht abrufbar" in x["text"] for x in c.get("/api/upload/spiele/m/pruefung", headers=c.als()).json()["punkte"])
+
+
+def test_neue_season_bei_geaenderter_bestenliste(uclient):
+    c = angemeldeter(uclient)
+    hoch(c, "b", game={"leaderboard": {"enabled": True, "order": "desc"}}); veroeff(c, "b")
+    hoch(c, "b", game={"leaderboard": {"enabled": True, "order": "asc"}})
+    pr = c.get("/api/upload/spiele/b/pruefung", headers=c.als()).json()
+    assert pr["seasonEmpfohlen"] is True
+    r = veroeff(c, "b", warnungenGelesen=True, neueSeason=True)
+    assert r.json()["season"] == 2 and ("POST", "/intern/season/paul/b", None) in c.speicher.aufrufe
+
+
+def test_rollback_fragt_bei_saveversion_grenze(uclient, umgebung):
+    c = angemeldeter(uclient)
+    basis = umgebung.spiele / "paul"
+    hoch(c, "r", GS + "v1", game={"saveVersion": 1}); veroeff(c, "r")
+    hoch(c, "r", GS + "v2", game={"saveVersion": 2}); veroeff(c, "r")
+    vid = liste(c)["r"]["versionen"][0]["id"]
+    r = c.post("/api/upload/spiele/r/zuruecksetzen", json={"version": vid}, headers=c.als())
+    assert r.status_code == 409 and r.json()["detail"]["frage"] == "spielstaende"
+    assert (basis / "r" / "index.html").read_text().endswith("v2")         # noch nichts passiert
+    r = c.post("/api/upload/spiele/r/zuruecksetzen", json={"version": vid, "spielstaende": "zuruecksetzen"}, headers=c.als())
+    assert r.status_code == 200 and r.json()["spielstaende"]["zurueckgeholt"] == 3
+    assert ("POST", "/intern/spielstaende-zurueck/paul/r", {"bisSaveVersion": 1}) in c.speicher.aufrufe
+    assert (basis / "r" / "index.html").read_text().endswith("v1")
+    s = liste(c)["r"]
+    assert s["version"] == "1.0.0" and s["releases"][0]["art"] == "rollback"
+    # zurück auf 1.1.0 (gleiche Richtung nach oben): keine Frage
+    vid2 = s["versionen"][0]["id"]
+    assert c.post("/api/upload/spiele/r/zuruecksetzen", json={"version": vid2}, headers=c.als()).status_code == 200
+    assert c.post("/api/upload/spiele/r/zuruecksetzen", json={"version": "../../etc"}, headers=c.als()).status_code == 404
+
+
+def test_rollback_spielstaende_behalten(uclient):
+    c = angemeldeter(uclient)
+    hoch(c, "k", game={"saveVersion": 1}); veroeff(c, "k")
+    hoch(c, "k", game={"saveVersion": 3}); veroeff(c, "k")
+    vid = liste(c)["k"]["versionen"][0]["id"]
+    vorher = len(c.speicher.aufrufe)
+    assert c.post("/api/upload/spiele/k/zuruecksetzen", json={"version": vid, "spielstaende": "behalten"}, headers=c.als()).status_code == 200
+    assert not [a for a in c.speicher.aufrufe[vorher:] if "spielstaende-zurueck" in a[1]]
 
 
 def test_nur_letzte_versionen_bleiben(uclient, umgebung, monkeypatch):
@@ -264,40 +392,22 @@ def test_nur_letzte_versionen_bleiben(uclient, umgebung, monkeypatch):
     monkeypatch.setattr(v, "datetime", Zeit)
     c = angemeldeter(uclient)
     for i in range(8):
-        hoch(c, "rennen", f"v{i}")
-    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
-    assert len(s["versionen"]) == v.VERSIONEN_MAX
+        hoch(c, "rennen", GS + f"v{i}"); veroeff(c, "rennen", "patch")
+    s = liste(c)["rennen"]
+    assert len(s["versionen"]) == v.VERSIONEN_MAX and s["version"] == "1.0.7"
 
 
-def test_nur_entwurf_neues_spiel_und_verwerfen(uclient, umgebung):
+def test_entwurf_verwerfen(uclient, umgebung):
     c = angemeldeter(uclient)
-    assert hoch(c, "neu", "x", entwurf=True).status_code == 200
-    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["neu"]
+    assert hoch(c, "neu", neu="wird verworfen").status_code == 200
+    s = liste(c)["neu"]
     assert s["live"] is None and s["entwurf"] is not None
     assert c.delete("/api/upload/spiele/neu/entwurf", headers=c.als()).status_code == 204
-    assert "neu" not in {x["ordner"] for x in c.get("/api/upload/spiele", headers=c.als()).json()}
+    assert "neu" not in liste(c)
 
 
 def test_loeschen_raeumt_alles_weg(uclient, umgebung):
     c = angemeldeter(uclient)
-    hoch(c, "weg", "1"); hoch(c, "weg", "2"); hoch(c, "weg", "3", entwurf=True)
+    hoch(c, "weg"); veroeff(c, "weg"); hoch(c, "weg"); veroeff(c, "weg"); hoch(c, "weg")
     assert c.delete("/api/upload/spiele/weg", headers=c.als()).status_code == 204
-    assert not [p for p in (umgebung.spiele / "paul").iterdir() if p.name.startswith("weg")]
-
-
-# ---------- „Was ist neu“ (05.11.2026) ----------
-
-def test_was_ist_neu_wandert_mit_dem_ordner(uclient, umgebung):
-    c = angemeldeter(uclient)
-    basis = umgebung.spiele / "paul"
-    r = c.post("/api/upload/spiele/rennen?entwurf=true", data={"neu": "  Neues   Level 4\n"},
-               files={"datei": ("s.zip", zip_bytes({"index.html": "v2"}), "application/zip")}, headers=c.als())
-    assert r.status_code == 200, r.text
-    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
-    assert s["neuEntwurf"]["text"] == "Neues Level 4" and s["neu"] is None
-    assert c.post("/api/upload/spiele/rennen/veroeffentlichen", headers=c.als()).status_code == 200
-    from savesvc import games
-    assert games.beschreibung(umgebung.spiele, "paul", "rennen")["neu"]["text"] == "Neues Level 4"
-    # ohne Text: keine Datei, die neue Version hat keinen Änderungstext
-    assert hoch(c, "rennen", "v3").status_code == 200
-    assert not (basis / "rennen" / games.NEU_DATEI).exists()
+    assert not [p for p in (umgebung.spiele / "paul").iterdir() if "weg" in p.name]

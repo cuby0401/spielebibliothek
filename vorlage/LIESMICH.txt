@@ -1,0 +1,26 @@
+STARTVORLAGE – SPIELEBIBLIOTHEK
+================================
+
+Diese Vorlage ist das Grundgerüst für ein neues Spiel. Sie läuft so, wie sie ist:
+index.html im Browser öffnen (lokal speichert sie nur bis zum Neuladen – das ist normal).
+
+SO BAUST DU DEIN SPIEL
+1. Gib deiner KI drei Dinge: KI-ANWEISUNG.txt, index.html und game.json aus diesem Ordner
+   – und beschreibe dein Spiel. Die KI baut auf diesem Gerüst auf.
+2. Testen: index.html im Browser öffnen.
+3. Ordner als ZIP packen (Mac: Rechtsklick → Komprimieren, Windows: Senden an → ZIP-komprimierter Ordner).
+4. Hochladen auf upload.cuby0401.uk → landet als Entwurf → „Testen“ → „Veröffentlichen …“.
+
+WAS IN DER VORLAGE WICHTIG IST (nicht entfernen)
+- <script src="/lib/gamesave.js"> als erstes Script
+- [hidden] { display: none !important; } im CSS
+- STANDARD (alle Felder des Spielstands) und MIGRATION beim Laden
+- try/catch um jeden GameSave-Aufruf
+- game.json mit title, description, thumbnail, saveVersion
+
+UPDATES
+- Immer denselben Ordnernamen beim Hochladen verwenden – sonst ist es ein neues Spiel.
+- Die Versionsnummer vergibt die Bibliothek im Update-Fenster. Nicht in die game.json schreiben.
+- saveVersion nur erhöhen, wenn sich der Aufbau des Spielstands ändert – und dann einen MIGRATION-Schritt ergänzen.
+
+Alles Weitere: Entwickler-Handbuch unter games.cuby0401.uk/handbuch/

@@ -50,11 +50,13 @@ async function spieleSeite(c) {
 		const schalter = (feld, text) => h("label", { class: "haken" }, h("input", { type: "checkbox", checked: !!s[feld],
 			onchange: (e) => sicher(async () => { await api("PATCH", "/spiele/" + idPfad(s.id), { [feld]: e.target.checked }); meldung(`${s.title}: ${text} ${e.target.checked ? "an" : "aus"}`); }) }), text);
 		return h("tr", {},
-			h("td", {}, h("strong", { text: s.title }), h("div", { class: "leise", text: s.id + (s.complete ? "" : " · unvollständig") })),
+			h("td", {}, h("strong", { text: s.title }),
+				h("div", { class: "leise", text: s.id + (s.version ? " · v" + s.version : "") + (s.complete ? "" : " · unvollständig") }),
+				s.complete ? h("a", { href: "/#/spiel/" + s.id, text: "Öffnen" }) : null),
 			h("td", { text: String(s.spieler) }), h("td", { text: String(s.daumen || 0) }), h("td", { text: datumZeit(s.zuletzt) }),
 			h("td", { text: s.leaderboard.enabled ? `S${s.leaderboardSeason} · ${s.scores}` : "aus" }),
 			h("td", { text: s.fehler && s.fehler.arten ? `${s.fehler.arten24h || 0} neu · ${s.fehler.anzahl}×` : "–" }),
-			h("td", {}, h("div", { class: "zeile" }, schalter("versteckt", "ausblenden"), schalter("hervorgehoben", "empfehlen"))),
+			h("td", {}, h("div", { class: "zeile" }, schalter("versteckt", "ausblenden"), schalter("hervorgehoben", "empfehlen"), schalter("testspiel", "Testspiel"))),
 			h("td", {}, h("div", { class: "zeile" },
 				s.leaderboard.enabled ? knopf("Bestenliste", () => bestenlisteDetail(c, s)) : null,
 				s.leaderboard.enabled ? knopf("Neue Season", async () => {
@@ -67,7 +69,7 @@ async function spieleSeite(c) {
 					await api("DELETE", "/spiele/" + idPfad(s.id)); meldung(`${s.title} gelöscht.`); zeigen();
 				}, "gefahr"))));
 	});
-	c.append(h("p", { class: "leise", text: "„Ausblenden“ versteckt ein Spiel in der Übersicht für alle außer dir (die Dateien bleiben unter play erreichbar). „Empfehlen“ heftet es mit Marke nach den Favoriten oben an." }),
+	c.append(h("p", { class: "leise", text: "„Ausblenden“ versteckt ein Spiel in der Übersicht für alle außer dir (die Dateien bleiben unter play erreichbar). „Empfehlen“ heftet es mit Marke nach den Favoriten oben an. „Testspiel“ nimmt es für alle aus der Übersicht – auch für dich; öffnen über „Öffnen“ hier. Für Tutorials und Testwerkzeuge wie Spike, Böse oder die Bestenlisten-Vorlage." }),
 		tabelle(["Spiel", "Spieler", "👍", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
 	const fehler = await Bridge.json("GET", "/api/entwickler/fehler?alle=true");
 	c.append(h("h2", { text: "Fehlerberichte aller Spiele" }),

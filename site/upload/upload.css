@@ -27,3 +27,26 @@ progress { flex: 1; min-width: 8rem; }
 .knopf.gefahr { background: transparent; color: var(--warn); border-color: var(--warn); }
 .meldung.ok { border-color: var(--akzent); }
 .meldung.fehler { border-color: var(--warn); color: var(--warn); }
+
+/* Update-Fenster und Rückfrage (E35–E37) */
+.hinweis-box { background: var(--grund); border-left: 3px solid var(--akzent); padding: 0.45rem 0.7rem; border-radius: 4px; }
+.fenster { max-width: 640px; width: calc(100% - 2rem); border: 1px solid var(--linie); border-radius: 12px; background: var(--flaeche); color: var(--text); padding: 1.1rem 1.3rem; }
+.fenster::backdrop { background: rgba(0, 0, 0, 0.45); }
+.fenster form { display: grid; gap: 0.8rem; }
+.fenster h2 { margin: 0; font-size: 1.15rem; }
+.fenster h3 { margin: 0.3rem 0 0; font-size: 0.95rem; }
+.fenster label.block { display: grid; gap: 0.3rem; font-weight: 600; }
+.fenster textarea { font: inherit; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--linie); background: var(--grund); color: var(--text); }
+.fenster .haken { display: flex; gap: 0.5rem; align-items: baseline; }
+.pruefliste { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; font-size: 0.9rem; }
+.pruefliste li { padding: 0.3rem 0.55rem; border-radius: 6px; background: var(--grund); }
+.pruefliste li::before { margin-right: 0.4rem; font-weight: 700; }
+.pruefliste li.ok::before { content: "✓"; color: var(--akzent); }
+.pruefliste li.hinweis::before { content: "ℹ"; color: #2f7de1; }
+.pruefliste li.warnung { border-left: 3px solid #e9b949; } .pruefliste li.warnung::before { content: "⚠"; color: #c88a00; }
+.pruefliste li.fehler { border-left: 3px solid var(--warn); } .pruefliste li.fehler::before { content: "✗"; color: var(--warn); }
+.auswahl { display: grid; gap: 0.5rem; }
+.auswahl .knopf { text-align: left; }
+.verlauf { font-size: 0.85rem; color: var(--leise); }
+.verlauf summary { cursor: pointer; }
+.verlauf ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
