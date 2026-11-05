@@ -108,13 +108,16 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         # „Ansicht als …“ (rollen.py): echte Admins können Spieler- oder Entwickler-Sicht simulieren.
         r = rollen.rolle(e, request, player)
         return {"player": player, "uploader": r["uploader"], "admin": r["admin"],
-                "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"]}
+                "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"],
+                "sitzungBis": getattr(request.state, "sitzung_bis", None)}
 
     @app.get("/api/games")
     def spiele(request: Request, player: str = Depends(spieler)):
         einst = db.spiel_einstellungen()
         zuletzt = db.zuletzt_gespielt(rollen.daten_id(e, request, player))
         ist_admin = rollen.rolle(e, request, player)["admin"]
+        daumen = db.daumen_zahlen()
+        meine = set() if rollen.simuliert(e, request, player) else db.meine_daumen(player)
         ergebnis = []
         for s in games.alle(e.spiele_dir):
             ein = einst.get(s["id"], {})
@@ -122,7 +125,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
                 continue   # ausgeblendet (nur Anzeige – die Dateien bleiben unter play erreichbar)
             ergebnis.append({**s, "leaderboardSeason": aktuelle_season(s["id"]),
                              "versteckt": bool(ein.get("versteckt")), "hervorgehoben": bool(ein.get("hervorgehoben")),
-                             "zuletztGespielt": zuletzt.get(s["id"])})
+                             "zuletztGespielt": zuletzt.get(s["id"]),
+                             "daumen": daumen.get(s["id"], 0), "meinDaumen": s["id"] in meine})
         return ergebnis
 
     @app.get("/api/save/{user}/{game}")
@@ -181,6 +185,21 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         season = aktuelle_season(sp[0], sp[1])
         db.score_eintragen(player, sp[0], season, float(wert), werte)
         return {"season": season}
+
+    # --- Daumen hoch (Idee „Bewertung“, 05.11.2026): Rückmeldung an die Entwickler ---
+    @app.put("/api/daumen/{user}/{game}")
+    def daumen_setzen(request: Request, player: str = Depends(spieler), sp=Depends(spiel), body: dict[str, Any] = Body(...)):
+        if rollen.simuliert(e, request, player):
+            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler wird nicht bewertet")
+        if sp[0].endswith(versionen.ENTWURF):
+            raise HTTPException(409, "Entwürfe werden nicht bewertet")
+        if sp[0].split("/")[0] == player:
+            raise HTTPException(409, "Eigene Spiele kann man nicht bewerten")
+        an = body.get("an")
+        if not isinstance(an, bool):
+            raise HTTPException(422, "an: true oder false")
+        db.daumen_setzen(player, sp[0], an)
+        return {"an": an, "daumen": db.daumen_zahlen().get(sp[0], 0)}
 
     @app.get("/api/leaderboard/{user}/{game}")
     def bestenliste(

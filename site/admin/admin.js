@@ -51,7 +51,7 @@ async function spieleSeite(c) {
 			onchange: (e) => sicher(async () => { await api("PATCH", "/spiele/" + idPfad(s.id), { [feld]: e.target.checked }); meldung(`${s.title}: ${text} ${e.target.checked ? "an" : "aus"}`); }) }), text);
 		return h("tr", {},
 			h("td", {}, h("strong", { text: s.title }), h("div", { class: "leise", text: s.id + (s.complete ? "" : " · unvollständig") })),
-			h("td", { text: String(s.spieler) }), h("td", { text: datumZeit(s.zuletzt) }),
+			h("td", { text: String(s.spieler) }), h("td", { text: String(s.daumen || 0) }), h("td", { text: datumZeit(s.zuletzt) }),
 			h("td", { text: s.leaderboard.enabled ? `S${s.leaderboardSeason} · ${s.scores}` : "aus" }),
 			h("td", { text: s.fehler && s.fehler.arten ? `${s.fehler.arten24h || 0} neu · ${s.fehler.anzahl}×` : "–" }),
 			h("td", {}, h("div", { class: "zeile" }, schalter("versteckt", "ausblenden"), schalter("hervorgehoben", "empfehlen"))),
@@ -68,7 +68,7 @@ async function spieleSeite(c) {
 				}, "gefahr"))));
 	});
 	c.append(h("p", { class: "leise", text: "„Ausblenden“ versteckt ein Spiel in der Übersicht für alle außer dir (die Dateien bleiben unter play erreichbar). „Empfehlen“ heftet es mit Marke nach den Favoriten oben an." }),
-		tabelle(["Spiel", "Spieler", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
+		tabelle(["Spiel", "Spieler", "👍", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
 	const fehler = await Bridge.json("GET", "/api/entwickler/fehler?alle=true");
 	c.append(h("h2", { text: "Fehlerberichte aller Spiele" }),
 		fehler.length ? tabelle(["Spiel", "Fehler", "Ort", "Anzahl", "Zuletzt", "Browser", ""], fehler.map((f) => h("tr", {},

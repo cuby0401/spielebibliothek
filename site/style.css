@@ -135,9 +135,12 @@ main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
 .stern { position: absolute; top: 6px; right: 6px; border: 0; border-radius: 50%; width: 2rem; height: 2rem;
   background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 1.1rem; cursor: pointer; line-height: 1; }
 .stern.an { color: #ffd34d; }
-.marke-klein { position: absolute; left: 6px; top: 6px; background: var(--akzent); color: var(--akzent-text);
+.marken { position: absolute; left: 6px; top: 6px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.marke-klein { background: var(--akzent); color: var(--akzent-text);
   font-size: 0.75rem; font-weight: 650; padding: 0.1rem 0.45rem; border-radius: 4px; }
 .marke-klein.versteckt { background: var(--warn); color: #fff; }
+.marke-klein.aktualisiert { background: #2f7de1; color: #fff; }
+.daumen-zahl { color: var(--leise); }
 
 /* ---------- Spielansicht ---------- */
 #spielansicht.gross .rahmen { aspect-ratio: auto; height: calc(100vh - 11rem); }
@@ -182,3 +185,11 @@ main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
 .fehler-zeile details { margin-top: 0.3rem; }
 .fehler-zeile pre { white-space: pre-wrap; font-size: 0.78rem; background: var(--grund); padding: 0.4rem; border-radius: 4px; max-height: 12rem; overflow: auto; }
 
+
+/* Was ist neu (einmalig beim ersten Öffnen nach einem Update) */
+.neu-hinweis { margin: 0 0 0.75rem; padding: 0.5rem 0.8rem; border-radius: 6px; background: #2f7de1; color: #fff; font-weight: 600;
+  display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; }
+.neu-zu { border: 0; background: transparent; color: inherit; font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0 0.2rem; }
+/* Daumen hoch in der Spielleiste */
+.knopf.daumen.an { background: var(--akzent); color: var(--akzent-text); border-color: var(--akzent); }
+.knopf.daumen:disabled { opacity: 0.6; cursor: default; }

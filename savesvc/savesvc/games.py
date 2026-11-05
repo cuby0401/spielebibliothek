@@ -99,6 +99,21 @@ def _geaendert(ordner: Path) -> str | None:
     return datetime.fromtimestamp(zeit, timezone.utc).isoformat(timespec="seconds")
 
 
+NEU_DATEI = ".was-ist-neu.json"   # schreibt der Upload-Dienst; versteckt → wird unter play nie ausgeliefert
+NEU_MAX = 200
+
+
+def was_ist_neu(ordner: Path) -> dict | None:
+    """Änderungstext der aktuellen Version (Idee „Was ist neu“, 05.11.2026)."""
+    try:
+        d = json.loads((ordner / NEU_DATEI).read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return None
+    text = _text(d.get("text"), NEU_MAX) if isinstance(d, dict) else None
+    zeit = d.get("zeit") if isinstance(d, dict) and isinstance(d.get("zeit"), str) else None
+    return {"text": text, "zeit": zeit} if text else None
+
+
 def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
     ordner = spiele_dir / benutzer / ordner_name
     daten, warnung = meta(ordner)
@@ -116,6 +131,7 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         "leaderboardSeason": season(ordner),
         "complete": (ordner / "index.html").is_file(),
         "geaendert": _geaendert(ordner),
+        "neu": was_ist_neu(ordner),
         "warning": warnung,
     }
 

@@ -77,7 +77,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
 	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
+		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "👍", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((s) => {
 			const [user, ordner] = s.id.split("/");
 			return h("tr", {},
@@ -87,6 +87,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 						h("a", { href: `#/entwurf/${user}/${ordner}`, text: "Entwurf testen" })) : null,
 					s.warning ? h("div", { class: "warnung", text: "⚠ " + s.warning }) : null),
 				h("td", { text: String(s.spieler) }),
+				h("td", { text: String(s.daumen || 0), title: "Daumen hoch von Spielern" }),
 				h("td", { text: datumZeit(s.zuletzt) }),
 				h("td", { text: s.leaderboard.enabled ? `Season ${s.leaderboardSeason} · ${s.scores} Einträge` : "aus" }),
 				h("td", {}, fehlerText(s.fehler), s.fehlerEntwurf && s.fehlerEntwurf.arten ? h("div", { class: "leise", text: "Entwurf: " + fehlerText(s.fehlerEntwurf) }) : null),

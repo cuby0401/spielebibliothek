@@ -1,3 +1,4 @@
+import time
 import sqlite3
 
 import pytest
@@ -34,7 +35,9 @@ def test_unbekannte_email_403(client):
 
 
 def test_me_und_grossschreibung(client):
-    assert client.get("/api/me", headers=client.als()).json() == {"player": "seb", "uploader": True, "admin": True, "ansicht": None, "echterAdmin": True}
+    me = client.get("/api/me", headers=client.als(exp_in=3600)).json()
+    assert abs(me.pop("sitzungBis") - (time.time() + 3600)) < 60   # Ende der Cloudflare-Sitzung aus dem JWT
+    assert me == {"player": "seb", "uploader": True, "admin": True, "ansicht": None, "echterAdmin": True}
     assert client.get("/api/me", headers=client.als("PAUL@example.COM")).json()["player"] == "paul"
 
 
@@ -44,7 +47,9 @@ def test_users_yaml_wird_neu_gelesen(client, umgebung):
     umgebung.users.write_text("seb@example.com: seb\nneu@example.com: neu\n")
     os.utime(umgebung.users, (time.time() + 5, time.time() + 5))
     # nur spielen: kein eigener Spielordner → kein Upload-Link
-    assert client.get("/api/me", headers=client.als("neu@example.com")).json() == {"player": "neu", "uploader": False, "admin": False, "ansicht": None, "echterAdmin": False}
+    me = client.get("/api/me", headers=client.als("neu@example.com")).json()
+    me.pop("sitzungBis")
+    assert me == {"player": "neu", "uploader": False, "admin": False, "ansicht": None, "echterAdmin": False}
 
 
 def test_ohne_login_kein_404_leck(client):

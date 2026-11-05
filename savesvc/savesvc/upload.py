@@ -9,6 +9,7 @@ Entwickler werden nur per CLI im Container angelegt:  python -m savesvc entwickl
 """
 
 import hashlib
+import json
 import hmac
 import logging
 import os
@@ -21,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, File, HTTPException, Path as P, Query, Request, Response, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Path as P, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 
 from . import games, versionen, zipinstall
@@ -246,6 +247,8 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
                 "title": b["title"],
                 "complete": b["complete"],
                 "warning": b["warning"],
+                "neu": games.was_ist_neu(live) if live.is_dir() else None,
+                "neuEntwurf": games.was_ist_neu(versionen.entwurf(basis, name)) if entw else None,
                 "live": versionen._info(live) if live.is_dir() else None,
                 "entwurf": entw,
                 "versionen": versionen.versionen(basis, name),
@@ -254,9 +257,10 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
 
     @app.post("/api/upload/spiele/{ordner}")
     def hochladen(player: str = Depends(angemeldet), ordner: str = P(...), datei: UploadFile = File(...),
-                  entwurf: bool = Query(False)):
+                  entwurf: bool = Query(False), neu: str = Form("")):
         ziel = ordnerpfad(player, ordner)
         basis = ziel.parent
+        neu = " ".join(neu.split())[: games.NEU_MAX]   # eine Zeile „Was ist neu“
         try:
             if entwurf:
                 ergebnis = zipinstall.installieren(datei.file, versionen.entwurf(basis, ordner))
@@ -264,6 +268,11 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
                 ergebnis = zipinstall.installieren(datei.file, ziel, wegraeumen=lambda: versionen.archivieren(basis, ordner))
         except zipinstall.UngueltigesZip as fehler:
             raise HTTPException(422, str(fehler)) from None
+        if neu:   # wandert mit dem Ordner (Veröffentlichen, Versionen); versteckt → unter play nie ausgeliefert
+            installiert = versionen.entwurf(basis, ordner) if entwurf else ziel
+            (installiert / games.NEU_DATEI).write_text(
+                json.dumps({"text": neu, "zeit": datetime.now(timezone.utc).isoformat(timespec="seconds")}, ensure_ascii=False),
+                encoding="utf-8")
         art = "als Entwurf hochgeladen" if entwurf else "hochgeladen"
         log.info("%s hat %s %s (%d Dateien)", player, ordner, art, ergebnis.dateien)
         store.ereignis(player, art, ordner, ergebnis.dateien)

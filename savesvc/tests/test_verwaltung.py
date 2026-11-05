@@ -47,7 +47,7 @@ def test_me_admin(client):
 def test_einstellungen(client):
     assert client.get("/api/einstellungen", headers=client.als()).json()["sortierung"] == "alphabetisch"
     r = client.put("/api/einstellungen", json={"sortierung": "zuletzt", "favoriten": ["seb/zaehler"], "grossansicht": True}, headers=client.als())
-    assert r.json() == {"sortierung": "zuletzt", "favoriten": ["seb/zaehler"], "grossansicht": True, "bestenliste": True}
+    assert r.json() == {"sortierung": "zuletzt", "favoriten": ["seb/zaehler"], "grossansicht": True, "bestenliste": True, "gesehen": {}}
     assert client.put("/api/einstellungen", json={"sortierung": "zufall"}, headers=client.als()).status_code == 422
     assert client.get("/api/einstellungen", headers=client.als(PAUL)).json()["favoriten"] == []   # je Spieler getrennt
 
@@ -152,6 +152,7 @@ def test_ansicht_als_spieler(client, upload):
     client.patch("/api/admin/spiele/paul/snake", json={"versteckt": True}, headers=client.als())
     h = {**client.als(), "X-Ansicht": "spieler"}
     me = client.get("/api/me", headers=h).json()
+    assert isinstance(me.pop("sitzungBis"), int)
     assert me == {"player": "seb", "uploader": False, "admin": False, "ansicht": "spieler", "echterAdmin": True}
     assert "paul/snake" not in {s["id"] for s in client.get("/api/games", headers=h).json()}
     r = client.get("/api/admin/uebersicht", headers=h)
@@ -257,3 +258,28 @@ def test_fehlerbericht_ratelimit_und_kuerzen(client):
     assert len(alle) == 20                                           # höchstens 20 pro Minute
     client.post("/api/fehler/seb/zaehler", json={"meldung": "x" * 5000}, headers=client.als())
     assert max(len(f["meldung"]) for f in client.get("/api/entwickler/fehler", headers=client.als()).json()) <= 300
+
+
+# ---------- Daumen hoch und „gesehen“ (05.11.2026) ----------
+
+def test_daumen(client):
+    p = client.als(PAUL)
+    assert client.put("/api/daumen/seb/zaehler", json={"an": True}, headers=p).json() == {"an": True, "daumen": 1}
+    assert client.put("/api/daumen/seb/zaehler", json={"an": True}, headers=p).json()["daumen"] == 1   # doppelt zählt nicht
+    spiele = {s["id"]: s for s in client.get("/api/games", headers=p).json()}
+    assert spiele["seb/zaehler"]["daumen"] == 1 and spiele["seb/zaehler"]["meinDaumen"] is True
+    assert {s["id"]: s for s in client.get("/api/games", headers=client.als()).json()}["seb/zaehler"]["meinDaumen"] is False
+    assert {s["id"]: s for s in client.get("/api/admin/spiele", headers=client.als()).json()}["seb/zaehler"]["daumen"] == 1
+    # eigenes Spiel, Simulation und ungültige Werte
+    assert client.put("/api/daumen/seb/zaehler", json={"an": True}, headers=client.als()).status_code == 409
+    assert client.put("/api/daumen/paul/snake", json={"an": True}, headers={**client.als(), "X-Ansicht": "spieler"}).status_code == 409
+    assert client.put("/api/daumen/paul/snake", json={"an": "ja"}, headers=client.als()).status_code == 422
+    assert client.put("/api/daumen/seb/zaehler", json={"an": False}, headers=p).json()["daumen"] == 0
+
+
+def test_gesehen_wird_zusammengefuehrt(client):
+    h = client.als()
+    client.put("/api/einstellungen", json={"gesehen": {"seb/zaehler": "2026-11-05T10:00:00+00:00"}}, headers=h)
+    d = client.put("/api/einstellungen", json={"gesehen": {"paul/snake": "2026-11-05T11:00:00+00:00"}}, headers=h).json()
+    assert d["gesehen"] == {"seb/zaehler": "2026-11-05T10:00:00+00:00", "paul/snake": "2026-11-05T11:00:00+00:00"}
+    assert client.put("/api/einstellungen", json={"gesehen": ["x"]}, headers=h).status_code == 422

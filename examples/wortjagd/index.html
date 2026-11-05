@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wortjagd</title>
+  <script src="/lib/gamesave.js"></script>
+  <style>
+    [hidden] { display: none !important; }
+    :root { --grund: #1d2433; --feld: #2a3245; --rand: #4a5265; --text: #f2f4f8; --leise: #9aa3b5;
+            --treffer: #1f8a8a; --drin: #e0912f; --weg: #3a4152; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--grund); color: var(--text);
+           font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; justify-content: center; }
+    main { width: 100%; max-width: 30rem; padding: 0.8rem; display: flex; flex-direction: column; gap: 0.8rem; align-items: center; }
+    header { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    h1 { margin: 0; font-size: 1.4rem; letter-spacing: 0.06em; }
+    .modi { display: flex; gap: 0.3rem; }
+    .modi button, .knopf { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.7rem; border-radius: 6px; border: 1px solid var(--rand);
+           background: transparent; color: var(--text); cursor: pointer; }
+    .modi button.an { background: var(--text); color: var(--grund); border-color: var(--text); }
+    #untertitel { color: var(--leise); font-size: 0.9rem; margin: -0.4rem 0 0; }
+    #gitter { display: grid; grid-template-rows: repeat(6, 1fr); gap: 0.35rem; }
+    .zeile { display: grid; grid-template-columns: repeat(5, 3.2rem); gap: 0.35rem; }
+    .zelle { height: 3.2rem; display: grid; place-items: center; font-size: 1.6rem; font-weight: 700; text-transform: uppercase;
+             border: 2px solid var(--rand); border-radius: 6px; background: var(--feld); }
+    .zelle.voll { border-color: var(--leise); }
+    .zelle.treffer { background: var(--treffer); border-color: var(--treffer); }
+    .zelle.drin { background: var(--drin); border-color: var(--drin); }
+    .zelle.weg { background: var(--weg); border-color: var(--weg); color: var(--leise); }
+    .zeile.wackeln { animation: wackeln 0.35s; }
+    @keyframes wackeln { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+    #meldung { min-height: 1.5em; font-weight: 600; text-align: center; }
+    #tastatur { display: grid; gap: 0.35rem; width: 100%; }
+    .reihe { display: flex; gap: 0.25rem; justify-content: center; }
+    .taste { flex: 1; max-width: 2.6rem; height: 3.2rem; border: 0; border-radius: 6px; background: #59617a; color: var(--text);
+             font: 600 1rem system-ui, sans-serif; cursor: pointer; padding: 0; }
+    .taste.breit { max-width: 4.2rem; flex: 1.6; font-size: 0.8rem; }
+    .taste.treffer { background: var(--treffer); } .taste.drin { background: var(--drin); } .taste.weg { background: var(--weg); color: var(--leise); }
+    #ende { width: 100%; background: var(--feld); border: 1px solid var(--rand); border-radius: 10px; padding: 0.8rem 1rem; display: grid; gap: 0.6rem; }
+    #ende h2 { margin: 0; font-size: 1.1rem; }
+    .zahlen { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; }
+    .zahlen b { display: block; font-size: 1.4rem; }
+    .zahlen span { color: var(--leise); font-size: 0.75rem; }
+    .verteilung { display: grid; gap: 0.2rem; font-size: 0.85rem; }
+    .balken { display: flex; align-items: center; gap: 0.4rem; }
+    .balken i { display: block; height: 1.1rem; background: var(--rand); border-radius: 3px; min-width: 1.4rem; text-align: right;
+                padding-right: 0.3rem; font-style: normal; font-weight: 600; }
+    .balken i.heute { background: var(--treffer); }
+    .regeln { color: var(--leise); font-size: 0.85rem; margin: 0; }
+    .regeln b.t { color: var(--treffer); } .regeln b.d { color: var(--drin); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>WORTJAGD</h1>
+      <div class="modi">
+        <button id="modus-tag" type="button" class="an">Tagesrätsel</button>
+        <button id="modus-uebung" type="button">Übung</button>
+      </div>
+    </header>
+    <p id="untertitel"></p>
+    <div id="gitter"></div>
+    <div id="meldung" role="status"></div>
+    <section id="ende" hidden>
+      <h2 id="ende-titel"></h2>
+      <div class="zahlen">
+        <div><b id="z-gespielt">0</b><span>gespielt</span></div>
+        <div><b id="z-quote">0</b><span>% gelöst</span></div>
+        <div><b id="z-serie">0</b><span>Serie</span></div>
+        <div><b id="z-beste">0</b><span>beste Serie</span></div>
+      </div>
+      <div id="verteilung" class="verteilung"></div>
+      <button id="nochmal" class="knopf" type="button" hidden>Neue Übungsrunde</button>
+    </section>
+    <div id="tastatur"></div>
+    <p class="regeln"><b class="t">Türkis</b> = richtiger Buchstabe an der richtigen Stelle, <b class="d">Orange</b> = kommt im Wort vor, aber woanders.
+      Das Tagesrätsel ist für alle gleich und zählt für die Bestenliste.</p>
+  </main>
+  <script>
+  "use strict";
+  const WOERTER = "ABEND ACKER ADLER AFFEN ALARM ALTER AMPEL ANGST APFEL ARMUT ASCHE ATLAS BACKE BADEN BANDE BAUCH BAUEN BAUER BEERE BESEN BETON BIBER BIENE BIRKE BIRNE BLATT BLECH BLICK BLITZ BLOCK BLUME BLUSE BODEN BOHNE BOMBE BONUS BOOTE BRAUT BRETT BRIEF BROTE BRUST BUCHT BÖRSE BÜHNE CHAOS DACHS DAMPF DATEN DAUER DECKE DEICH DIELE DINGE DOSEN DRAHT DRAMA DRUCK DUNST DURST EBENE ECKEN EICHE EIMER ELFEN ENGEL ENKEL ERBSE ERNTE ESSIG EULEN FABEL FADEN FAHNE FALKE FALTE FARBE FASAN FAUST FEDER FEIER FELGE FERNE FESTE FEUER FIBEL FIGUR FILME FINKE FIRMA FISCH FLECK FLUCH FLUSS FLÖTE FOLGE FORST FRAGE FRECH FRIST FUCHS FUNKE GABEL GASSE GEHEN GEIGE GEIST GENIE GERTE GLANZ GLEIS GLÜCK GNADE GREIF GRIFF GRILL GRUBE GRUFT GRUND GUNST GURKE HAFEN HAGEL HAKEN HALLE HALME HARFE HARKE HASEN HAUBE HAUPT HECHT HECKE HEFTE HEIDE HELME HERDE HEXEN HIRTE HITZE HOBEL HONIG HORDE HOSEN HOTEL HUMOR HUNDE HÄNDE HÖHLE HÜGEL HÜTTE IDEAL IDEEN IMKER INSEL JACKE JUBEL JUNGE KABEL KAKAO KAMEL KAMIN KAMPF KANAL KANNE KANTE KAPPE KARTE KASSE KATZE KEGEL KEHLE KEKSE KELCH KELLE KERZE KETTE KEULE KISTE KLAGE KLANG KLEID KLEIN KLIMA KLUFT KNABE KNALL KNOPF KOBRA KOHLE KOMET KOPIE KRAFT KRANZ KRAUT KREBS KREIS KREUZ KRIEG KRONE KUGEL KUNDE KUNST KURVE KÄFER KÖNIG KÜSTE LACHS LADEN LAGER LAMPE LANZE LASER LATTE LAUNE LEBER LEDER LEHRE LEINE LEISE LESEN LESER LICHT LIEBE LILIE LINDE LINIE LINSE LISTE LOBEN LUCHS LUNGE LÖWEN LÜCKE MACHT MAGEN MAKEL MALEN MALER MANGO MARKT MASKE MAUER MEISE MENGE MESSE METER MIETE MILCH MINZE MITTE MONAT MOTOR MUSIK MÖBEL MÖWEN MÜCKE MÜHLE MÜNZE NACHT NADEL NAGEL NARBE NEBEL NEFFE NELKE NIERE NONNE NOTEN NUDEL OASEN ONKEL OPFER ORDEN ORGEL PAKET PALME PANDA PAPST PASTA PAUSE PERLE PFAHL PFEIL PFERD PFLUG PFOTE PFUND PILOT PILZE PIZZA PLATZ POKAL PREIS PRINZ PROBE PUDEL PUDER PUMPE PUPPE QUARK QUOTE RABEN RADAR RASEN RATTE RAUCH RAUPE REBEN REGAL REGEL REGEN REIHE REISE RENTE RIESE RINDE RINGE ROBBE ROLLE ROSEN RUDER RUFEN RUHIG RUNDE RÜBEN SACHE SAGEN SAITE SALAT SALBE SAMEN SANFT SAUNA SCHAF SCHAL SCHUH SCHÖN SEGEL SEIDE SEIFE SEILE SENKE SIRUP SOCKE SOHLE SONNE SORGE SPATZ SPECK SPIEL SPION SPORN SPORT SPOTT STAAT STADT STAHL STALL STAMM STAND STARK STAUB STEIN STERN STIEL STIER STIFT STIRN STOCK STOFF STOLZ STROH STROM STUBE STUHL STURM STÜCK SUMPF SUPPE TAFEL TALER TANNE TANTE TASSE TATZE TAUBE TEICH THRON TIGER TINTE TISCH TITEL TOAST TONNE TORTE TRAUM TREUE TRICK TRITT TROST TRUHE TULPE UHREN VATER VILLA VOGEL WAAGE WABEN WAFFE WAGEN WALZE WANGE WANNE WAREN WATTE WEICH WEIDE WEILE WELLE WELPE WERFT WESPE WESTE WETTE WIESE WINDE WITWE WITZE WOCHE WOLKE WOLLE WUNDE WURST WÄRME WÜRZE WÜSTE ZANGE ZEBRA ZECKE ZEHEN ZEILE ZELLE ZELTE ZIEGE ZWEIG ZWERG ZWIRN".split(" ");
+  const VERSUCHE = 6, LAENGE = 5;
+  const el = (id) => document.getElementById(id);
+
+  // --- Tagesrätsel: für alle gleich, feste gemischte Reihenfolge ---
+  function zufall(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const REIHENFOLGE = (() => { const r = zufall(20261105), a = WOERTER.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; })();
+  function heute() {   // Tagesnummer nach Ortszeit, Tag 1 = 01.11.2026
+    const d = new Date(); return Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 10, 1)) / 864e5) + 1;
+  }
+  const tagesWort = (tag) => REIHENFOLGE[((tag - 1) % REIHENFOLGE.length + REIHENFOLGE.length) % REIHENFOLGE.length];
+
+  // --- Spielstand ---
+  const STANDARD = { statistik: { gespielt: 0, geloest: 0, serie: 0, besteSerie: 0, letzterSieg: 0, versucheSumme: 0, verteilung: [0, 0, 0, 0, 0, 0] },
+                     tag: { nr: 0, versuche: [], fertig: false, geloest: false } };
+  let stand = JSON.parse(JSON.stringify(STANDARD));
+  let modus = "tag", ziel = "", versuche = [], eingabe = "", fertig = false;
+
+  async function speichern() {
+    try { await GameSave.save("stand", stand); }
+    catch (e) { meldung("Nicht gespeichert: " + e.message); }
+  }
+
+  // --- Auswertung ---
+  function bewerten(rate, wort) {
+    const r = Array(LAENGE).fill("weg"), rest = {};
+    for (let i = 0; i < LAENGE; i++) { if (rate[i] === wort[i]) r[i] = "treffer"; else rest[wort[i]] = (rest[wort[i]] || 0) + 1; }
+    for (let i = 0; i < LAENGE; i++) if (r[i] !== "treffer" && rest[rate[i]]) { r[i] = "drin"; rest[rate[i]]--; }
+    return r;
+  }
+
+  // --- Anzeige ---
+  function gitterZeichnen() {
+    const g = el("gitter"); g.replaceChildren();
+    for (let z = 0; z < VERSUCHE; z++) {
+      const zeile = document.createElement("div"); zeile.className = "zeile";
+      const wort = z < versuche.length ? versuche[z] : (z === versuche.length && !fertig ? eingabe : "");
+      const farben = z < versuche.length ? bewerten(versuche[z], ziel) : null;
+      for (let i = 0; i < LAENGE; i++) {
+        const c = document.createElement("div");
+        c.className = "zelle" + (farben ? " " + farben[i] : wort[i] ? " voll" : "");
+        c.textContent = wort[i] || "";
+        zeile.append(c);
+      }
+      g.append(zeile);
+    }
+    tastaturFaerben();
+  }
+  const TASTEN = ["QWERTZUIOPÜ", "ASDFGHJKLÖÄ", "↵YXCVBNM⌫"];
+  function tastaturBauen() {
+    el("tastatur").replaceChildren(...TASTEN.map((reihe) => {
+      const r = document.createElement("div"); r.className = "reihe";
+      for (const t of reihe) {
+        const b = document.createElement("button"); b.type = "button"; b.className = "taste" + (t === "↵" || t === "⌫" ? " breit" : "");
+        b.dataset.t = t; b.textContent = t === "↵" ? "Raten" : t === "⌫" ? "⌫" : t;
+        b.addEventListener("click", () => taste(t)); r.append(b);
+      }
+      return r;
+    }));
+  }
+  function tastaturFaerben() {
+    const rang = { weg: 1, drin: 2, treffer: 3 }, best = {};
+    for (const v of versuche) bewerten(v, ziel).forEach((f, i) => { if ((rang[f] || 0) > (rang[best[v[i]]] || 0)) best[v[i]] = f; });
+    for (const b of el("tastatur").querySelectorAll(".taste")) {
+      const f = best[b.dataset.t]; b.classList.remove("treffer", "drin", "weg"); if (f) b.classList.add(f);
+    }
+  }
+  let meldungTimer;
+  function meldung(text, dauer = 2500) { el("meldung").textContent = text; clearTimeout(meldungTimer); if (dauer) meldungTimer = setTimeout(() => (el("meldung").textContent = ""), dauer); }
+
+  function endeZeigen() {
+    const s = stand.statistik;
+    el("ende").hidden = !fertig;
+    if (!fertig) return;
+    const geloest = versuche[versuche.length - 1] === ziel;
+    el("ende-titel").textContent = geloest ? `Gelöst in ${versuche.length} ${versuche.length === 1 ? "Versuch" : "Versuchen"}!` : `Leider nicht – gesucht war ${ziel}.`;
+    el("nochmal").hidden = modus !== "uebung";
+    el("z-gespielt").textContent = s.gespielt;
+    el("z-quote").textContent = s.gespielt ? Math.round((s.geloest / s.gespielt) * 100) : 0;
+    el("z-serie").textContent = s.serie;
+    el("z-beste").textContent = s.besteSerie;
+    const max = Math.max(1, ...s.verteilung);
+    el("verteilung").replaceChildren(...s.verteilung.map((n, i) => {
+      const z = document.createElement("div"); z.className = "balken";
+      const l = document.createElement("span"); l.textContent = i + 1;
+      const b = document.createElement("i"); b.textContent = n; b.style.width = (n / max) * 85 + "%";
+      if (modus === "tag" && geloest && versuche.length === i + 1) b.className = "heute";
+      z.append(l, b); return z;
+    }));
+    if (modus === "uebung") el("verteilung").replaceChildren();
+  }
+
+  // --- Ablauf ---
+  function taste(t) {
+    if (fertig) return;
+    if (t === "↵" || t === "ENTER") return raten();
+    if (t === "⌫" || t === "BACKSPACE") { eingabe = eingabe.slice(0, -1); return gitterZeichnen(); }
+    if (/^[A-ZÄÖÜ]$/.test(t) && eingabe.length < LAENGE) { eingabe += t; gitterZeichnen(); }
+  }
+  function wackeln() {
+    const z = el("gitter").children[versuche.length]; if (!z) return;
+    z.classList.remove("wackeln"); void z.offsetWidth; z.classList.add("wackeln");
+  }
+  async function raten() {
+    if (eingabe.length < LAENGE) { meldung("Zu kurz – fünf Buchstaben"); return wackeln(); }
+    versuche.push(eingabe); eingabe = "";
+    const geloest = versuche[versuche.length - 1] === ziel;
+    fertig = geloest || versuche.length === VERSUCHE;
+    gitterZeichnen();
+    if (geloest) meldung(["Genial!", "Großartig!", "Stark!", "Sehr gut!", "Gut gemacht!", "Puh, geschafft!"][versuche.length - 1], 0);
+    if (modus !== "tag") { endeZeigen(); return; }
+    stand.tag = { nr: heute(), versuche: versuche.slice(), fertig, geloest };
+    if (fertig) {
+      const s = stand.statistik;
+      s.gespielt++;
+      if (geloest) {
+        s.geloest++; s.versucheSumme += versuche.length; s.verteilung[versuche.length - 1]++;
+        s.serie = s.letzterSieg === heute() - 1 ? s.serie + 1 : 1; s.letzterSieg = heute();
+        s.besteSerie = Math.max(s.besteSerie, s.serie);
+      } else s.serie = 0;
+    }
+    await speichern();
+    if (fertig) {
+      endeZeigen();
+      const s = stand.statistik;
+      try {
+        await GameSave.submitScore({ geloest: s.geloest, serie: s.serie, schnitt: s.geloest ? Math.round((s.versucheSumme / s.geloest) * 100) / 100 : 0 });
+      } catch (e) { meldung("Bestenliste: " + e.message, 4000); }
+    }
+  }
+
+  function tagStarten() {
+    modus = "tag"; ziel = tagesWort(heute()); eingabe = "";
+    const t = stand.tag;
+    if (t.nr === heute()) { versuche = t.versuche.slice(); fertig = t.fertig; } else { versuche = []; fertig = false; }
+    // Serie bricht, wenn gestern nicht gelöst wurde
+    if (stand.statistik.letzterSieg < heute() - 1 && !(t.nr === heute() && t.geloest)) stand.statistik.serie = 0;
+    el("untertitel").textContent = `Rätsel Nr. ${heute()} · ${new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}`;
+    el("modus-tag").classList.add("an"); el("modus-uebung").classList.remove("an");
+    meldung(fertig ? "Das heutige Rätsel hast du schon gespielt – morgen gibt es ein neues." : "", fertig ? 0 : 1);
+    gitterZeichnen(); endeZeigen();
+  }
+  function uebungStarten() {
+    modus = "uebung"; eingabe = ""; versuche = []; fertig = false;
+    do { ziel = WOERTER[Math.floor(Math.random() * WOERTER.length)]; } while (ziel === tagesWort(heute()));
+    el("untertitel").textContent = "Übungsrunde – zählt nicht für Statistik und Bestenliste";
+    el("modus-uebung").classList.add("an"); el("modus-tag").classList.remove("an");
+    meldung("", 1); gitterZeichnen(); endeZeigen();
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.length === 1 ? e.key.toUpperCase() : e.key.toUpperCase();
+    if (k === "ENTER" || k === "BACKSPACE" || /^[A-ZÄÖÜ]$/.test(k)) { e.preventDefault(); taste(k); }
+  });
+  el("modus-tag").addEventListener("click", tagStarten);
+  el("modus-uebung").addEventListener("click", uebungStarten);
+  el("nochmal").addEventListener("click", uebungStarten);
+
+  (async () => {
+    tastaturBauen();
+    try {
+      const { data } = await GameSave.load("stand", { standard: STANDARD });
+      if (data) stand = data;
+    } catch (e) { meldung("Spielstand nicht geladen: " + e.message, 5000); }
+    tagStarten();
+  })();
+  </script>
+</body>
+</html>

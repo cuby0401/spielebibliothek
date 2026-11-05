@@ -69,6 +69,7 @@ async function liste() {
 			div("titel", s.title),
 			div("info", s.live ? `Live · Ordner ${s.ordner} · ${s.live.dateien} Dateien · ${groesse(s.live.bytes)} · geändert ${datum(s.live.geaendert)}`
 				: `Ordner ${s.ordner} · noch nicht veröffentlicht`));
+		if (s.neu) bereich.append(div("info", "Was ist neu: " + s.neu.text));
 		if (s.warning || (s.live && !s.complete)) bereich.append(div("warnung", "⚠ " + (s.warning || "index.html fehlt")));
 
 		if (s.entwurf) {
@@ -76,7 +77,7 @@ async function liste() {
 			testen.href = `${GAMES}/#/entwurf/${encodeURIComponent($("benutzer").textContent)}/${encodeURIComponent(s.ordner)}`;
 			testen.target = "_blank"; testen.rel = "noopener"; testen.className = "knopf klein leise"; testen.textContent = "Testen";
 			bereich.append(div("entwurf-box",
-				span(`Entwurf vom ${datum(s.entwurf.geaendert)} · ${s.entwurf.dateien} Dateien`),
+				span(`Entwurf vom ${datum(s.entwurf.geaendert)} · ${s.entwurf.dateien} Dateien` + (s.neuEntwurf ? ` · Was ist neu: ${s.neuEntwurf.text}` : "")),
 				div("zeile-klein", testen,
 					knopfK("Veröffentlichen", () => {
 						if (!confirm(`Entwurf von „${s.title}“ veröffentlichen? Er ist dann für alle sichtbar; die bisherige Version wird aufgehoben.`)) return;
@@ -124,6 +125,7 @@ function hochladen(datei, ordner) {
 		x.onerror = () => nein(new Error("Verbindung abgebrochen – evtl. ist die Datei größer als 100 MB oder die Sitzung abgelaufen"));
 		const f = new FormData();
 		f.append("datei", datei);
+		f.append("neu", $("neu").value.trim());
 		x.send(f);
 	});
 }

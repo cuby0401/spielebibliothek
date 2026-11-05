@@ -115,6 +115,9 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             "favoriten": [f for f in d.get("favoriten", []) if isinstance(f, str)],
             "grossansicht": d.get("grossansicht") is True,
             "bestenliste": d.get("bestenliste") is not False,
+            # Spiel-ID → „geaendert“ der Version, die der Spieler zuletzt geöffnet hat (Marke „Aktualisiert“)
+            "gesehen": {k: v for k, v in (d.get("gesehen") or {}).items() if isinstance(k, str) and isinstance(v, str)}
+                       if isinstance(d.get("gesehen"), dict) else {},
         }
 
     @app.put("/api/einstellungen")
@@ -129,6 +132,13 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             if not isinstance(fav, list) or len(fav) > 200 or not all(isinstance(f, str) and len(f) <= 100 for f in fav):
                 raise HTTPException(422, "favoriten: Liste von Spiel-IDs")
             d["favoriten"] = list(dict.fromkeys(fav))
+        if "gesehen" in body:   # wird zusammengeführt, nicht ersetzt
+            g = body["gesehen"]
+            if not isinstance(g, dict) or not all(isinstance(k, str) and len(k) <= 100 and isinstance(v, str) and len(v) <= 40
+                                                  for k, v in g.items()):
+                raise HTTPException(422, "gesehen: Objekt Spiel-ID → Zeitpunkt")
+            zusammen = {**d["gesehen"], **g}
+            d["gesehen"] = dict(list(zusammen.items())[-300:])
         for k in ("grossansicht", "bestenliste"):
             if k in body:
                 if not isinstance(body[k], bool):
@@ -170,6 +180,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.get("/api/entwickler/spiele")
     def entwickler_spiele(player: str = Depends(entwickler)):
         statistik = db.spiel_statistik()
+        daumen = db.daumen_zahlen()
         einst = db.spiel_einstellungen()
         fehler = db.fehler_zahlen()
         basis = e.spiele_dir / player
@@ -190,7 +201,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             ergebnis.append({**s, "live": live, "leaderboardSeason": aktuelle_season(sid),
                              "spieler": st.get("spieler", 0), "zuletzt": st.get("zuletzt"), "scores": st.get("scores", 0),
                              "versteckt": einst.get(sid, {}).get("versteckt", False),
-                             "entwurf": entw, "fehler": f_live, "fehlerEntwurf": f_entw})
+                             "entwurf": entw, "fehler": f_live, "fehlerEntwurf": f_entw, "daumen": daumen.get(sid, 0)})
         return ergebnis
 
     @app.post("/api/entwickler/entwurf/{user}/{game}")
@@ -323,11 +334,12 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.get("/api/admin/spiele")
     def admin_spiele(_: str = Depends(admin)):
         statistik = db.spiel_statistik()
+        daumen = db.daumen_zahlen()
         einst = db.spiel_einstellungen()
         fehler = db.fehler_zahlen()
         return [{**s, **{"versteckt": False, "hervorgehoben": False}, **{k: v for k, v in einst.get(s["id"], {}).items() if k != "season"},
                  "leaderboardSeason": aktuelle_season(s["id"]), **statistik.get(s["id"], {"spieler": 0, "zuletzt": None, "scores": 0}),
-                 "fehler": fehler.get(s["id"], {})}
+                 "fehler": fehler.get(s["id"], {}), "daumen": daumen.get(s["id"], 0)}
                 for s in games.alle(e.spiele_dir)]
 
     @app.patch("/api/admin/spiele/{user}/{game}")

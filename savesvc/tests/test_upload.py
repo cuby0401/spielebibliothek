@@ -283,3 +283,21 @@ def test_loeschen_raeumt_alles_weg(uclient, umgebung):
     hoch(c, "weg", "1"); hoch(c, "weg", "2"); hoch(c, "weg", "3", entwurf=True)
     assert c.delete("/api/upload/spiele/weg", headers=c.als()).status_code == 204
     assert not [p for p in (umgebung.spiele / "paul").iterdir() if p.name.startswith("weg")]
+
+
+# ---------- „Was ist neu“ (05.11.2026) ----------
+
+def test_was_ist_neu_wandert_mit_dem_ordner(uclient, umgebung):
+    c = angemeldeter(uclient)
+    basis = umgebung.spiele / "paul"
+    r = c.post("/api/upload/spiele/rennen?entwurf=true", data={"neu": "  Neues   Level 4\n"},
+               files={"datei": ("s.zip", zip_bytes({"index.html": "v2"}), "application/zip")}, headers=c.als())
+    assert r.status_code == 200, r.text
+    s = {x["ordner"]: x for x in c.get("/api/upload/spiele", headers=c.als()).json()}["rennen"]
+    assert s["neuEntwurf"]["text"] == "Neues Level 4" and s["neu"] is None
+    assert c.post("/api/upload/spiele/rennen/veroeffentlichen", headers=c.als()).status_code == 200
+    from savesvc import games
+    assert games.beschreibung(umgebung.spiele, "paul", "rennen")["neu"]["text"] == "Neues Level 4"
+    # ohne Text: keine Datei, die neue Version hat keinen Änderungstext
+    assert hoch(c, "rennen", "v3").status_code == 200
+    assert not (basis / "rennen" / games.NEU_DATEI).exists()

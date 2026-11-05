@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS fehler (
 CREATE TABLE IF NOT EXISTS antraege (
     id INTEGER PRIMARY KEY AUTOINCREMENT, player TEXT NOT NULL, art TEXT NOT NULL, spiel TEXT, text TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'offen', antwort TEXT, erstellt TEXT NOT NULL, geaendert TEXT NOT NULL);
+-- Daumen hoch je Spieler und Spiel (Idee „Bewertung“, 05.11.2026)
+CREATE TABLE IF NOT EXISTS daumen (
+    player TEXT NOT NULL, game TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game));
 """
 
 
@@ -184,6 +187,23 @@ class Datenbank:
             if season is None:
                 return v.execute("DELETE FROM scores WHERE game=?", (game,)).rowcount
             return v.execute("DELETE FROM scores WHERE game=? AND season=?", (game, season)).rowcount
+
+    # --- Daumen hoch ---
+
+    def daumen_setzen(self, player: str, game: str, an: bool) -> None:
+        with self.verbindung() as v:
+            if an:
+                v.execute("INSERT OR IGNORE INTO daumen (player, game, zeit) VALUES (?,?,?)", (player, game, jetzt()))
+            else:
+                v.execute("DELETE FROM daumen WHERE player=? AND game=?", (player, game))
+
+    def daumen_zahlen(self) -> dict[str, int]:
+        with self.verbindung() as v:
+            return dict(v.execute("SELECT game, COUNT(*) FROM daumen GROUP BY game").fetchall())
+
+    def meine_daumen(self, player: str) -> set[str]:
+        with self.verbindung() as v:
+            return {z[0] for z in v.execute("SELECT game FROM daumen WHERE player=?", (player,))}
 
     # --- Einstellungen je Spieler ---
 

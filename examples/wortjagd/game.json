@@ -1,0 +1,16 @@
+{
+  "title": "Wortjagd",
+  "description": "Finde das gesuchte Wort mit fünf Buchstaben in sechs Versuchen. Jeden Tag ein neues Rätsel für alle – dazu ein Übungsmodus.",
+  "thumbnail": "thumb.svg",
+  "saveVersion": 1,
+  "leaderboard": {
+    "enabled": true,
+    "rangiertNach": "geloest",
+    "order": "desc",
+    "spalten": [
+      { "key": "geloest", "label": "Gelöst" },
+      { "key": "serie", "label": "Serie" },
+      { "key": "schnitt", "label": "Ø Versuche", "format": "dezimal" }
+    ]
+  }
+}

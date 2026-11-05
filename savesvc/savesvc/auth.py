@@ -101,6 +101,7 @@ class Pruefer:
         except jwt.PyJWTError as fehler:
             log.info("JWT abgelehnt: %s", fehler)
             raise HTTPException(401, "Anmeldung ungültig") from None
+        request.state.sitzung_bis = daten.get("exp")   # Ende der Cloudflare-Sitzung (Sekunden, UTC)
         email = daten.get("email")
         if not isinstance(email, str) or not email:
             raise HTTPException(401, "keine E-Mail im Token")

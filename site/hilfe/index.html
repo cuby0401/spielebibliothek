@@ -50,6 +50,7 @@
         (Bestenlisten-Einträge bleiben; Seb kann die letzten 5 Stände wiederherstellen).</li>
       <li><strong>Anträge:</strong> Fehler melden, Wunsch / Idee, Spielstand wiederherstellen lassen oder Sonstiges.
         Seb bekommt den Antrag direkt; Status und seine Antwort siehst du unter „Anträge“.</li>
+      <li><strong>👍 neben dem Spieltitel:</strong> zeigt dem Entwickler, dass dir das Spiel gefällt. Nochmal klicken nimmt den Daumen zurück.</li>
       <li><strong>Abmelden:</strong> z. B. an einem fremden Rechner. Danach ist ein neuer E-Mail-Code nötig.</li>
     </ul>
     <div data-rolle="entwickler">
@@ -132,7 +133,27 @@ GameSave.available                               // false beim lokalen Testen</c
       <li><strong>Fehlerberichte:</strong> JavaScript-Fehler, die beim Spielen auftreten, werden automatisch gemeldet – gleiche Fehler zusammengefasst,
         ohne Spielernamen, nur mit Browser und Gerätetyp. Du findest sie unter Menü → Meine Spiele → „Fehlerberichte“ mit Datei, Zeile und Stacktrace.
         Fehler aus dem Entwurf sind extra gekennzeichnet.</li>
+      <li><strong>Was ist neu:</strong> Beim Hochladen kannst du eine Zeile schreiben, was sich geändert hat („Neues Level 4, Sprung-Fehler behoben“).
+        Wer das Spiel schon kennt, sieht dann auf der Kachel „Aktualisiert“ und beim nächsten Öffnen einmal deinen Text.</li>
+      <li><strong>Daumen hoch:</strong> Spieler können dein Spiel mit 👍 bewerten. Die Zahl siehst du unter Menü → Meine Spiele.</li>
     </ul>
+
+    <h2 id="werkzeuge">Fehler suchen mit den Entwicklerwerkzeugen</h2>
+    <p>Dein Spiel läuft in einem eigenen Rahmen von <code>play.cuby0401.uk</code>. Die Entwicklerwerkzeuge des Browsers zeigen trotzdem alles –
+      du musst nur auf den Rahmen umschalten:</p>
+    <ol>
+      <li><strong>Öffnen:</strong> Chrome/Edge: <kbd>F12</kbd> bzw. <kbd>⌥⌘I</kbd> am Mac. Safari: zuerst Einstellungen → Erweitert →
+        „Funktionen für Webentwickler anzeigen“, dann <kbd>⌥⌘C</kbd>. Firefox: <kbd>F12</kbd>.</li>
+      <li><strong>Auf das Spiel umschalten:</strong> Im Reiter <em>Konsole</em> oben links die Auswahl „top“ auf <code>play.cuby0401.uk</code> stellen
+        (Safari: Auswahl über der Konsole, Firefox: Symbol mit dem Rahmen oben rechts). Jetzt siehst du <code>console.log</code> und Fehler deines Spiels
+        und kannst Befehle direkt im Spiel ausführen, z. B. <code>await GameSave.load("spielstand")</code>.</li>
+      <li><strong>Weiße Fläche?</strong> In der Konsole stehen dann meist rote Zeilen:
+        <em>„Refused to load … Content Security Policy“</em> = etwas von einem CDN oder anderen Server (Regel 4),
+        <em>404</em> = Datei fehlt oder absoluter Pfad <code>/…</code> (Regel 2). Der Reiter <em>Netzwerk</em> zeigt, welche Datei fehlt.</li>
+      <li><strong>Speichern prüfen:</strong> Jeder <code>GameSave</code>-Aufruf liefert bei Ablehnung eine Fehlermeldung mit Grund –
+        mit <code>try/catch</code> abfangen und in die Konsole schreiben.</li>
+    </ol>
+    <p class="hinweis">Am besten im <strong>Entwurf</strong> testen: Dort kannst du ausprobieren, ohne Spieler oder Bestenliste zu stören.</p>
 
     <h2 id="updates">Updates: was mit Spielständen passiert</h2>
     <ul>
@@ -234,7 +255,7 @@ const top = await GameSave.leaderboard();
       <dd>Menü → Anträge → „Spielstand wiederherstellen“ – die letzten 5 Stände jedes Spielstands sind gesichert.</dd>
       <div data-rolle="entwickler">
       <dt>Mein Spiel zeigt nur eine weiße Fläche.</dt>
-      <dd>Meist ein absoluter Pfad (<code>/assets/…</code>) oder eine Bibliothek vom CDN. Beides geht hier nicht – siehe Regeln 2 und 4.</dd>
+      <dd>Meist ein absoluter Pfad (<code>/assets/…</code>) oder eine Bibliothek vom CDN. Beides geht hier nicht – siehe Regeln 2 und 4. Die genaue Ursache zeigen die <a href="#werkzeuge">Entwicklerwerkzeuge</a>.</dd>
       <dt>Ein Overlay oder Menü verschwindet nicht.</dt>
       <dd>Siehe die <code>hidden</code>-Zeile im Prompt-Block.</dd>
       <dt>Mein Spielstand ist nach einem Update weg oder kaputt.</dt>
@@ -257,7 +278,11 @@ const top = await GameSave.leaderboard();
       <dt>Ich möchte selbst Spiele bauen.</dt>
       <dd>Sag Seb Bescheid – dann bekommst du ein Upload-Konto, und diese Hilfe zeigt dir alles für Entwickler.</dd>
       <dt>Die Seite sagt „Anmeldung abgelaufen“.</dt>
-      <dd>Nach einer Woche ist ein neuer E-Mail-Code nötig – Seite neu laden.</dd>
+      <dd>Nach einer Woche ist ein neuer E-Mail-Code nötig. Du kannst trotzdem weiterspielen: Dein Fortschritt wird so lange auf diesem Gerät
+        gesichert und nach der nächsten Anmeldung automatisch übertragen – auch wenn du den Tab vorher schließt.
+        Bei „Jetzt neu anmelden“ geht ebenfalls nichts verloren.</dd>
+      <dt>Was bedeutet „Aktualisiert“ auf einer Kachel?</dt>
+      <dd>Das Spiel hat seit deinem letzten Besuch eine neue Version. Was sich geändert hat, siehst du beim Öffnen.</dd>
     </dl>
   </main>
   <script src="/hilfe/hilfe.js?v=__VERSION__"></script>

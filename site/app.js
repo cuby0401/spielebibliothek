@@ -122,6 +122,47 @@ function sortiert(liste) {
 	return liste.slice().sort((a, b) => (fav.has(b.id) - fav.has(a.id)) || (b.hervorgehoben - a.hervorgehoben) || nach(a, b));
 }
 
+// „Aktualisiert“: neue Version seit dem letzten Öffnen bzw. Spielen – nur bei Spielen, die man kennt, höchstens 30 Tage
+const versionsZeit = (spiel) => (spiel.neu && spiel.neu.zeit) || spiel.geaendert;
+function aktualisiert(spiel) {
+	const neu = Date.parse(versionsZeit(spiel) || "");
+	const basis = Date.parse((einstellungen.gesehen || {})[spiel.id] || spiel.zuletztGespielt || "");
+	if (!neu || !basis) return false;
+	return neu > basis && Date.now() - neu < 30 * 864e5;
+}
+
+function alsGesehenMerken(spiel) {
+	const zeit = versionsZeit(spiel);
+	if (!zeit) return;
+	einstellungen.gesehen = { ...(einstellungen.gesehen || {}), [spiel.id]: zeit };
+	Bridge.json("PUT", "/api/einstellungen", { gesehen: { [spiel.id]: zeit } })
+		.then((d) => { einstellungen.gesehen = d.gesehen; })
+		.catch(() => { /* nur eine Marke – nicht schlimm */ });
+}
+
+function daumenZeigen(spiel, entwurf) {
+	const k = el("daumen");
+	k.hidden = !!entwurf;
+	if (entwurf) return;
+	el("daumen-zahl").textContent = spiel.daumen ? String(spiel.daumen) : "";
+	k.classList.toggle("an", !!spiel.meinDaumen);
+	const eigen = spiel.author === ich.player;
+	k.disabled = eigen || !!ich.ansicht;
+	k.title = eigen ? "Eigene Spiele kann man nicht bewerten"
+		: ich.ansicht ? "In der Ansicht als … wird nicht bewertet"
+		: spiel.meinDaumen ? "Daumen zurücknehmen" : "Daumen hoch – zeigt dem Entwickler, dass dir das Spiel gefällt";
+	k.onclick = async () => {
+		try {
+			const d = await Bridge.json("PUT", "/api/daumen/" + spiel.id.split("/").map(encodeURIComponent).join("/"), { an: !spiel.meinDaumen });
+			spiel.meinDaumen = d.an;
+			spiel.daumen = d.daumen;
+			daumenZeigen(spiel, false);
+		} catch (e) {
+			if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Daumen nicht gespeichert: " + e.message);
+		}
+	};
+}
+
 function kachelnZeigen() {
 	el("sortierung").value = einstellungen.sortierung;
 	el("kacheln").replaceChildren(...sortiert(spiele).map(kachel));
@@ -161,12 +202,19 @@ function kachel(spiel) {
 		kachelnZeigen();
 	};
 	bild.append(stern);
-	if (spiel.hervorgehoben || spiel.versteckt) {
-		const marke = document.createElement("span");
-		marke.className = "marke-klein" + (spiel.versteckt ? " versteckt" : "");
-		marke.textContent = spiel.versteckt ? "ausgeblendet" : "Empfohlen";
-		bild.append(marke);
-	}
+	const marken = document.createElement("div");
+	marken.className = "marken";
+	const marke = (text, klasse, titel) => {
+		const m = document.createElement("span");
+		m.className = "marke-klein" + (klasse ? " " + klasse : "");
+		m.textContent = text;
+		if (titel) m.title = titel;
+		marken.append(m);
+	};
+	if (spiel.versteckt) marke("ausgeblendet", "versteckt");
+	else if (spiel.hervorgehoben) marke("Empfohlen");
+	if (aktualisiert(spiel)) marke("Aktualisiert", "aktualisiert", spiel.neu ? "Neu: " + spiel.neu.text : "");
+	if (marken.childElementCount) bild.append(marken);
 
 	const inhalt = document.createElement("div");
 	inhalt.className = "inhalt";
@@ -175,6 +223,13 @@ function kachel(spiel) {
 	const autor = document.createElement("span");
 	autor.className = "autor";
 	autor.textContent = "von " + spiel.author;
+	if (spiel.daumen) {
+		const d = document.createElement("span");
+		d.className = "daumen-zahl";
+		d.textContent = " · 👍 " + spiel.daumen;
+		d.title = spiel.daumen === 1 ? "1 Daumen hoch" : spiel.daumen + "-mal Daumen hoch";
+		autor.append(d);
+	}
 	const text = document.createElement("p");
 	text.className = "beschreibung";
 	text.textContent = spiel.description;
@@ -254,6 +309,14 @@ async function zeigeSpiel(id, entwurfSpiel) {
 			(spiel.spielstaendeKopiert ? "Dein Spielstand wurde als Kopie übernommen. " : "Dein Spielstand im Entwurf ist getrennt vom echten. ") +
 			"Bestenlisten-Einträge werden erst nach dem Veröffentlichen gespeichert. Veröffentlichen auf der Upload-Seite.";
 	}
+	const zeigeNeu = !entwurfSpiel && aktualisiert(spiel) && spiel.neu;
+	el("neu-hinweis").hidden = !zeigeNeu;
+	if (zeigeNeu) {
+		el("neu-text").textContent = "Neu in dieser Version: " + spiel.neu.text;
+		el("neu-zu").onclick = () => { el("neu-hinweis").hidden = true; };
+	}
+	if (!entwurfSpiel) alsGesehenMerken(spiel);
+	daumenZeigen(spiel, entwurfSpiel);
 	aktuellesSpiel = spiel.id;
 	bestenlisteZeigen(spiel);
 	el("spieltitel").textContent = spiel.title;
@@ -326,6 +389,7 @@ function ansichtWechseln(rolle) {
 
 async function start() {
 	Bridge.beiAblauf = () => { el("abgelaufen").hidden = false; };
+	Bridge.beiWieder = () => { el("abgelaufen").hidden = true; };
 	Bridge.beiScore = (id) => {
 		const spiel = spiele.find((s) => s.id === id);
 		if (spiel && aktuellesSpiel === id) bestenlisteZeigen(spiel);
@@ -351,6 +415,7 @@ async function start() {
 		ich = wer;
 		einstellungen = einst;
 		Bridge.spieler = ich.player;
+		Bridge.sitzungBis = ich.sitzungBis;
 		ichSelbst = ich.player;
 		el("benutzer").textContent = ich.player;
 		el("upload-link").hidden = !ich.uploader;
@@ -373,6 +438,12 @@ async function start() {
 
 	window.addEventListener("hashchange", route);
 	route();
+
+	// Was bei abgelaufener Anmeldung zwischengespeichert wurde, jetzt übertragen
+	Bridge.nachreichen().then((n) => {
+		if (n) meldung(n === 1 ? "1 zwischengespeicherte Änderung aus deiner letzten Sitzung wurde übertragen."
+			: n + " zwischengespeicherte Änderungen aus deiner letzten Sitzung wurden übertragen.");
+	});
 }
 
 start();

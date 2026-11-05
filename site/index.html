@@ -37,8 +37,9 @@
   </p>
 
   <p id="abgelaufen" class="abgelaufen" hidden>
-    Deine Anmeldung ist abgelaufen – Spielstände werden gerade nicht gespeichert.
-    <a href="">Seite neu laden</a>
+    Deine Anmeldung ist abgelaufen. Du kannst weiterspielen – dein Fortschritt wird auf diesem Gerät gesichert
+    und nach der nächsten Anmeldung automatisch übertragen.
+    <a href="">Jetzt neu anmelden</a>
   </p>
 
   <main>
@@ -61,9 +62,14 @@
 
     <section id="spielansicht" hidden>
       <p id="entwurf-hinweis" class="entwurf-hinweis" hidden></p>
+      <p id="neu-hinweis" class="neu-hinweis" hidden>
+        <span id="neu-text"></span>
+        <button id="neu-zu" class="neu-zu" type="button" aria-label="Hinweis schließen">×</button>
+      </p>
       <div class="spielleiste">
         <a class="knopf leise" href="#/">← Übersicht</a>
         <h1 id="spieltitel"></h1>
+        <button id="daumen" class="knopf leise daumen" type="button" hidden>👍 <span id="daumen-zahl"></span></button>
         <button id="vollbild" class="knopf" type="button">Vollbild</button>
       </div>
       <div class="spielbereich">
