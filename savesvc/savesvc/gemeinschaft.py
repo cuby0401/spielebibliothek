@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Request
+from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 
 from . import games, rollen, versionen
 
@@ -55,8 +55,26 @@ def registrieren(app: FastAPI, e, db, spieler, spiel, ich_daten, benutzerliste, 
     # ---------- Meldungen (Glocke) ----------
 
     @app.get("/api/meldungen")
-    def meldungen(player: str = Depends(ich_daten)):
-        return db.meldungen(player)
+    def meldungen(player: str = Depends(ich_daten), archiv: bool = Query(False)):
+        return db.meldungen(player, 50 if archiv else 30, archiv)
+
+    @app.post("/api/meldungen/{meldung_id}/archivieren", status_code=204)
+    def archivieren(player: str = Depends(ich_daten), meldung_id: int = P(...)):
+        if not db.meldung_ablegen(player, meldung_id, "archiv"):
+            raise HTTPException(404, "Meldung nicht gefunden")
+
+    @app.post("/api/meldungen/{meldung_id}/zurueck", status_code=204)
+    def zurueckholen(player: str = Depends(ich_daten), meldung_id: int = P(...)):
+        db.meldung_zurueck(player, meldung_id)
+
+    @app.delete("/api/meldungen/{meldung_id}", status_code=204)
+    def loeschen(player: str = Depends(ich_daten), meldung_id: int = P(...)):
+        if not db.meldung_ablegen(player, meldung_id, "geloescht"):
+            raise HTTPException(404, "Meldung nicht gefunden")
+
+    @app.post("/api/meldungen/alle-archivieren")
+    def alle_archivieren(player: str = Depends(ich_daten)):
+        return {"archiviert": db.meldung_ablegen(player, None, "archiv")}
 
     @app.post("/api/meldungen/gelesen", status_code=204)
     def gelesen(player: str = Depends(ich_daten)):
@@ -80,7 +98,7 @@ def registrieren(app: FastAPI, e, db, spieler, spiel, ich_daten, benutzerliste, 
             raise HTTPException(422, f"Erfolg {eid!r} steht nicht in der game.json unter \"erfolge\"")
         neu = db.erfolg_freischalten(player, sp[0], eid)
         if neu and echt(player) and not sp[0].endswith(versionen.ENTWURF):
-            db.melden(player, f"🏆 Erfolg in „{titel(sp[0])}“: {d['titel']}", f"#/spiel/{sp[0]}")
+            db.melden(player, f"Erfolg in „{titel(sp[0])}“: {d['titel']}", f"#/spiel/{sp[0]}")
         return {"neu": neu, "erfolg": d}
 
     # ---------- Profil ----------
@@ -91,9 +109,10 @@ def registrieren(app: FastAPI, e, db, spieler, spiel, ich_daten, benutzerliste, 
             raise HTTPException(404, "Spieler nicht gefunden")
         einst = db.spiel_einstellungen()
         ist_admin = rollen.rolle(e, request, player)["admin"]
+        # Testspiele zählen nie (auch nicht für Admins) – sie sind keine Spiele (E38)
         sichtbar = {s["id"]: s for s in games.alle(e.spiele_dir)
-                    if ist_admin or not (einst.get(s["id"], {}).get("versteckt") or einst.get(s["id"], {}).get("testspiel")
-                                         or einst.get(s["id"], {}).get("offline"))}
+                    if not einst.get(s["id"], {}).get("testspiel")
+                    and (ist_admin or not (einst.get(s["id"], {}).get("versteckt") or einst.get(s["id"], {}).get("offline")))}
         zeit = db.spielzeit_von(name)
         erf: dict[str, list] = {}
         for x in db.erfolge_von(name):
@@ -148,7 +167,7 @@ def registrieren(app: FastAPI, e, db, spieler, spiel, ich_daten, benutzerliste, 
         start = datetime.now(timezone.utc)
         db.sdw_setzen(f"{user}/{game}", start.isoformat(timespec="seconds"),
                       (start + timedelta(days=SDW_TAGE)).isoformat(timespec="seconds"))
-        db.melden("*", f"⭐ Spiel der Woche: „{titel(f'{user}/{game}')}“ – eigene Bestenliste nur für diese Woche", f"#/spiel/{user}/{game}")
+        db.melden("*", f"Spiel der Woche: „{titel(f'{user}/{game}')}“ – eigene Bestenliste nur für diese Woche", f"#/spiel/{user}/{game}")
         return sdw_daten()
 
     @app.delete("/api/admin/spiel-der-woche", status_code=204)

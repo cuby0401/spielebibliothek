@@ -183,3 +183,53 @@ def test_probe_freigabe(umgebung, rsa_schluessel, token):
     assert probe.get("/api/admin/probe", headers=h).json()["freigabe"]["version"] == "1.2.0"
     assert probe.delete("/api/admin/probe/freigeben", headers=h).status_code == 204
     assert not (umgebung.db.parent / "freigabe.json").exists()
+
+
+# ---------- Zentrale 1.3.0: Meldungen ablegen, Verbindungen trennen, Profil ohne Testspiele ----------
+
+def test_meldungen_archivieren_und_loeschen(iclient):
+    c, T = iclient, {"X-Intern-Token": "geheim"}
+    for t in ("eins", "zwei", "drei"):
+        c.post("/intern/meldung", json={"an": "*", "text": "🎮 " + t}, headers=T)
+    p = c.als(PAUL)
+    liste = c.get("/api/meldungen", headers=p).json()["liste"]
+    assert [m["text"] for m in liste] == ["drei", "zwei", "eins"]                  # Emoji am Anfang entfernt
+    assert c.post(f"/api/meldungen/{liste[0]['id']}/archivieren", headers=p).status_code == 204
+    assert c.delete(f"/api/meldungen/{liste[1]['id']}", headers=p).status_code == 204
+    assert [m["text"] for m in c.get("/api/meldungen", headers=p).json()["liste"]] == ["eins"]
+    assert [m["text"] for m in c.get("/api/meldungen?archiv=true", headers=p).json()["liste"]] == ["drei"]
+    assert len(c.get("/api/meldungen", headers=c.als()).json()["liste"]) == 3      # andere Spieler unberührt
+    c.post(f"/api/meldungen/{liste[0]['id']}/zurueck", headers=p)
+    assert c.post("/api/meldungen/alle-archivieren", headers=p).json()["archiviert"] >= 2
+    m = c.get("/api/meldungen", headers=p).json()
+    assert m["liste"] == [] and m["ungelesen"] == 0
+    assert c.delete("/api/meldungen/99999", headers=p).status_code == 404
+
+
+def test_verbindung_trennen(client, token):
+    import time as t
+    alt = {"Cf-Access-Jwt-Assertion": token(email=PAUL), "X-Bibliothek": "1", "User-Agent": "Mozilla/5.0 (iPad) Safari/605"}
+    client.get("/api/me", headers=alt)
+    t.sleep(1.1)                                                                   # neue Anmeldung = anderes iat
+    neu = {"Cf-Access-Jwt-Assertion": token(email=PAUL), "X-Bibliothek": "1", "User-Agent": "Mozilla/5.0 (Macintosh) Chrome/130"}
+    client.get("/api/me", headers=neu)                                           # die Seite ruft /api/me immer zuerst auf
+    liste = client.get("/api/meine/anmeldungen", headers=neu).json()
+    ipad = next(a for a in liste if "iPad" in a["geraet"])
+    jetzt = next(a for a in liste if a["aktuell"])
+    assert client.post("/api/meine/anmeldungen/trennen", json={"sitzung": jetzt["sitzung"]}, headers=neu).status_code == 409
+    assert client.post("/api/meine/anmeldungen/trennen", json={"sitzung": ipad["sitzung"]}, headers=neu).status_code == 204
+    r = client.get("/api/me", headers=alt)
+    assert r.status_code == 401 and r.json()["detail"] == "Sitzung getrennt"
+    assert client.get("/api/me", headers=neu).status_code == 200
+    assert next(a for a in client.get("/api/meine/anmeldungen", headers=neu).json() if "iPad" in a["geraet"])["getrennt"] is True
+    # Admin kann trennen, andere nicht
+    assert client.post("/api/admin/anmeldungen/trennen", json={"player": "paul", "sitzung": jetzt["sitzung"]}, headers=neu).status_code == 403
+    assert client.post("/api/admin/anmeldungen/trennen", json={"player": "paul", "sitzung": jetzt["sitzung"]}, headers=client.als()).status_code == 204
+    assert client.get("/api/me", headers=neu).status_code == 401
+
+
+def test_profil_ohne_testspiele(client):
+    p = client.als(PAUL)
+    client.post("/api/spielzeit/seb/zaehler", json={"sekunden": 60}, headers=p)
+    client.patch("/api/admin/spiele/seb/zaehler", json={"testspiel": True}, headers=client.als())
+    assert client.get("/api/profil/paul", headers=client.als()).json()["spiele"] == []   # auch für Admins nicht

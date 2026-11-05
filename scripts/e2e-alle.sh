@@ -27,7 +27,7 @@ teststand() {
 }
 
 FEHLER=""
-for t in versionierung zentrale-1.1 zentrale-1.2 boese; do
+for t in versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 boese; do
 	echo "→ Ende-zu-Ende: $t"
 	PW=$(teststand)
 	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"

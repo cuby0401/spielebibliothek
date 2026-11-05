@@ -13,7 +13,7 @@
     <nav>
       <a class="knopf leise" id="upload-link" href="https://upload.cuby0401.uk" target="_blank" rel="noopener" hidden>Spiel hochladen</a>
       <div class="menue glocke" id="glocke" hidden>
-        <button id="glocke-knopf" class="knopf leise glocke-knopf" type="button" aria-haspopup="true" aria-label="Meldungen">🔔<span id="glocke-zahl" class="zahl-marke" hidden></span></button>
+        <button id="glocke-knopf" class="knopf leise glocke-knopf" type="button" aria-haspopup="true" aria-label="Meldungen"><span id="glocke-ikon"></span><span id="glocke-zahl" class="zahl-marke" hidden></span></button>
         <div id="glocke-liste" class="menue-liste glocke-liste" hidden></div>
       </div>
       <a class="knopf leise" href="/hilfe/">Hilfe</a>
@@ -25,8 +25,6 @@
         <div id="menue" class="menue-liste" hidden>
           <a href="#/profil">Mein Profil</a>
           <a href="#/einstellungen">Einstellungen</a>
-          <a href="#/spielstaende">Meine Spielstände</a>
-          <a href="#/anmeldungen">Meine Anmeldungen</a>
           <a href="#/meine-spiele" data-rolle="entwickler" hidden>Meine Spiele</a>
           <a href="#/antraege">Anträge</a>
           <a href="/admin/" data-rolle="admin" hidden>Admin-Panel</a>
@@ -84,7 +82,7 @@
         <a class="knopf leise" href="#/">← Übersicht</a>
         <h1 id="spieltitel"></h1>
         <button id="version-knopf" class="version-knopf" type="button" hidden title="Versionsverlauf anzeigen"></button>
-        <button id="daumen" class="knopf leise daumen" type="button" hidden>👍</button>
+        <button id="daumen" class="knopf leise daumen" type="button" hidden></button>
         <button id="vollbild" class="knopf" type="button">Vollbild</button>
       </div>
       <div id="versionen-panel" class="versionen-panel" hidden></div>

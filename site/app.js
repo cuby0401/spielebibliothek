@@ -154,7 +154,7 @@ function daumenEigenschaften(spiel) {
 	const eigen = spiel.author === ich.player;
 	return {
 		gesperrt: eigen || !!ich.ansicht,
-		text: "👍" + (spiel.daumen ? " " + spiel.daumen : "") + (eigen ? " · eigenes Spiel" : ""),
+		text: (spiel.daumen ? String(spiel.daumen) : "") + (eigen ? (spiel.daumen ? " · " : "") + "eigenes Spiel" : ""),
 		titel: eigen ? "Eigene Spiele kann man nicht bewerten – die Zahl zeigt die Daumen der anderen"
 			: ich.ansicht ? "In der Ansicht als … wird nicht bewertet"
 			: spiel.meinDaumen ? "Daumen zurücknehmen" : "Daumen hoch – zeigt dem Entwickler, dass dir das Spiel gefällt",
@@ -224,7 +224,7 @@ function daumenZeigen(spiel, entwurf) {
 	k.hidden = !!entwurf;
 	if (entwurf) return;
 	const d = daumenEigenschaften(spiel);
-	k.textContent = d.text;
+	k.replaceChildren(ikon("daumen"), d.text ? Object.assign(document.createElement("span"), { textContent: d.text }) : "");
 	k.title = d.titel;
 	k.disabled = d.gesperrt;
 	k.classList.toggle("an", !!spiel.meinDaumen);
@@ -344,7 +344,7 @@ function kachel(spiel) {
 	const dd = daumenEigenschaften(spiel);
 	daumen.type = "button";
 	daumen.className = "knopf leise daumen klein" + (spiel.meinDaumen ? " an" : "");
-	daumen.textContent = dd.text.replace(" · eigenes Spiel", "");
+	daumen.replaceChildren(ikon("daumen"), spiel.daumen ? Object.assign(document.createElement("span"), { textContent: String(spiel.daumen) }) : "");
 	daumen.title = dd.titel;
 	daumen.disabled = dd.gesperrt;
 	daumen.onclick = async () => { await daumenUmschalten(spiel); kachelnZeigen(); };
@@ -512,6 +512,7 @@ function route() {
 	if (ent) { letzteRoute = location.hash; return zeigeEntwurf(ent[1], ent[2]); }
 	const m = location.hash.match(/^#\/spiel\/(.+)$/);
 	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1]); }
+	if (/^#\/(spielstaende|anmeldungen)$/.test(location.hash)) { location.replace("#/profil"); return; }
 	const pr = location.hash.match(/^#\/profil(?:\/([a-z0-9][a-z0-9_~-]*))?$/);
 	if (pr) { profilName = pr[1] ? decodeURIComponent(pr[1]) : (ich.ansicht ? `${ich.player}~${ich.ansicht}` : ich.player); return zeigeSeite("profil"); }
 	const s = location.hash.match(/^#\/([a-z-]+)(?:\?.*)?$/);
@@ -580,25 +581,64 @@ function alarmZeigen(wichtige) {
 	box.replaceChildren(titel, ul, zu);
 	box.hidden = false;
 }
+let glockeArchiv = false;
+async function glockeListeZeigen() {
+	const liste = el("glocke-liste");
+	let daten = glockeDaten;
+	if (glockeArchiv) { try { daten = await Bridge.json("GET", "/api/meldungen?archiv=true"); } catch { return; } }
+	const knopf = (text, titel, aktion) => {
+		const b = document.createElement("button");
+		b.type = "button"; b.textContent = text; b.title = titel;
+		b.onclick = async (e) => { e.stopPropagation(); try { await aktion(); } catch { /* egal */ } await glockeLaden(); glockeListeZeigen(); };
+		return b;
+	};
+	const zeilen = daten.liste.map((m) => {
+		const a = document.createElement("a");
+		a.href = m.link || "#/";
+		a.className = (m.neu ? "neu" : "") + (m.wichtig ? " wichtig" : "");
+		const t = document.createElement("span"); t.textContent = m.text;
+		const z = document.createElement("small"); z.className = "leise"; z.textContent = new Date(m.zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+		a.append(t, z);
+		const akt = document.createElement("div");
+		akt.className = "aktionen";
+		akt.append(glockeArchiv
+			? knopf("Zurück", "Zurück in den Eingang", () => Bridge.json("POST", `/api/meldungen/${m.id}/zurueck`))
+			: knopf("Archiv", "Archivieren", () => Bridge.json("POST", `/api/meldungen/${m.id}/archivieren`)),
+			knopf("Löschen", "Endgültig löschen", () => Bridge.json("DELETE", `/api/meldungen/${m.id}`)));
+		const zeile = document.createElement("div");
+		zeile.className = "meldung-zeile";
+		zeile.append(a, akt);
+		return zeile;
+	});
+	const fuss = document.createElement("div");
+	fuss.className = "glocke-fuss";
+	const umschalten = document.createElement("button");
+	umschalten.type = "button";
+	umschalten.textContent = glockeArchiv ? "Zurück zum Eingang" : "Archiv ansehen";
+	umschalten.onclick = (e) => { e.stopPropagation(); glockeArchiv = !glockeArchiv; glockeListeZeigen(); };
+	fuss.append(umschalten);
+	if (!glockeArchiv && daten.liste.length) {
+		const alle = document.createElement("button");
+		alle.type = "button"; alle.textContent = "Alle archivieren";
+		alle.onclick = async (e) => { e.stopPropagation(); await Bridge.json("POST", "/api/meldungen/alle-archivieren").catch(() => {}); await glockeLaden(); glockeListeZeigen(); };
+		fuss.append(alle);
+	}
+	liste.replaceChildren(...(zeilen.length ? zeilen : [Object.assign(document.createElement("span"), {
+		className: "leise leer", textContent: glockeArchiv ? "Archiv ist leer." : "Keine Meldungen." })]), fuss);
+}
 function glockeEinrichten() {
+	el("glocke-ikon").replaceWith(ikon("glocke"));
 	const knopf = el("glocke-knopf"), liste = el("glocke-liste");
 	knopf.onclick = async (e) => {
 		e.stopPropagation();
 		if (!liste.hidden) { liste.hidden = true; return; }
-		liste.replaceChildren(...(glockeDaten.liste.length ? glockeDaten.liste.map((m) => {
-			const a = document.createElement("a");
-			a.href = m.link || "#/";
-			a.className = (m.neu ? "neu" : "") + (m.wichtig ? " wichtig" : "");
-			const t = document.createElement("span"); t.textContent = m.text;
-			const z = document.createElement("small"); z.className = "leise"; z.textContent = new Date(m.zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
-			a.append(t, z);
-			return a;
-		}) : [Object.assign(document.createElement("span"), { className: "leise leer", textContent: "Keine Meldungen." })]));
+		glockeArchiv = false;
+		await glockeListeZeigen();
 		liste.hidden = false;
 		if (glockeDaten.ungelesen) {
 			el("glocke-zahl").hidden = true;
 			el("glocke-knopf").classList.remove("alarm");
-			try { await Bridge.json("POST", "/api/meldungen/gelesen"); glockeDaten.ungelesen = 0; } catch { /* egal */ }
+			try { await Bridge.json("POST", "/api/meldungen/gelesen"); glockeDaten.ungelesen = 0; glockeDaten.wichtigUngelesen = 0; } catch { /* egal */ }
 		}
 	};
 	document.addEventListener("click", (e) => { if (!liste.contains(e.target)) liste.hidden = true; });

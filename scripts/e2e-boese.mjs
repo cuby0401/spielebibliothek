@@ -4,11 +4,13 @@ import { setTimeout as warte } from "node:timers/promises";
 const G = "http://<NAS_GH>:18088";
 const chrome = spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   ["--headless=new", "--remote-debugging-port=9334", `--user-data-dir=${process.argv[2]}/chrome-profil2`, "--no-first-run", "about:blank"], { stdio: "ignore" });
+process.on("exit", () => chrome.kill());   // Chrome nie hängen lassen, auch bei Abbruch
 let ws, nr = 0; const offen = new Map(); const rahmen = [];
 const cdp = (method, params = {}, sessionId) => { const id = ++nr; ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) })); return new Promise((ja) => offen.set(id, ja)); };
 (async () => {
-  await warte(1500);
-  const v = await (await fetch("http://127.0.0.1:9334/json/version")).json();
+  let v = null;   // Chrome braucht unterschiedlich lange zum Start – bis zu 15 s warten
+  for (let i = 0; i < 60 && !v; i++) { await warte(250); v = await fetch("http://127.0.0.1:9334/json/version").then((r) => r.json()).catch(() => null); }
+  if (!v) throw new Error("Chrome startet nicht");
   ws = new WebSocket(v.webSocketDebuggerUrl); await new Promise((r) => ws.addEventListener("open", r));
   ws.addEventListener("message", (m) => { const d = JSON.parse(m.data);
     if (d.id && offen.has(d.id)) { offen.get(d.id)(d.result); offen.delete(d.id); }

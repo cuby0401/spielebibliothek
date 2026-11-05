@@ -5,6 +5,16 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.3.0 – 06.11.2026
+
+- **Geändert:** „Mein Profil“ ist die zentrale Seite mit Spielen, Spielständen und Anmeldungen. „Meine Spielstände“ und „Meine Anmeldungen“ sind aus dem Kontextmenü entfernt, die alten Adressen leiten aufs Profil um.
+- **Neu:** Anmeldungen trennen, einzeln oder „alle anderen Geräte“. Das Gerät wird beim nächsten Klick abgemeldet, der Fortschritt landet vorher im Zwischenspeicher. Admins können Anmeldungen aller Benutzer trennen.
+- **Neu:** Meldungen in der Glocke archivieren, löschen oder alle archivieren. Archivierte lassen sich zurückholen.
+- **Geändert:** Glocke und Daumen als schlichte Symbole statt Emojis, Meldungstexte ohne Emojis.
+- **Geändert:** Größen in passender Einheit (B, KB, MB, GB, TB, PB) statt immer MB.
+- **Behoben:** Das Profil zählte Testspiele (Spike) als gespielte Spiele.
+- **Tests:** E2E-Skripte warten bis zu 15 s auf Chrome und beenden Chrome auch bei Abbruch. Neuer Test `scripts/e2e-zentrale-1.3.mjs`.
+
 ## 1.2.0 – 05.11.2026
 
 Enthält auch 1.1.1, das nicht einzeln ausgeliefert wurde.

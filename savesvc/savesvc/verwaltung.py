@@ -291,7 +291,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                                text("stack", 1500) or None, browser_von(request.headers.get("user-agent", "")))
         # Glocke des Entwicklers: neue Fehlerart in einem veröffentlichten Spiel – höchstens eine Meldung je Spiel und Stunde
         if neu and not game.endswith(versionen.ENTWURF) and not db.wichtig_kuerzlich(user, f"#/meine-spiele?{sid}"):
-            db.melden(user, f"⚠ Neuer Fehler in „{titel_von(sid)}“: {meldung[:120]}" + (f" (Zeile {zahl('zeile')})" if zahl("zeile") else ""),
+            db.melden(user, f"Neuer Fehler in „{titel_von(sid)}“: {meldung[:120]}" + (f" (Zeile {zahl('zeile')})" if zahl("zeile") else ""),
                       f"#/meine-spiele?{sid}", wichtig=True)
 
     @app.get("/api/entwickler/fehler")
@@ -348,10 +348,10 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         # Glocke: Admins bekommen jeden Antrag, Entwickler Fehlermeldungen zu ihren Spielen – beides auffällig
         kurz = " ".join(text.split())[:100]
         for a in sorted(e.admins):
-            db.melden(a, f"📮 Neuer Antrag von {player} ({art}): {kurz}", "/admin/#antraege", wichtig=True)
+            db.melden(a, f"Neuer Antrag von {player} ({art}): {kurz}", "/admin/#antraege", wichtig=True)
         besitzer = spiel.split("/", 1)[0] if spiel and "/" in spiel else None
         if art == "fehler" and besitzer and besitzer != player and besitzer not in e.admins:
-            db.melden(besitzer, f"🐞 {player} meldet einen Fehler in „{titel_von(spiel)}“: {kurz}", "#/meine-spiele", wichtig=True)
+            db.melden(besitzer, f"{player} meldet einen Fehler in „{titel_von(spiel)}“: {kurz}", "#/meine-spiele", wichtig=True)
         from . import waechter
         waechter.ha_senden(e, "antrag", f"Neuer Antrag von {player} ({art}): {kurz}")
         return {"id": aid}
@@ -365,11 +365,43 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.get("/api/meine/anmeldungen")
     def meine_anmeldungen(request: Request, player: str = Depends(spieler)):
         aktuell = (int(getattr(request.state, "sitzung_start", 0) or 0), browser_von(request.headers.get("user-agent", "")))
-        return [{**a, "aktuell": (a["sitzung"], a["geraet"]) == aktuell} for a in db.anmeldungen(player, 50)]
+        getrennt = spieler.getrennt
+        return [{**a, "aktuell": (a["sitzung"], a["geraet"]) == aktuell, "getrennt": (player, a["sitzung"]) in getrennt}
+                for a in db.anmeldungen(player, 50)]
 
     @app.get("/api/admin/anmeldungen")
     def alle_anmeldungen(_: str = Depends(admin)):
-        return db.anmeldungen(None, 200)
+        getrennt = spieler.getrennt
+        return [{**a, "getrennt": (a["player"], a["sitzung"]) in getrennt} for a in db.anmeldungen(None, 200)]
+
+    def trennen(player: str, sitzung, von: str) -> None:
+        if not isinstance(sitzung, int) or isinstance(sitzung, bool) or sitzung <= 0:
+            raise HTTPException(422, "sitzung ungültig")
+        db.sitzung_trennen(player, sitzung, von)
+        spieler.getrennt.add((player, sitzung))
+        log.info("%s hat die Sitzung %s von %s getrennt", von, sitzung, player)
+
+    @app.post("/api/meine/anmeldungen/trennen", status_code=204)
+    def eigene_trennen(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
+        """Eine eigene Anmeldung beenden – das Gerät wird beim nächsten Klick abgemeldet (Zentrale 1.3.0)."""
+        aktuell = int(getattr(request.state, "sitzung_start", 0) or 0)
+        if body.get("alleAnderen") is True:
+            for a in db.anmeldungen(player, 100):
+                if a["sitzung"] and a["sitzung"] != aktuell:
+                    trennen(player, a["sitzung"], player)
+            return
+        if body.get("sitzung") == aktuell:
+            raise HTTPException(409, "Das ist dieses Gerät – zum Abmelden „Abmelden“ benutzen")
+        if not any(a["sitzung"] == body.get("sitzung") for a in db.anmeldungen(player, 100)):
+            raise HTTPException(404, "Anmeldung nicht gefunden")
+        trennen(player, body.get("sitzung"), player)
+
+    @app.post("/api/admin/anmeldungen/trennen", status_code=204)
+    def admin_trennen(player: str = Depends(admin), body: dict[str, Any] = Body(...)):
+        wer = body.get("player")
+        if not isinstance(wer, str) or not any(a["sitzung"] == body.get("sitzung") for a in db.anmeldungen(wer, 100)):
+            raise HTTPException(404, "Anmeldung nicht gefunden")
+        trennen(wer, body.get("sitzung"), player)
 
     # ---------- Probe-Zentrale (E56) ----------
 
@@ -607,6 +639,6 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             raise HTTPException(404, "Antrag nicht gefunden")
         a = db.antrag(antrag_id)
         if a and status != "offen":   # Glocke: Antragsteller erfährt die Antwort (Zentrale 1.2.0)
-            db.melden(a["player"], f"📬 Dein Antrag wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'}"
+            db.melden(a["player"], f"Dein Antrag wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'}"
                                    + (f": {antwort[:120]}" if antwort else ""), "#/antraege")
         return {"ok": True}

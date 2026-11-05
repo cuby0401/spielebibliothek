@@ -141,7 +141,7 @@ async function spieleSeite(c) {
 				}, "gefahr"))));
 	});
 	c.append(h("p", { class: "leise", text: "„Ausblenden“ versteckt ein Spiel in der Übersicht für alle außer dir (die Dateien bleiben unter play erreichbar). „Empfehlen“ heftet es mit Marke nach den Favoriten oben an. „Testspiel“ nimmt es für alle aus der Übersicht – auch für dich; öffnen über „Öffnen“ hier. Für Tutorials und Testwerkzeuge wie Spike, Böse oder die Bestenlisten-Vorlage." }),
-		tabelle(["Spiel", "Spieler", "👍", "Spielzeit", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
+		tabelle(["Spiel", "Spieler", "Daumen", "Spielzeit", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
 	const fehler = await Bridge.json("GET", "/api/entwickler/fehler?alle=true");
 	c.append(h("h2", { text: "Fehlerberichte aller Spiele" }),
 		fehler.length ? tabelle(["Spiel", "Fehler", "Ort", "Anzahl", "Zuletzt", "Browser", ""], fehler.map((f) => h("tr", {},
@@ -269,8 +269,11 @@ async function benutzerMitAnmeldungen(c) {
 	await benutzerSeite(c);
 	const liste = await api("GET", "/anmeldungen");
 	c.append(h("h2", { text: "Letzte Anmeldungen" }),
-		h("p", { class: "leise", text: "Je Cloudflare-Sitzung und Gerät. Unbekanntes Gerät? In Cloudflare Zero Trust → Access → Benutzer die Sitzungen widerrufen. Stadt und Region erscheinen erst mit der Managed Transform „Add visitor location headers“ in Cloudflare, sonst nur das Land." }),
-		liste.length ? anmeldeTabelle(liste, true) : h("p", { class: "leise", text: "Noch keine Anmeldungen aufgezeichnet." }));
+		h("p", { class: "leise", text: "Je Cloudflare-Sitzung und Gerät. Unbekanntes Gerät? „Trennen“ meldet es bei der nächsten Anfrage ab (neuer E-Mail-Code nötig). Stadt und Region erscheinen erst mit der Managed Transform „Add visitor location headers“ in Cloudflare, sonst nur das Land." }),
+		liste.length ? anmeldeTabelle(liste, true, async (a) => {
+			if (!confirm(`Anmeldung von ${a.player} („${a.geraet}“) beenden? Das Gerät wird beim nächsten Klick abgemeldet.`)) return;
+			await api("POST", "/anmeldungen/trennen", { player: a.player, sitzung: a.sitzung }); meldung(`${a.player}: ${a.geraet} getrennt.`); zeigen();
+		}) : h("p", { class: "leise", text: "Noch keine Anmeldungen aufgezeichnet." }));
 }
 
 const SEITEN = { uebersicht, spiele: spieleSeite, benutzer: benutzerMitAnmeldungen, spielstaende: spielstaendeSeite, antraege: antraegeSeite };

@@ -56,7 +56,7 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Nach jeder Änderung an Caddyfile oder Bridge: Testspiel „Böse“ öffnen – alle Angriffe müssen abgewehrt sein.
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
-- Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`.
+- Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`, 1.3 (Profil, Glocke archivieren, Symbole, Größen): `scripts/e2e-zentrale-1.3.mjs`.
 - **Alle Ende-zu-Ende-Tests auf einmal:** `scripts/e2e-alle.sh` (frischer Teststand je Test, ca. 4–8 Min., räumt danach auf). Vor dem Deploy automatisch mit `scripts/deploy.sh --gruendlich`.
 
 ## Probe-Zentrale (E56) – erst testen, dann live

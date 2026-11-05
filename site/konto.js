@@ -25,7 +25,28 @@ function dauer(sek) {
 	return h ? `${h} h ${m} min` : `${m} min`;
 }
 const datumZeit = (iso) => iso ? new Date(iso).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
-const groesse = (b) => b > 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.ceil(b / 1024)) + " KB";
+// Größe lesbar, Einheit passend zur Größe: B, KB, MB, GB, TB, PB (Zentrale 1.3.0)
+function groesse(b) {
+	const einheiten = ["B", "KB", "MB", "GB", "TB", "PB"];
+	let i = 0, n = Math.max(0, Number(b) || 0);
+	while (n >= 1024 && i < einheiten.length - 1) { n /= 1024; i++; }
+	const stellen = i === 0 || n >= 100 ? 0 : n >= 10 ? 1 : 2;
+	return n.toLocaleString("de-DE", { maximumFractionDigits: stellen }) + " " + einheiten[i];
+}
+
+// Icons als SVG statt Emojis (Glocke, Daumen) – feste Zeichenwege, keine fremden Inhalte
+const IKONEN = {
+	glocke: '<path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>',
+	daumen: '<path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3Z"/><path d="M7 11l4-7a2 2 0 0 1 3.2 2.3L13 10h5.3a2 2 0 0 1 2 2.4l-1.3 6A2 2 0 0 1 17 20H7"/>',
+};
+function ikon(name) {
+	const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+	s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "ikon"); s.setAttribute("aria-hidden", "true");
+	s.setAttribute("fill", "none"); s.setAttribute("stroke", "currentColor"); s.setAttribute("stroke-width", "1.8");
+	s.setAttribute("stroke-linecap", "round"); s.setAttribute("stroke-linejoin", "round");
+	s.innerHTML = IKONEN[name];
+	return s;
+}
 const titelVon = (id) => (spiele.find((s) => s.id === id) || {}).title || id;
 
 // ---------- Einstellungen ----------
@@ -53,8 +74,8 @@ SEITEN_REG["einstellungen"] = async (c) => {
 };
 
 // ---------- Meine Spielstände ----------
-SEITEN_REG["spielstaende"] = async (c) => {
-	c.append(h("h1", { text: "Meine Spielstände" }),
+async function spielstaendeAbschnitt(c) {
+	c.append(
 		h("p", { class: "leise", text: "Spielstände liegen auf dem Server und gelten auf allen deinen Geräten. „Neu anfangen“ löscht deine Spielstände für ein Spiel – die letzten 5 Stände bleiben im Verlauf, Seb kann sie wiederherstellen. Deine Bestenlisten-Einträge bleiben." }));
 	const liste = await Bridge.json("GET", "/api/meine/spielstaende");
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spielstände." }));
@@ -68,11 +89,11 @@ SEITEN_REG["spielstaende"] = async (c) => {
 				if (!confirm(`Deine Spielstände für „${s.title}“ löschen und neu anfangen?`)) return;
 				await Bridge.json("DELETE", "/api/meine/spielstaende/" + s.spiel.split("/").map(encodeURIComponent).join("/"));
 				meldung(`Spielstände für „${s.title}“ gelöscht.`);
-				c.replaceChildren(); SEITEN_REG["spielstaende"](c);
+				c.replaceChildren(); spielstaendeAbschnitt(c);
 			} }))));
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
 		h("thead", {}, h("tr", {}, ...["Spiel", "Umfang", "Zuletzt", "Deine Spielzeit", ""].map((t) => h("th", { text: t })))), h("tbody", {}, zeilen))));
-};
+}
 
 // ---------- Meine Spiele (Entwickler) ----------
 SEITEN_REG["meine-spiele"] = async (c) => {
@@ -84,7 +105,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
 	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "👍", "Spielzeit", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
+		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Daumen", "Spielzeit", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((s) => {
 			const [user, ordner] = s.id.split("/");
 			return h("tr", {},
@@ -178,8 +199,9 @@ SEITEN_REG["profil"] = async (c) => {
 			h("div", {}, h("b", { text: dauer(d.sekunden) }), "Spielzeit"),
 			h("div", {}, h("b", { text: String(d.spiele.length) }), "Spiele"),
 			h("div", {}, h("b", { text: String(d.erfolge) }), "Erfolge")));
-	if (!d.spiele.length) return c.append(h("p", { class: "leise", text: "Noch nichts gespielt." }));
-	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
+	c.append(h("h2", { text: "Spiele" }));
+	if (!d.spiele.length) c.append(h("p", { class: "leise", text: "Noch nichts gespielt." }));
+	else c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
 		h("thead", {}, h("tr", {}, ...["Spiel", "Spielzeit", "Platz (aktuelle Season)", "Erfolge"].map((t) => h("th", { text: t })))),
 		h("tbody", {}, d.spiele.map((s) => h("tr", {},
 			h("td", {}, h("a", { href: "#/spiel/" + s.id, text: s.title })),
@@ -187,26 +209,45 @@ SEITEN_REG["profil"] = async (c) => {
 			h("td", { text: s.platz ? s.platz + "." : "–" }),
 			h("td", {}, s.erfolgeGesamt ? `${s.erfolge.length}/${s.erfolgeGesamt}` : "–",
 				s.erfolge.length ? h("div", { class: "leise", text: s.erfolge.map((e) => "🏆 " + e.titel).join(" · ") }) : null)))))));
+	// Nur im eigenen Profil: Spielstände und Anmeldungen (privat)
+	if (!d.ich) return;
+	const spielstaende = h("section", { class: "profil-abschnitt", id: "spielstaende" }, h("h2", { text: "Spielstände" }));
+	const anmeldungen = h("section", { class: "profil-abschnitt", id: "anmeldungen" }, h("h2", { text: "Anmeldungen" }));
+	c.append(spielstaende, anmeldungen);
+	const sInhalt = h("div"), aInhalt = h("div");
+	spielstaende.append(sInhalt); anmeldungen.append(aInhalt);
+	await Promise.all([spielstaendeAbschnitt(sInhalt), anmeldungenAbschnitt(aInhalt)]);
 };
 
-// ---------- Meine Anmeldungen (E55): wo, mit welchem Gerät, wann ----------
-SEITEN_REG["anmeldungen"] = async (c) => {
-	c.append(h("h1", { text: "Meine Anmeldungen" }),
-		h("p", { class: "leise", text: "Jede Anmeldung per E-Mail-Code gilt eine Woche auf einem Gerät. Hier siehst du, wo und mit welchem Gerät du angemeldet warst. Ein Eintrag, den du nicht kennst? Abmelden und Seb Bescheid geben – er kann alle Sitzungen in Cloudflare widerrufen." }));
+// ---------- Anmeldungen (E55) mit „Trennen“ (Zentrale 1.3.0) ----------
+async function anmeldungenAbschnitt(c) {
+	c.append(h("p", { class: "leise", text: "Jede Anmeldung per E-Mail-Code gilt eine Woche auf einem Gerät. „Trennen“ beendet eine Anmeldung: Das Gerät wird beim nächsten Klick abgemeldet und braucht einen neuen Code. Unbekanntes Gerät? Trennen und Seb Bescheid geben." }));
 	const liste = await Bridge.json("GET", "/api/meine/anmeldungen");
 	if (!liste.length) return c.append(h("p", { text: "Noch keine Anmeldungen aufgezeichnet." }));
-	c.append(anmeldeTabelle(liste, false));
-};
+	const neu = async () => { c.replaceChildren(); await anmeldungenAbschnitt(c); };
+	const andere = liste.filter((a) => !a.aktuell && !a.getrennt && a.sitzung);
+	if (andere.length) c.append(h("p", {}, h("button", { type: "button", class: "knopf klein gefahr", text: `Alle anderen Geräte trennen (${andere.length})`,
+		onclick: async () => {
+			if (!confirm("Alle anderen Anmeldungen beenden? Nur dieses Gerät bleibt angemeldet.")) return;
+			await Bridge.json("POST", "/api/meine/anmeldungen/trennen", { alleAnderen: true }); meldung("Alle anderen Geräte getrennt."); neu();
+		} })));
+	c.append(anmeldeTabelle(liste, false, async (a) => {
+		if (!confirm(`Anmeldung „${a.geraet}“ beenden?`)) return;
+		await Bridge.json("POST", "/api/meine/anmeldungen/trennen", { sitzung: a.sitzung }); meldung(`${a.geraet} getrennt.`); neu();
+	}));
+}
 
-function anmeldeTabelle(liste, mitSpieler) {
+function anmeldeTabelle(liste, mitSpieler, trennen) {
 	return h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...[...(mitSpieler ? ["Spieler"] : []), "Gerät", "Ort", "IP", "Angemeldet", "Zuletzt aktiv"].map((t) => h("th", { text: t })))),
+		h("thead", {}, h("tr", {}, ...[...(mitSpieler ? ["Spieler"] : []), "Gerät", "Ort", "IP", "Angemeldet", "Zuletzt aktiv", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((a) => h("tr", {},
 			mitSpieler ? h("td", { text: a.player }) : null,
 			h("td", {}, a.geraet, a.aktuell ? h("span", { class: "status erledigt", text: " dieses Gerät " }) : null),
 			h("td", { text: a.ort || "–" }),
 			h("td", { text: a.ip || "–" }),
 			h("td", { text: a.sitzung ? datumZeit(new Date(a.sitzung * 1000).toISOString()) : "–" }),
-			h("td", { text: datumZeit(a.letzte) }))))));
+			h("td", { text: datumZeit(a.letzte) }),
+			h("td", {}, a.getrennt ? h("span", { class: "status abgelehnt", text: "getrennt" })
+				: trennen && !a.aktuell && a.sitzung ? h("button", { type: "button", class: "knopf klein gefahr", text: "Trennen", onclick: () => trennen(a) }) : null))))));
 }
 

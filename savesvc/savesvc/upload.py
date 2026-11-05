@@ -428,8 +428,8 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         speicher_still("POST", "/intern/meldung", {
             # neues Spiel → alle; Update → nur wer es als Favorit hat (Seb, 05.11.2026)
             "an": "*" if pr["erstveroeffentlichung"] else f"favoriten:{player}/{ordner}", "link": f"#/spiel/{player}/{ordner}",
-            "text": (f"🎮 Neues Spiel: „{titel}“ von {player}" if pr["erstveroeffentlichung"]
-                     else f"🔄 „{titel}“ ist jetzt Version {version}: {' · '.join(aenderungen)[:150]}")})
+            "text": (f"Neues Spiel: „{titel}“ von {player}" if pr["erstveroeffentlichung"]
+                     else f"„{titel}“ ist jetzt Version {version}: {' · '.join(aenderungen)[:150]}")})
         return {"version": version, "eintrag": eintrag, "season": season}
 
     @app.delete("/api/upload/spiele/{ordner}/entwurf", status_code=204)

@@ -61,6 +61,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         sicherung.starten(db, e.backup_ziel, e.backup_uhrzeit)
     benutzerliste = Benutzerliste(e.users_file)
     spieler = Pruefer(e, benutzerliste, schluessel_quelle)
+    spieler.getrennt = db.getrennte_sitzungen()
     app = FastAPI(title="Spielebibliothek – Speicher-Dienst", docs_url=None, redoc_url=None, openapi_url=None)
 
     def spiel(request: Request, user: str = P(...), game: str = P(...), player: str = Depends(spieler)):
@@ -224,7 +225,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
             ueber = {x["player"] for x in vorher if x["rank"] < rang_vorher} & {x["player"] for x in nachher if x["rank"] > rang_nachher}
             for anderer in sorted(ueber):
                 if "~" not in anderer:
-                    db.melden(anderer, f"🏁 {player} hat dich in „{games.beschreibung(e.spiele_dir, *sp[0].split('/', 1))['title']}“ überholt "
+                    db.melden(anderer, f"{player} hat dich in „{games.beschreibung(e.spiele_dir, *sp[0].split('/', 1))['title']}“ überholt "
                                        f"(jetzt Platz {rang_nachher})", f"#/spiel/{sp[0]}")
         return {"season": season}
 

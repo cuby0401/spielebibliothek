@@ -3,7 +3,14 @@
 
 const $ = (id) => document.getElementById(id);
 const API = "/api/upload";
-const groesse = (b) => b > 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.ceil(b / 1024) + " KB";
+// Größe lesbar, Einheit passend zur Größe: B, KB, MB, GB, TB, PB (Zentrale 1.3.0)
+function groesse(b) {
+	const einheiten = ["B", "KB", "MB", "GB", "TB", "PB"];
+	let i = 0, n = Math.max(0, Number(b) || 0);
+	while (n >= 1024 && i < einheiten.length - 1) { n /= 1024; i++; }
+	const stellen = i === 0 || n >= 100 ? 0 : n >= 10 ? 1 : 2;
+	return n.toLocaleString("de-DE", { maximumFractionDigits: stellen }) + " " + einheiten[i];
+}
 const datum = (iso) => new Date(iso).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
 
 function meldung(text, art = "") {

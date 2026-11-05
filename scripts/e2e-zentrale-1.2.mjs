@@ -6,6 +6,7 @@ const G = "http://<NAS_GH>:18088", U = "http://<NAS_UH>:18090";
 const DIR = process.argv[2], PW = process.argv[3];
 const chrome = spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   ["--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${DIR}/chrome-profil`, "--no-first-run", "about:blank"], { stdio: "ignore" });
+process.on("exit", () => chrome.kill());   // Chrome nie hängen lassen, auch bei Abbruch
 let ws, nr = 0; const offen = new Map(); const fehler = []; const ergebnis = [];
 const ok = (bed, text) => { ergebnis.push((bed ? "✓ " : "✗ ") + text); if (!bed) process.exitCode = 1; };
 function cdp(method, params = {}, sessionId) {
@@ -35,8 +36,9 @@ async function updateFensterOeffnen() {
 }
 const dialoge = [];
 (async () => {
-  await warte(1500);
-  const v = await (await fetch("http://127.0.0.1:9333/json/version")).json();
+  let v = null;   // Chrome braucht unterschiedlich lange zum Start – bis zu 15 s warten
+  for (let i = 0; i < 60 && !v; i++) { await warte(250); v = await fetch("http://127.0.0.1:9333/json/version").then((r) => r.json()).catch(() => null); }
+  if (!v) throw new Error("Chrome startet nicht");
   ws = new WebSocket(v.webSocketDebuggerUrl);
   await new Promise((r) => ws.addEventListener("open", r));
   ws.addEventListener("message", (m) => {
@@ -60,7 +62,7 @@ const dialoge = [];
   await eval_(`[...document.querySelectorAll("#tag-filter .tag")][0].click(); true`);
   ok(await eval_(`${kachel("Zähler")}.querySelector(".daumen").disabled`), "Eigenes Spiel: Daumen nur Anzeige");
   await eval_(`${kachel("Rätselspaß")}.querySelector(".daumen").click(); true`);
-  ok(await bis(`${kachel("Rätselspaß")}.querySelector(".daumen").textContent==="👍 1" && ${kachel("Rätselspaß")}.querySelector(".daumen").classList.contains("an")`), "Daumen auf der Kachel gegeben → 👍 1");
+  ok(await bis(`${kachel("Rätselspaß")}.querySelector(".daumen").textContent==="1" && ${kachel("Rätselspaß")}.querySelector(".daumen").classList.contains("an")`), "Daumen auf der Kachel gegeben → 1");
 
   // 2) Spiel der Woche + Glocke
   await eval_(`fetch("/api/admin/spiel-der-woche/paul/raetsel",{method:"PUT",headers:{"X-Bibliothek":"1"}}).then(r=>r.status)`);
@@ -78,7 +80,7 @@ const dialoge = [];
   ok(await eval_(`[...document.getElementById("bl-season").options].some(o=>o.value==="woche")`), "Auswahl enthält „Diese Woche“");
   ok(await eval_(`document.getElementById("toast").textContent.includes("Losgelegt")`), "Einblendung „Erfolg freigeschaltet: Losgelegt“");
   ok(await bis(`document.getElementById("erfolge").textContent.includes("Erfolge 1/2") && document.getElementById("erfolge").textContent.includes("🔒 ???")`), "Erfolge 1/2, geheimer als ???");
-  ok(await eval_(`document.getElementById("daumen").textContent==="👍 1" && !document.getElementById("daumen").disabled`), "Daumen im Spiel zeigt 1");
+  ok(await eval_(`document.getElementById("daumen").textContent==="1" && !document.getElementById("daumen").disabled`), "Daumen im Spiel zeigt 1");
   await gehe(G + "/#/", 2500);
   await warte(1500);
   const sz = await eval_(`fetch("/api/games").then(r=>r.json()).then(l=>l.find(s=>s.id==="paul/raetsel").meineSpielzeit)`);

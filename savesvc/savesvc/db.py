@@ -1,6 +1,7 @@
 """SQLite: Spielstände, Verlauf und Bestenliste."""
 
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -58,6 +59,10 @@ CREATE TABLE IF NOT EXISTS meldungen (
     id INTEGER PRIMARY KEY AUTOINCREMENT, an TEXT NOT NULL, text TEXT NOT NULL, link TEXT, zeit TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS meldungen_an ON meldungen (an, id);
 CREATE TABLE IF NOT EXISTS meldungen_gelesen (player TEXT PRIMARY KEY, bis_id INTEGER NOT NULL);
+-- Zentrale 1.3.0: Meldungen je Spieler archivieren oder löschen (auch solche an alle)
+CREATE TABLE IF NOT EXISTS meldung_status (player TEXT NOT NULL, id INTEGER NOT NULL, status TEXT NOT NULL, PRIMARY KEY (player, id));
+-- Zentrale 1.3.0: getrennte Sitzungen (Anmeldungen, die der Spieler oder ein Admin beendet hat)
+CREATE TABLE IF NOT EXISTS getrennte_sitzungen (player TEXT NOT NULL, sitzung INTEGER NOT NULL, zeit TEXT NOT NULL, von TEXT, PRIMARY KEY (player, sitzung));
 CREATE TABLE IF NOT EXISTS erfolge (
     player TEXT NOT NULL, game TEXT NOT NULL, erfolg TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game, erfolg));
 CREATE TABLE IF NOT EXISTS spiel_der_woche (
@@ -316,18 +321,50 @@ class Datenbank:
             v.execute("INSERT INTO meldungen (an, text, link, zeit, wichtig) VALUES (?,?,?,?,?)", (an, text[:300], link, jetzt(), int(wichtig)))
             v.execute("DELETE FROM meldungen WHERE id NOT IN (SELECT id FROM meldungen ORDER BY id DESC LIMIT 5000)")
 
-    def meldungen(self, player: str, limit: int = 30) -> dict:
+    def meldungen(self, player: str, limit: int = 30, archiv: bool = False) -> dict:
+        """Eingang (ohne archivierte/gelöschte) oder Archiv. Ungelesen zählt nur im Eingang."""
+        filtern = ("AND id IN (SELECT id FROM meldung_status WHERE player=? AND status='archiv')" if archiv
+                   else "AND id NOT IN (SELECT id FROM meldung_status WHERE player=?)")
         with self.verbindung() as v:
             z = v.execute("SELECT bis_id FROM meldungen_gelesen WHERE player=?", (player,)).fetchone()
             bis = z["bis_id"] if z else 0
             liste = [dict(r) for r in v.execute(
-                "SELECT id, text, link, zeit, wichtig FROM meldungen WHERE an IN (?, '*') ORDER BY id DESC LIMIT ?", (player, limit))]
-            neu = v.execute("SELECT COUNT(*) FROM meldungen WHERE an IN (?, '*') AND id > ?", (player, bis)).fetchone()[0]
-            wichtig = v.execute("SELECT COUNT(*) FROM meldungen WHERE an IN (?, '*') AND id > ? AND wichtig=1", (player, bis)).fetchone()[0]
+                f"SELECT id, text, link, zeit, wichtig FROM meldungen WHERE an IN (?, '*') {filtern} ORDER BY id DESC LIMIT ?",
+                (player, player, limit))]
+            eingang = "AND id NOT IN (SELECT id FROM meldung_status WHERE player=?)"
+            neu = v.execute(f"SELECT COUNT(*) FROM meldungen WHERE an IN (?, '*') AND id > ? {eingang}", (player, bis, player)).fetchone()[0]
+            wichtig = v.execute(f"SELECT COUNT(*) FROM meldungen WHERE an IN (?, '*') AND id > ? AND wichtig=1 {eingang}",
+                                (player, bis, player)).fetchone()[0]
         for m in liste:
-            m["neu"] = m["id"] > bis
+            m["neu"] = m["id"] > bis and not archiv
             m["wichtig"] = bool(m["wichtig"])
+            m["text"] = re.sub(r"^[^\w„\"(]+\s*", "", m["text"])   # alte Meldungen mit Emoji am Anfang (vor 1.3.0)
         return {"ungelesen": neu, "wichtigUngelesen": wichtig, "liste": liste}
+
+    def meldung_ablegen(self, player: str, meldung_id: int | None, status: str) -> int:
+        """status 'archiv' oder 'geloescht'. meldung_id None = alle aus dem Eingang archivieren."""
+        with self.verbindung() as v:
+            if meldung_id is None:
+                return v.execute("""INSERT OR IGNORE INTO meldung_status (player, id, status)
+                                    SELECT ?, id, 'archiv' FROM meldungen WHERE an IN (?, '*')""", (player, player)).rowcount
+            if not v.execute("SELECT 1 FROM meldungen WHERE id=? AND an IN (?, '*')", (meldung_id, player)).fetchone():
+                return 0
+            return v.execute("""INSERT INTO meldung_status (player, id, status) VALUES (?,?,?)
+                                ON CONFLICT (player, id) DO UPDATE SET status=excluded.status""", (player, meldung_id, status)).rowcount
+
+    def meldung_zurueck(self, player: str, meldung_id: int) -> None:
+        with self.verbindung() as v:
+            v.execute("DELETE FROM meldung_status WHERE player=? AND id=? AND status='archiv'", (player, meldung_id))
+
+    # --- Getrennte Sitzungen (Zentrale 1.3.0) ---
+
+    def sitzung_trennen(self, player: str, sitzung: int, von: str) -> None:
+        with self.verbindung() as v:
+            v.execute("INSERT OR IGNORE INTO getrennte_sitzungen (player, sitzung, zeit, von) VALUES (?,?,?,?)", (player, sitzung, jetzt(), von))
+
+    def getrennte_sitzungen(self) -> set[tuple[str, int]]:
+        with self.verbindung() as v:
+            return {(z["player"], z["sitzung"]) for z in v.execute("SELECT player, sitzung FROM getrennte_sitzungen")}
 
     def melden_favoriten(self, game: str, text: str, link: str | None = None) -> int:
         """Meldung an alle echten Spieler, die das Spiel als Favorit markiert haben (Updates, Zentrale 1.2.0)."""
@@ -434,7 +471,7 @@ class Datenbank:
         with self.verbindung() as v:
             n = v.execute("DELETE FROM saves WHERE player=?", (player,)).rowcount
             for tabelle in ("save_history", "save_vor_update", "einstellungen", "daumen", "entwurf_tests",
-                            "spielzeit", "erfolge", "meldungen_gelesen"):
+                            "spielzeit", "erfolge", "meldungen_gelesen", "meldung_status"):
                 v.execute(f"DELETE FROM {tabelle} WHERE player=?", (player,))
             v.execute("DELETE FROM meldungen WHERE an=?", (player,))
         return n
