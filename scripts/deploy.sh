@@ -30,6 +30,9 @@ done
 cd "$(dirname "$0")/.."
 export COPYFILE_DISABLE=1 # keine ._-Dateien von macOS
 
+# Versionskennung gegen Browser-/CDN-Cache: Commit plus Zeitstempel, ersetzt __VERSION__ in site/**/*.html
+VERSION="$(git rev-parse --short HEAD)-$(date +%s)"
+
 LISTE=$(git ls-files | grep -v '^examples/' | grep -vx -e '.env' -e 'users.yaml')
 
 echo "→ Stack nach $NAS:$ZIEL"
@@ -45,6 +48,7 @@ tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "
 	done
 	find . -mindepth 1 -type d -empty -delete
 	rm -f .deploy-liste
+	find site -name '*.html' -exec sed -i 's/__VERSION__/$VERSION/g' {} +
 	[ -f .env ] || cp .env.example .env
 	[ -f users.yaml ] || cp users.example.yaml users.yaml
 	# /volume1/docker vererbt per Default-ACL 777 – hier zurücknehmen.
