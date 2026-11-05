@@ -230,10 +230,16 @@ async function zeigeSeite(name) {
 	zurueck.textContent = "←";
 	zurueck.title = letzteRoute.startsWith("#/spiel/") ? "Zurück zum Spiel" : "Zurück zur Übersicht";
 	zurueck.setAttribute("aria-label", zurueck.title);
-	el("seite").replaceChildren(zurueck);
+	el("seite").replaceChildren();
 	meldung("");
 	try { await seiten[name](el("seite")); }
 	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message); }
+	// Pfeil unauffällig links neben die Überschrift der Unterseite
+	const titel = el("seite").querySelector("h1");
+	const kopf = document.createElement("div");
+	kopf.className = "seitenkopf";
+	if (titel) { titel.replaceWith(kopf); kopf.append(zurueck, titel); }
+	else { kopf.append(zurueck); el("seite").prepend(kopf); }
 }
 
 async function zeigeSpiel(id) {
@@ -273,6 +279,7 @@ function route() {
 	zeigeUebersicht();
 }
 
+// Kontextmenü (Menü unter dem Benutzernamen in der Taskleiste)
 function menueEinrichten() {
 	const knopf = el("menue-knopf"), menue = el("menue");
 	knopf.hidden = false;
