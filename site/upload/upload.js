@@ -3,7 +3,7 @@
 
 const $ = (id) => document.getElementById(id);
 const API = "/api/upload";
-// Größe lesbar, Einheit passend zur Größe: B, KB, MB, GB, TB, PB (Zentrale 1.3.0)
+// Größe lesbar, Einheit passend zur Größe: B, KB, MB, GB, TB, PB (Zentrale 1.2.1)
 function groesse(b) {
 	const einheiten = ["B", "KB", "MB", "GB", "TB", "PB"];
 	let i = 0, n = Math.max(0, Number(b) || 0);
@@ -158,7 +158,7 @@ async function liste() {
 	}));
 }
 
-// ---------- Steckbrief: Titel, Beschreibung, Vorschaubild (Zentrale 1.3.0) ----------
+// ---------- Steckbrief: Titel, Beschreibung, Vorschaubild (Zentrale 1.2.1) ----------
 // Gilt sofort, ohne neue Version, und übersteht Updates. Vorrang vor der game.json.
 function steckbriefBereich(s) {
 	const pfad = "/spiele/" + encodeURIComponent(s.ordner);

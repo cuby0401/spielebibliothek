@@ -383,7 +383,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     @app.post("/api/meine/anmeldungen/trennen", status_code=204)
     def eigene_trennen(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
-        """Eine eigene Anmeldung beenden – das Gerät wird beim nächsten Klick abgemeldet (Zentrale 1.3.0)."""
+        """Eine eigene Anmeldung beenden – das Gerät wird beim nächsten Klick abgemeldet (Zentrale 1.2.1)."""
         aktuell = int(getattr(request.state, "sitzung_start", 0) or 0)
         if body.get("alleAnderen") is True:
             for a in db.anmeldungen(player, 100):

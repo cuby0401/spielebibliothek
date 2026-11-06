@@ -1,4 +1,4 @@
-"""Steckbrief (Zentrale 1.3.0): Titel, Beschreibung, Vorschaubild auf der Upload-Seite pflegen."""
+"""Steckbrief (Zentrale 1.2.1): Titel, Beschreibung, Vorschaubild auf der Upload-Seite pflegen."""
 
 import pytest
 

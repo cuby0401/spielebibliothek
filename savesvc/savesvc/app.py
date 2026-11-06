@@ -123,7 +123,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
 
     @app.get("/api/vorschau/{user}/{ordner}")
     def vorschau(_: str = Depends(spieler), user: str = P(...), ordner: str = P(...)):
-        """Vorschaubild aus dem Steckbrief (Zentrale 1.3.0) – nur PNG/JPG/WebP, Art an den ersten Bytes geprüft."""
+        """Vorschaubild aus dem Steckbrief (Zentrale 1.2.1) – nur PNG/JPG/WebP, Art an den ersten Bytes geprüft."""
         if not games.BENUTZER_MUSTER.match(user) or not games.ORDNER_MUSTER.match(ordner):
             raise HTTPException(404, "kein Vorschaubild")
         bild = steckbrief.bild(e.spiele_dir / user, ordner)

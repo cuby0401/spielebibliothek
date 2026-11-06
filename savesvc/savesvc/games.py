@@ -188,7 +188,7 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
 
 
 def _steckbrief_anwenden(b: dict, basis: Path, ordner_name: str) -> dict:
-    """Steckbrief von der Upload-Seite (Zentrale 1.3.0) gilt vor der game.json – auch für Entwurf und alte Versionen."""
+    """Steckbrief von der Upload-Seite (Zentrale 1.2.1) gilt vor der game.json – auch für Entwurf und alte Versionen."""
     from . import steckbrief
     name = re.split(r"~", ordner_name, maxsplit=1)[0]
     sb = steckbrief.lesen(basis, name)

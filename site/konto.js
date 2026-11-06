@@ -25,7 +25,7 @@ function dauer(sek) {
 	return h ? `${h} h ${m} min` : `${m} min`;
 }
 const datumZeit = (iso) => iso ? new Date(iso).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
-// Größe lesbar, Einheit passend zur Größe: B, KB, MB, GB, TB, PB (Zentrale 1.3.0)
+// Größe lesbar, Einheit passend zur Größe: B, KB, MB, GB, TB, PB (Zentrale 1.2.1)
 function groesse(b) {
 	const einheiten = ["B", "KB", "MB", "GB", "TB", "PB"];
 	let i = 0, n = Math.max(0, Number(b) || 0);
@@ -219,7 +219,7 @@ SEITEN_REG["profil"] = async (c) => {
 	await Promise.all([spielstaendeAbschnitt(sInhalt), anmeldungenAbschnitt(aInhalt)]);
 };
 
-// ---------- Anmeldungen (E55) mit „Trennen“ (Zentrale 1.3.0) ----------
+// ---------- Anmeldungen (E55) mit „Trennen“ (Zentrale 1.2.1) ----------
 async function anmeldungenAbschnitt(c) {
 	c.append(h("p", { class: "leise", text: "Jede Anmeldung per E-Mail-Code gilt eine Woche auf einem Gerät. „Trennen“ beendet eine Anmeldung: Das Gerät wird beim nächsten Klick abgemeldet und braucht einen neuen Code. Unbekanntes Gerät? Trennen und Seb Bescheid geben." }));
 	const liste = await Bridge.json("GET", "/api/meine/anmeldungen");

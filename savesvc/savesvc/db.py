@@ -59,9 +59,9 @@ CREATE TABLE IF NOT EXISTS meldungen (
     id INTEGER PRIMARY KEY AUTOINCREMENT, an TEXT NOT NULL, text TEXT NOT NULL, link TEXT, zeit TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS meldungen_an ON meldungen (an, id);
 CREATE TABLE IF NOT EXISTS meldungen_gelesen (player TEXT PRIMARY KEY, bis_id INTEGER NOT NULL);
--- Zentrale 1.3.0: Meldungen je Spieler archivieren oder löschen (auch solche an alle)
+-- Zentrale 1.2.1: Meldungen je Spieler archivieren oder löschen (auch solche an alle)
 CREATE TABLE IF NOT EXISTS meldung_status (player TEXT NOT NULL, id INTEGER NOT NULL, status TEXT NOT NULL, PRIMARY KEY (player, id));
--- Zentrale 1.3.0: getrennte Sitzungen (Anmeldungen, die der Spieler oder ein Admin beendet hat)
+-- Zentrale 1.2.1: getrennte Sitzungen (Anmeldungen, die der Spieler oder ein Admin beendet hat)
 CREATE TABLE IF NOT EXISTS getrennte_sitzungen (player TEXT NOT NULL, sitzung INTEGER NOT NULL, zeit TEXT NOT NULL, von TEXT, PRIMARY KEY (player, sitzung));
 CREATE TABLE IF NOT EXISTS erfolge (
     player TEXT NOT NULL, game TEXT NOT NULL, erfolg TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game, erfolg));
@@ -338,7 +338,7 @@ class Datenbank:
         for m in liste:
             m["neu"] = m["id"] > bis and not archiv
             m["wichtig"] = bool(m["wichtig"])
-            m["text"] = re.sub(r"^[^\w„\"(]+\s*", "", m["text"])   # alte Meldungen mit Emoji am Anfang (vor 1.3.0)
+            m["text"] = re.sub(r"^[^\w„\"(]+\s*", "", m["text"])   # alte Meldungen mit Emoji am Anfang (vor 1.2.1)
         return {"ungelesen": neu, "wichtigUngelesen": wichtig, "liste": liste}
 
     def meldung_ablegen(self, player: str, meldung_id: int | None, status: str) -> int:
@@ -356,7 +356,7 @@ class Datenbank:
         with self.verbindung() as v:
             v.execute("DELETE FROM meldung_status WHERE player=? AND id=? AND status='archiv'", (player, meldung_id))
 
-    # --- Getrennte Sitzungen (Zentrale 1.3.0) ---
+    # --- Getrennte Sitzungen (Zentrale 1.2.1) ---
 
     def sitzung_trennen(self, player: str, sitzung: int, von: str) -> None:
         with self.verbindung() as v:

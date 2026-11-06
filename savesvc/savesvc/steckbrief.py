@@ -1,4 +1,4 @@
-"""Steckbrief eines Spiels (Zentrale 1.3.0): Titel, Beschreibung und Vorschaubild direkt auf der Upload-Seite pflegen.
+"""Steckbrief eines Spiels (Zentrale 1.2.1): Titel, Beschreibung und Vorschaubild direkt auf der Upload-Seite pflegen.
 
 Liegt neben dem Spielordner (wie der Versionsverlauf), damit er Uploads, Veröffentlichen und Zurücksetzen übersteht:
     <entwickler>/.<ordner>.steckbrief.json     {"title": "...", "description": "..."}

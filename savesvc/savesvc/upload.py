@@ -475,7 +475,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         store.ereignis(player, f"auf Version {vid} zurückgesetzt", ordner)
         return {"ok": True, "spielstaende": ergebnis}
 
-    # ---------- Steckbrief: Titel, Beschreibung, Vorschaubild (Zentrale 1.3.0) ----------
+    # ---------- Steckbrief: Titel, Beschreibung, Vorschaubild (Zentrale 1.2.1) ----------
 
     def spiel_basis(player: str, ordner: str) -> Path:
         ziel = ordnerpfad(player, ordner)

@@ -1,4 +1,4 @@
-// Ende-zu-Ende-Test für Zentrale 1.3.0 (Profil mit Spielständen/Anmeldungen, Menü, Glocke archivieren/löschen, SVG statt Emojis, Größen). Wie e2e-zentrale-1.2.mjs.
+// Ende-zu-Ende-Test für Zentrale 1.2.1 (Profil mit Spielständen/Anmeldungen, Menü, Glocke archivieren/löschen, SVG statt Emojis, Größen). Wie e2e-zentrale-1.2.mjs.
 import { spawn } from "node:child_process";
 import { setTimeout as warte } from "node:timers/promises";
 const G = "http://<NAS_GH>:18088", U = "http://<NAS_UH>:18090";

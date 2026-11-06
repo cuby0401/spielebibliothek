@@ -5,7 +5,9 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
-## 1.3.0 – 06.11.2026
+## 1.2.1 – 06.11.2026
+
+Als Bugfix-Update ohne Probe eingespielt (Seb, 06.11.2026). Enthält neben den Fixes auch die neuen Funktionen, die zuerst als 1.3.0 geplant waren.
 
 - **Geändert:** „Mein Profil“ ist die zentrale Seite mit Spielen, Spielständen und Anmeldungen. „Meine Spielstände“ und „Meine Anmeldungen“ sind aus dem Kontextmenü entfernt, die alten Adressen leiten aufs Profil um.
 - **Neu:** Anmeldungen trennen, einzeln oder „alle anderen Geräte“. Das Gerät wird beim nächsten Klick abgemeldet, der Fortschritt landet vorher im Zwischenspeicher. Admins können Anmeldungen aller Benutzer trennen.

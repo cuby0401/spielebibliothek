@@ -185,7 +185,7 @@ def test_probe_freigabe(umgebung, rsa_schluessel, token):
     assert not (umgebung.db.parent / "freigabe.json").exists()
 
 
-# ---------- Zentrale 1.3.0: Meldungen ablegen, Verbindungen trennen, Profil ohne Testspiele ----------
+# ---------- Zentrale 1.2.1: Meldungen ablegen, Verbindungen trennen, Profil ohne Testspiele ----------
 
 def test_meldungen_archivieren_und_loeschen(iclient):
     c, T = iclient, {"X-Intern-Token": "geheim"}

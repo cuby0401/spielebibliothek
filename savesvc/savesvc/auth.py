@@ -111,7 +111,7 @@ class Pruefer:
         if not name:
             log.info("unbekannte E-Mail abgelehnt")
             raise HTTPException(403, "kein Konto in der Spielebibliothek")
-        # „Verbindung trennen“ (Zentrale 1.3.0): diese Anmeldung gilt nicht mehr – die Seite meldet das Gerät ab
+        # „Verbindung trennen“ (Zentrale 1.2.1): diese Anmeldung gilt nicht mehr – die Seite meldet das Gerät ab
         if (name, int(daten.get("iat") or 0)) in self.getrennt:
             raise HTTPException(401, "Sitzung getrennt")
         return name
