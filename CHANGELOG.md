@@ -5,6 +5,13 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.3.0 – 06.11.2026
+
+- **Neu:** Cloudflare-Abgleich. Das Admin-Panel (Reiter Benutzer) zeigt, wer in den Richtlinien „Kollegen“/„Entwickler“ fehlt oder zu viel ist. Der Server bekommt dafür höchstens einen Nur-Lese-Schlüssel. Geschrieben wird nur vom Mac mit `scripts/cloudflare.py abgleichen`: Schlüssel im Schlüsselbund, Anzeige und Bestätigung, Sicherung vorher, Gegenprobe danach. Siehe `docs/cloudflare-abgleich.md`.
+- **Neu:** „noch nie angemeldet“ in der Benutzerliste, wenn jemand weder angemeldet war noch gespielt oder hochgeladen hat. Der typische Fall, wenn der E-Mail-Code nicht ankommt.
+- **Geändert:** Der Wächter schreibt jetzt bei jedem Lauf in die Datenbank und in die Upload-Datenbank (`/intern/gesund`) und prüft, ob der Spieleordner beschreibbar ist. Ein Schreibschutz wie am 06.11.2026 (Fehler 500) wird so nach spätestens 5 Minuten gemeldet.
+- **Tests:** neuer Ende-zu-Ende-Test `scripts/e2e-zentrale-1.3-steckbrief.mjs` (Beschreibung und Vorschaubild, „noch nie angemeldet“, Cloudflare-Hinweis). `E2E_TESTS="…" sh scripts/e2e-alle.sh` führt einzelne Tests aus.
+
 ## 1.2.1 – 06.11.2026
 
 Als Bugfix-Update ohne Probe eingespielt (Seb, 06.11.2026). Enthält neben den Fixes auch die neuen Funktionen, die zuerst als 1.3.0 geplant waren.

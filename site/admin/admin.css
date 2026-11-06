@@ -13,3 +13,5 @@
 .admin .filter label { display: grid; gap: 0.2rem; font-size: 0.85rem; }
 .admin input, .admin select, .admin textarea { font: inherit; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); }
 .hinweis-box { background: var(--flaeche); border-left: 3px solid #e9b949; padding: 0.5rem 0.8rem; border-radius: 4px; margin: 0.6rem 0; }
+/* Zentrale 1.3.0: noch nie angemeldet / fehlt in Cloudflare */
+.tabelle td.warn { color: #e9b949; font-weight: 600; cursor: help; }

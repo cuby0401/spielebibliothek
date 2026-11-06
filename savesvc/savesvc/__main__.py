@@ -4,6 +4,8 @@
   python -m savesvc restore <history-id>
   python -m savesvc backup /data/backup/saves-latest.db
   python -m savesvc reset-leaderboard <benutzer>/<spiel> [--season N]
+  python -m savesvc cloudflare-soll               Welche E-Mails in „Kollegen“/„Entwickler“ gehören (JSON, für scripts/cloudflare.py)
+  python -m savesvc cloudflare-lesetoken          Nur-Lese-Schlüssel von stdin prüfen und nach /data legen (Modus 600)
 
 Im Upload-Container (spielebibliothek-upload):
   python -m savesvc entwickler anlegen <name>     Upload-Konto + Spielordner; Passwort wird EINMAL angezeigt
@@ -35,10 +37,16 @@ def main(argv=None) -> int:
     en = sub.add_parser("entwickler", help="Upload-Konten (nur im Upload-Container)")
     en.add_argument("aktion", choices=["anlegen", "passwort", "sperren", "liste"])
     en.add_argument("name", nargs="?")
+    sub.add_parser("cloudflare-soll", help="Soll-Stand der Cloudflare-Richtlinien als JSON")
+    sub.add_parser("cloudflare-lesetoken", help="Nur-Lese-Schlüssel von stdin hinterlegen")
     a = p.parse_args(argv)
 
     if a.befehl == "entwickler":
         return entwickler(a.aktion, a.name)
+    if a.befehl == "cloudflare-soll":
+        return cloudflare_soll()
+    if a.befehl == "cloudflare-lesetoken":
+        return cloudflare_lesetoken(sys.stdin.read())
 
     db = Datenbank(laden().db_path)
     if a.befehl == "history":
@@ -94,6 +102,49 @@ def entwickler(aktion: str, name: str | None) -> int:
     print(f"Ordner:    {ordner}")
     print()
     print("Passwort jetzt notieren und persönlich weitergeben – es wird nur als Hash gespeichert.")
+    return 0
+
+
+def cloudflare_soll() -> int:
+    import json
+    from . import cloudflare
+    from .auth import Benutzerliste
+    from .verwaltung import UploadDienst
+    e = laden()
+    benutzer = Benutzerliste(e.users_file).alle()
+    entw = {z["player"] for z in UploadDienst(e.upload_url, e.intern_token)("GET", "/intern/entwickler")}
+    s = cloudflare.soll(benutzer, entw)
+    print(json.dumps({"kollegen": sorted(s["kollegen"]), "entwickler": sorted(s["entwickler"]),
+                      "geschuetzt": sorted(m.lower() for m, n in benutzer.items() if n in e.admins),
+                      "richtlinien": {"kollegen": e.richtlinie_kollegen, "entwickler": e.richtlinie_entwickler},
+                      "konto": e.cloudflare_konto}))
+    return 0
+
+
+def cloudflare_lesetoken(text: str) -> int:
+    """Erst ausprobieren, dann speichern – nur für den Speicher-Dienst lesbar (Modus 600)."""
+    import os
+    from . import cloudflare
+    e = laden()
+    schluessel = text.strip()
+    if not 20 <= len(schluessel) <= 200 or any(c.isspace() for c in schluessel):
+        print("Schlüssel sieht nicht richtig aus (eine Zeile, 20–200 Zeichen)", file=sys.stderr)
+        return 2
+    try:
+        anzahl = len(cloudflare.Api(schluessel, e.cloudflare_konto).richtlinien())
+    except cloudflare.CloudflareFehler as f:
+        print(f"Nicht gespeichert: {f}", file=sys.stderr)
+        return 1
+    ziel = e.cloudflare_schluessel
+    tmp = ziel.with_suffix(".tmp")
+    alt = os.umask(0o077)
+    try:
+        tmp.write_text(schluessel + "\n", encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        tmp.replace(ziel)
+    finally:
+        os.umask(alt)
+    print(f"Nur-Lese-Schlüssel gespeichert ({anzahl} Richtlinien lesbar). Das Admin-Panel zeigt den Abgleich ab sofort.")
     return 0
 
 

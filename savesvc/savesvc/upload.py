@@ -59,6 +59,7 @@ class Entwickler:
                 CREATE TABLE IF NOT EXISTS ereignisse (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, zeit TEXT NOT NULL, player TEXT NOT NULL,
                     aktion TEXT NOT NULL, ordner TEXT, dateien INTEGER);
+                CREATE TABLE IF NOT EXISTS waechter_probe (id INTEGER PRIMARY KEY CHECK (id = 1), zeit TEXT NOT NULL);
             """)
 
     @contextmanager
@@ -118,6 +119,11 @@ class Entwickler:
             v.execute("INSERT INTO ereignisse (zeit, player, aktion, ordner, dateien) VALUES (?,?,?,?,?)",
                       (datetime.now(timezone.utc).isoformat(timespec="seconds"), player, aktion, ordner, dateien))
             v.execute("DELETE FROM ereignisse WHERE id NOT IN (SELECT id FROM ereignisse ORDER BY id DESC LIMIT 500)")
+
+    def schreibtest(self) -> None:
+        with self._v() as v:
+            v.execute("INSERT INTO waechter_probe (id, zeit) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET zeit=excluded.zeit",
+                      (datetime.now(timezone.utc).isoformat(timespec="seconds"),))
 
     def ereignisse(self, limit: int = 25) -> list[dict]:
         with self._v() as v:
@@ -591,6 +597,17 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         release.verlauf_loeschen(ziel.parent, ordner)
         steckbrief.alles_loeschen(ziel.parent, ordner)
         store.ereignis(user, "gelöscht (Admin)", ordner)
+
+    @app.get("/intern/gesund", dependencies=[Depends(intern)])
+    def i_gesund():
+        """Für den Wächter (1.3.0): eigene Datenbank wirklich beschreiben, Spieleordner beschreibbar?"""
+        try:
+            store.schreibtest()
+        except sqlite3.Error as f:
+            raise HTTPException(503, f"Upload-Datenbank nicht beschreibbar ({f})") from None
+        if not os.access(e.spiele_dir, os.W_OK):
+            raise HTTPException(503, "Spieleordner nicht beschreibbar – Uploads schlagen fehl")
+        return {"ok": True}
 
     @app.get("/intern/ereignisse", dependencies=[Depends(intern)])
     def i_ereignisse():

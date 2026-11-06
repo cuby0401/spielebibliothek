@@ -63,6 +63,9 @@ services:
       UPLOAD_KONTINGENT_MB: ${UPLOAD_KONTINGENT_MB:-1024}
       # Home Assistant: Wächter (alle 5 Min Lebenszeichen/Probleme) und neue Anträge, siehe docs/home-assistant.md. Leer = aus.
       HA_WEBHOOK_URL: ${HA_WEBHOOK_URL:-}
+      # Cloudflare-Abgleich (nur lesen) im Admin-Panel, siehe docs/cloudflare-abgleich.md. Leer = aus.
+      # Der Nur-Lese-Schlüssel liegt in /data/cloudflare-lesen.token (nur für diesen Dienst lesbar), nie hier oder in .env.
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
       # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
     volumes:
       - /volume1/games/data:/data

@@ -73,6 +73,13 @@ def browser_von(ua: str) -> str:
 
 def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, aktuelle_season, upload: UploadDienst | None = None):
     upload = upload or UploadDienst(e.upload_url, e.intern_token)
+    from . import cloudflare
+    cf_pruefung = cloudflare.Pruefung(e.cloudflare_schluessel, e.cloudflare_konto,
+                                      {"kollegen": e.richtlinie_kollegen, "entwickler": e.richtlinie_entwickler})
+
+    def cf_soll(entw_namen: set[str]) -> dict[str, set[str]]:
+        return cloudflare.soll(benutzerliste.alle(), entw_namen)
+
     waechter_zustand: dict = {"letzterLauf": None, "probleme": [], "homeAssistant": bool(e.ha_webhook), "aktiv": e.waechter}
     if e.waechter:
         from . import waechter
@@ -558,9 +565,26 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                     merken(a.get("player", ""), a.get("zeit"))
         except HTTPException:
             pass
+        # Cloudflare-Abgleich (1.3.0, nur lesen): fehlt jemand in einer Richtlinie, kommt sein Code nie an
+        cf = cf_pruefung.ergebnis(cf_soll(set(entw)))
+        fehlt = {r["art"]: set(r["fehlt"]) for r in cf.get("richtlinien", [])}
         return [{"email": mail, "name": name, "admin": name in e.admins, "ordner": ist_entwickler(name),
-                 "uploadKonto": name in entw, "zuletzt": aktiv.get(name)}
+                 "uploadKonto": name in entw, "zuletzt": aktiv.get(name),
+                 # noch nie angemeldet = keine Anmeldung, kein Spielstand, kein Score, kein Upload (1.3.0)
+                 "nieAngemeldet": name not in aktiv,
+                 "cloudflare": None if not cf.get("richtlinien") else
+                 {"kollegen": mail not in fehlt.get("kollegen", set()),
+                  "entwickler": (mail not in fehlt.get("entwickler", set())) if name in entw else None}}
                 for mail, name in sorted(benutzerliste.alle().items(), key=lambda x: x[1])]
+
+    @app.get("/api/admin/cloudflare")
+    def cloudflare_stand(_: str = Depends(admin), neu: bool = Query(False)):
+        """Vergleich Benutzerliste ↔ Cloudflare-Richtlinien. Liest nur – geändert wird mit scripts/cloudflare.py am Mac."""
+        try:
+            entw = {z["player"] for z in upload("GET", "/intern/entwickler")}
+        except HTTPException as f:
+            return {"eingerichtet": cf_pruefung.eingerichtet(), "fehler": f"Upload-Dienst: {f.detail}", "richtlinien": []}
+        return cf_pruefung.ergebnis(cf_soll(entw), neu=neu)
 
     @app.post("/api/admin/benutzer", status_code=201)
     def benutzer_anlegen(admin_name: str = Depends(admin), body: dict[str, Any] = Body(...)):

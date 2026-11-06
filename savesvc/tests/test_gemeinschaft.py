@@ -138,13 +138,33 @@ def test_waechter_meldet_probleme(monkeypatch, umgebung):
     monkeypatch.setattr(waechter.urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("weg")))
     monkeypatch.setattr(waechter.urllib.request, "build_opener", lambda *a: SimpleNamespace(open=lambda *a, **k: SimpleNamespace(status=302)))
     e = SimpleNamespace(spiele_dir=umgebung.spiele, backup_ziel=None, ha_webhook="")
-    db = SimpleNamespace(zaehlen=lambda: {})
+    db = SimpleNamespace(zaehlen=lambda: {}, schreibtest=lambda: None)
     def upload(*a):
         raise RuntimeError("Upload weg")
     probleme = waechter.pruefen(e, db, upload)
     assert any("Upload-Dienst" in p for p in probleme) and any("Caddy" in p for p in probleme)
+    assert not any("beschreibbar" in p for p in probleme)
     assert not any("außen" in p for p in probleme)                                 # 302 von Cloudflare Access = erreichbar
     waechter.ha_senden(e, "test")                                                     # ohne URL: tut nichts, kein Fehler
+
+
+def test_waechter_merkt_schreibschutz(monkeypatch, umgebung, tmp_path):
+    """06.11.2026: saves.db war schreibgeschützt, Lesen ging weiter – der Wächter muss das merken (1.3.0)."""
+    import sqlite3
+    from types import SimpleNamespace
+    from savesvc import waechter
+    from savesvc.db import Datenbank
+    monkeypatch.setattr(waechter.urllib.request, "urlopen", lambda *a, **k: SimpleNamespace(status=200))
+    monkeypatch.setattr(waechter.urllib.request, "build_opener", lambda *a: SimpleNamespace(open=lambda *a, **k: SimpleNamespace(status=302)))
+    e = SimpleNamespace(spiele_dir=umgebung.spiele, backup_ziel=None, ha_webhook="")
+    db = Datenbank(tmp_path / "w.db")
+    db.schreibtest(); db.schreibtest()                                               # zweimal: Upsert klappt
+    assert waechter.pruefen(e, db, lambda *a: {"ok": True}) == []
+    def schreibgeschuetzt():
+        raise sqlite3.OperationalError("attempt to write a readonly database")
+    monkeypatch.setattr(db, "schreibtest", schreibgeschuetzt)
+    probleme = waechter.pruefen(e, db, lambda *a: {"ok": True})
+    assert len(probleme) == 1 and "nicht beschreibbar" in probleme[0] and "saves.db-wal" in probleme[0]
 
 
 # ---------- Anmeldungen (E55) und Probe-Zentrale (E56) ----------

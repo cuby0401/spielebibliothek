@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS meldungen_gelesen (player TEXT PRIMARY KEY, bis_id IN
 CREATE TABLE IF NOT EXISTS meldung_status (player TEXT NOT NULL, id INTEGER NOT NULL, status TEXT NOT NULL, PRIMARY KEY (player, id));
 -- Zentrale 1.2.1: getrennte Sitzungen (Anmeldungen, die der Spieler oder ein Admin beendet hat)
 CREATE TABLE IF NOT EXISTS getrennte_sitzungen (player TEXT NOT NULL, sitzung INTEGER NOT NULL, zeit TEXT NOT NULL, von TEXT, PRIMARY KEY (player, sitzung));
+-- Zentrale 1.3.0: Wächter schreibt hier alle 5 Minuten – merkt so, wenn die Datenbank schreibgeschützt ist
+CREATE TABLE IF NOT EXISTS waechter_probe (id INTEGER PRIMARY KEY CHECK (id = 1), zeit TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS erfolge (
     player TEXT NOT NULL, game TEXT NOT NULL, erfolg TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game, erfolg));
 CREATE TABLE IF NOT EXISTS spiel_der_woche (
@@ -569,6 +571,11 @@ class Datenbank:
                        SELECT player, game, updated_at AS zeit FROM saves WHERE {ECHT}
                        UNION ALL SELECT player, game, created_at FROM scores WHERE {ECHT})
                    GROUP BY player, game ORDER BY zeit DESC LIMIT ?""".format(ECHT=ECHT), (limit,))]
+
+    def schreibtest(self) -> None:
+        """Für den Wächter: einmal wirklich schreiben (Lesen allein merkt keinen Schreibschutz, siehe 06.11.2026)."""
+        with self.verbindung() as v:
+            v.execute("INSERT INTO waechter_probe (id, zeit) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET zeit=excluded.zeit", (jetzt(),))
 
     def zaehlen(self) -> dict:
         with self.verbindung() as v:

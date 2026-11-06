@@ -169,7 +169,7 @@ async function bestenlisteDetail(c, s) {
 
 // ---------- Benutzer ----------
 async function benutzerSeite(c) {
-	const liste = await api("GET", "/benutzer");
+	const [liste, cf] = await Promise.all([api("GET", "/benutzer"), api("GET", "/cloudflare").catch(() => ({ eingerichtet: false }))]);
 	const passwortZeigen = (name, pw) => {
 		c.prepend(h("div", { class: "karte" }, h("strong", { text: `Upload-Passwort für ${name} (wird nur jetzt angezeigt):` }),
 			h("div", { class: "passwort-box", text: pw }), h("span", { class: "leise", text: "Persönlich weitergeben, nicht per Mail." })));
@@ -187,12 +187,20 @@ async function benutzerSeite(c) {
 		}); } },
 			h("div", { class: "zeile" }, h("label", {}, "E-Mail (Cloudflare-Login) ", mail), h("label", {}, "Benutzername ", name),
 				h("label", { class: "haken" }, entw, "Entwickler (darf hochladen)")),
-			h("div", { class: "hinweis-box", text: "Danach in Cloudflare Zero Trust die E-Mail in die Richtlinie „Kollegen“ eintragen – bei Entwicklern zusätzlich in „Entwickler“. Benutzernamen danach nie mehr ändern." }),
+			h("div", { class: "hinweis-box", text: (cf.eingerichtet
+				? "Danach am Mac „python3 scripts/cloudflare.py abgleichen“ ausführen – das trägt die E-Mail in „Kollegen“ (und bei Entwicklern in „Entwickler“) ein. "
+				: "Danach in Cloudflare Zero Trust die E-Mail in die Richtlinie „Kollegen“ eintragen – bei Entwicklern zusätzlich in „Entwickler“ (oder am Mac: python3 scripts/cloudflare.py abgleichen). ")
+				+ "Ohne diesen Eintrag verschickt Cloudflare keinen Code. Benutzernamen danach nie mehr ändern." }),
 			h("div", {}, h("button", { type: "submit", class: "knopf", text: "Anlegen" }))));
-	c.append(h("h2", { text: "Alle Benutzer" }), tabelle(["Name", "E-Mail", "Rolle", "Zuletzt aktiv", ""], liste.map((b) => h("tr", {},
+	c.append(h("h2", { text: "Alle Benutzer" }), cloudflareBox(cf), tabelle(["Name", "E-Mail", "Rolle", "Zuletzt aktiv", ...(cf.richtlinien && cf.richtlinien.length ? ["Cloudflare"] : []), ""], liste.map((b) => h("tr", {},
 		h("td", {}, h("strong", { text: b.name })), h("td", { text: b.email }),
 		h("td", { text: [b.admin && "Admin", b.uploadKonto && "Entwickler", !b.uploadKonto && b.ordner && "Ordner ohne Upload-Konto", !b.admin && !b.uploadKonto && !b.ordner && "Spieler"].filter(Boolean).join(", ") }),
-		h("td", { text: datumZeit(b.zuletzt) }),
+		b.nieAngemeldet
+			? h("td", { class: "warn", title: "Noch keine Anmeldung, kein Spielstand, kein Upload. Kommt der E-Mail-Code nicht an? Dann fehlt die Adresse meist in der Cloudflare-Richtlinie „Kollegen“ – genau so geschrieben wie hier.", text: "noch nie angemeldet" })
+			: h("td", { text: datumZeit(b.zuletzt) }),
+		...(b.cloudflare ? [h("td", { class: b.cloudflare.kollegen && b.cloudflare.entwickler !== false ? "" : "warn",
+			text: !b.cloudflare.kollegen ? "fehlt in Kollegen" : b.cloudflare.entwickler === false ? "fehlt in Entwickler" : "✓" })]
+			: cf.richtlinien && cf.richtlinien.length ? [h("td", {})] : []),
 		h("td", {}, h("div", { class: "zeile" },
 			b.uploadKonto ? knopf("Neues Passwort", async () => {
 				if (!confirm(`Neues Upload-Passwort für ${b.name}? Das alte gilt sofort nicht mehr.`)) return;
@@ -208,6 +216,22 @@ async function benutzerSeite(c) {
 				if (!confirm(`${b.name} entfernen? Danach kein Zugang mehr zur Bibliothek. Spiele, Spielstände und Scores bleiben.\nIn Cloudflare zusätzlich die E-Mail aus den Richtlinien nehmen und Sitzungen widerrufen.`)) return;
 				await api("DELETE", `/benutzer/${encodeURIComponent(b.name)}`); meldung(`${b.name} entfernt.`); zeigen();
 			}, "gefahr") : null))))));
+}
+
+// Cloudflare-Abgleich (1.3.0): nur anzeigen – geschrieben wird am Mac mit scripts/cloudflare.py (Schreib-Schlüssel nie auf der NAS)
+function cloudflareBox(cf) {
+	if (!cf.eingerichtet) return h("p", { class: "leise", text: "Cloudflare-Abgleich nicht eingerichtet (docs/cloudflare-abgleich.md) – ob die E-Mails in den Cloudflare-Richtlinien stehen, wird nicht geprüft." });
+	if (cf.fehler) return h("div", { class: "hinweis-box", text: "Cloudflare-Abgleich: " + cf.fehler });
+	const zeilen = [];
+	for (const r of cf.richtlinien) {
+		for (const x of r.bedenken) zeilen.push(`${r.name}: ${x}`);
+		for (const m of r.fehlt) zeilen.push(`${r.name}: fehlt ${m} – bekommt keinen Code`);
+		for (const m of r.zuviel) zeilen.push(`${r.name}: ${m} steht nur in Cloudflare, nicht in der Bibliothek`);
+	}
+	if (!zeilen.length) return h("p", { class: "leise", text: "✓ Cloudflare-Richtlinien passen zur Benutzerliste." });
+	return h("div", { class: "hinweis-box" }, h("strong", { text: "Cloudflare passt nicht zur Benutzerliste:" }),
+		h("ul", {}, ...zeilen.map((z) => h("li", { text: z }))),
+		h("span", { class: "leise", text: "Beheben am Mac: python3 scripts/cloudflare.py abgleichen (Entfernen nur mit --entfernen). Stand: alle 5 Minuten neu gelesen." }));
 }
 
 // ---------- Spielstände ----------

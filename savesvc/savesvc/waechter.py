@@ -8,7 +8,7 @@ Home Assistant bekommt über einen Webhook (HA_WEBHOOK_URL in der .env):
     {"art": "antrag", "text": "..."}                                 bei jedem neuen Antrag (aus verwaltung.py)
 Die passende Automation steht in docs/home-assistant.md.
 
-Geprüft wird: Datenbank, Upload-Dienst, Caddy (intern), Erreichbarkeit von außen über Cloudflare, freier Speicher,
+Geprüft wird: Datenbank (lesen und schreiben, seit 1.3.0), Upload-Dienst (inkl. Schreiben), Caddy (intern), Erreichbarkeit von außen über Cloudflare, freier Speicher,
 Alter der nächtlichen Datenbank-Kopie fürs Backup. Ohne HA_WEBHOOK_URL läuft der Wächter trotzdem – das Ergebnis
 steht dann nur im Admin-Panel.
 """
@@ -53,9 +53,14 @@ def pruefen(e, db, upload) -> list[str]:
     except Exception as f:   # noqa: BLE001
         probleme.append(f"Datenbank: {f}")
     try:
-        upload("GET", "/intern/entwickler")
+        db.schreibtest()
     except Exception as f:   # noqa: BLE001
-        probleme.append(f"Upload-Dienst antwortet nicht ({getattr(f, 'detail', f)})")
+        probleme.append(f"Datenbank nicht beschreibbar ({f}) – Spielstände gehen verloren. Besitzer/Rechte der Dateien "
+                        "in /volume1/games/data prüfen (auch saves.db-wal und saves.db-shm)")
+    try:
+        upload("GET", "/intern/gesund")
+    except Exception as f:   # noqa: BLE001
+        probleme.append(f"Upload-Dienst: {getattr(f, 'detail', f)}")
     try:
         r = urllib.request.urlopen(urllib.request.Request("http://caddy:8080/zentrale.json",
                                                           headers={"Host": "games.cuby0401.uk"}), timeout=10)

@@ -56,7 +56,7 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Nach jeder Änderung an Caddyfile oder Bridge: Testspiel „Böse“ öffnen – alle Angriffe müssen abgewehrt sein.
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
-- Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`, 1.3 (Profil, Glocke archivieren, Symbole, Größen): `scripts/e2e-zentrale-1.3.mjs`.
+- Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`, 1.2.1 (Profil, Glocke archivieren, Symbole, Größen): `scripts/e2e-zentrale-1.3.mjs`, 1.3.0 (Beschreibung und Vorschaubild, „noch nie angemeldet“, Cloudflare-Hinweis): `scripts/e2e-zentrale-1.3-steckbrief.mjs`. Einzelne Tests: `E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh`.
 - **Alle Ende-zu-Ende-Tests auf einmal:** `scripts/e2e-alle.sh` (frischer Teststand je Test, ca. 4–8 Min., räumt danach auf). Vor dem Deploy automatisch mit `scripts/deploy.sh --gruendlich`.
 
 ## Probe-Zentrale (E56) – erst testen, dann live
@@ -92,3 +92,6 @@ Technisch ist die Probe derselbe Aufbau wie der Teststand (`scripts/teststand.sh
 
 Wächter und Anträge melden sich per Webhook (`HA_WEBHOOK_URL` in der `.env`). Einrichtung mit Automationen zum Einfügen: `docs/home-assistant.md`.
 
+## Cloudflare-Abgleich
+
+Richtlinien „Kollegen“/„Entwickler“ ↔ Benutzerliste: Prüfen im Admin-Panel (Nur-Lese-Schlüssel auf der NAS), Schreiben nur am Mac mit `python3 scripts/cloudflare.py abgleichen` (Schreib-Schlüssel im Schlüsselbund). Warum so und wie einrichten: `docs/cloudflare-abgleich.md`. **Live-Datenbank nie mit `sqlite3` auf dem NAS-Host öffnen**, nur per `docker exec` im Container (sonst gehören die WAL-Dateien dem falschen Benutzer → Fehler 500, 06.11.2026).

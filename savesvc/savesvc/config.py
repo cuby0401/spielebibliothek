@@ -23,6 +23,11 @@ class Einstellungen:
     probe: bool = False                     # Probe-Zentrale (Kopie zum Testen vor dem Live-Gang, E56)
     zentrale_commit: str = ""
     zentrale_version: str = ""
+    # Cloudflare-Abgleich (Zentrale 1.3.0): nur lesen, siehe cloudflare.py und docs/cloudflare-abgleich.md
+    cloudflare_konto: str = ""                                  # Account-ID (nicht geheim); leer = aus
+    cloudflare_schluessel: Path = Path("/data/cloudflare-lesen.token")
+    richtlinie_kollegen: str = "Kollegen"
+    richtlinie_entwickler: str = "Entwickler"
 
     @property
     def jwks_url(self) -> str:
@@ -55,4 +60,8 @@ def laden() -> Einstellungen:
         probe=os.environ.get("PROBE", "0") == "1",
         zentrale_commit=os.environ.get("ZENTRALE_COMMIT", ""),
         zentrale_version=os.environ.get("ZENTRALE_VERSION", ""),
+        cloudflare_konto=os.environ.get("CF_ACCOUNT_ID", "").strip(),
+        cloudflare_schluessel=Path(os.environ.get("CF_LESE_SCHLUESSEL", "/data/cloudflare-lesen.token")),
+        richtlinie_kollegen=os.environ.get("CF_RICHTLINIE_KOLLEGEN", "Kollegen"),
+        richtlinie_entwickler=os.environ.get("CF_RICHTLINIE_ENTWICKLER", "Entwickler"),
     )

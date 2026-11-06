@@ -424,3 +424,19 @@ def test_speicher_kontingent(uclient, umgebung, monkeypatch):
     assert hoch(c, "klein").status_code == 200
     s = liste(c)["klein"]["speicher"]
     assert s["entwurf"] > 0 and s["live"] == 0 and s["versionen"] == 0
+
+
+def test_intern_gesund(uclient, monkeypatch):
+    monkeypatch.setenv("INTERN_TOKEN", "")
+    assert uclient.get("/intern/gesund").status_code == 403                    # ohne Token nie
+
+
+def test_intern_gesund_mit_token(umgebung, rsa_schluessel, tmp_path, monkeypatch):
+    monkeypatch.setenv("INTERN_TOKEN", "t" * 32)
+    e = Einstellungen(team_domain=TEAM, audience=AUD_UPLOAD, users_file=umgebung.users,
+                      spiele_dir=umgebung.spiele, db_path=tmp_path / "unbenutzt.db", dev_user=None)
+    (tmp_path / "ud").mkdir()
+    app = up.erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key()), daten=tmp_path / "ud", speicher=FalscherSpeicher())
+    c = TestClient(app)
+    assert c.get("/intern/gesund", headers={"X-Intern-Token": "t" * 32}).json() == {"ok": True}
+    assert c.get("/intern/gesund", headers={"X-Intern-Token": "falsch"}).status_code == 403
