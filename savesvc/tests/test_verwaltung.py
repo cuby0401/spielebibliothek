@@ -117,6 +117,15 @@ def test_benutzer_anlegen_und_entfernen(client, umgebung, upload):
     assert ("DELETE", "/intern/entwickler/emil", None) in upload.aufrufe
 
 
+def test_zuletzt_aktiv_auch_ohne_spielstand(client, upload):
+    """Paul hat nur hochgeladen, Eli sich nur umgesehen – beide waren aktiv (06.11.2026)."""
+    liste = {b["name"]: b for b in client.get("/api/admin/benutzer", headers=client.als()).json()}
+    assert liste["paul"]["zuletzt"] == "2026-11-05T10:00:00+00:00"          # aus Upload-Ereignis
+    client.get("/api/me", headers=client.als(PAUL))                          # Anmeldung, jetzt
+    liste = {b["name"]: b for b in client.get("/api/admin/benutzer", headers=client.als()).json()}
+    assert liste["paul"]["zuletzt"] > "2026-11-05T10:00:00+00:00"            # Anmeldung ist später
+
+
 def test_admin_spielstand_verlauf_wiederherstellen(client):
     h = client.als(PAUL)
     client.put("/api/save/seb/zaehler/stand", json={"data": {"zahl": 1}}, headers=h)

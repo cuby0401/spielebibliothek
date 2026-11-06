@@ -13,6 +13,7 @@ Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 - **Geändert:** Glocke und Daumen als schlichte Symbole statt Emojis, Meldungstexte ohne Emojis.
 - **Geändert:** Größen in passender Einheit (B, KB, MB, GB, TB, PB) statt immer MB.
 - **Behoben:** Das Profil zählte Testspiele (Spike) als gespielte Spiele.
+- **Behoben:** „Zuletzt aktiv“ im Admin-Panel (Benutzer) zählte nur Spielstände und Scores. Jetzt zählen auch Anmeldungen und Uploads, sonst stand bei Entwicklern, die nur hochladen, und bei Spielern, die sich nur umsehen, „–“.
 - **Tests:** E2E-Skripte warten bis zu 15 s auf Chrome und beenden Chrome auch bei Abbruch. Neuer Test `scripts/e2e-zentrale-1.3.mjs`.
 
 ## 1.2.0 – 05.11.2026

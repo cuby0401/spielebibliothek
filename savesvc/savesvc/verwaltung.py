@@ -540,9 +540,24 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             entw = {z["player"]: z for z in upload("GET", "/intern/entwickler")}
         except HTTPException:
             entw = {}
+        # „Zuletzt aktiv“ = das Späteste aus Spielständen/Scores, Anmeldungen (auch reines Umsehen) und
+        # Upload-Ereignissen – wer nur hochlädt oder nur schaut, war trotzdem aktiv (06.11.2026)
         aktiv: dict[str, str] = {}
+
+        def merken(name: str, zeit: str | None) -> None:
+            if name and zeit and zeit > aktiv.get(name, ""):
+                aktiv[name] = zeit
+
         for a in db.letzte_aktivitaet(1000):
-            aktiv.setdefault(a["player"], a["zeit"])
+            merken(a["player"], a["zeit"])
+        for a in db.anmeldungen(limit=1000):
+            merken(a["player"], a["letzte"])
+        try:
+            for a in upload("GET", "/intern/ereignisse"):
+                if isinstance(a, dict):
+                    merken(a.get("player", ""), a.get("zeit"))
+        except HTTPException:
+            pass
         return [{"email": mail, "name": name, "admin": name in e.admins, "ordner": ist_entwickler(name),
                  "uploadKonto": name in entw, "zuletzt": aktiv.get(name)}
                 for mail, name in sorted(benutzerliste.alle().items(), key=lambda x: x[1])]
