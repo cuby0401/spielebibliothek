@@ -138,11 +138,11 @@ def test_pruefung(tmp_path):
 def test_admin_ohne_cloudflare(client, upload):  # noqa: F811
     assert client.get("/api/admin/cloudflare", headers=client.als()).json() == {"eingerichtet": False}
     assert client.get("/api/admin/cloudflare", headers=client.als("paul@example.com")).status_code == 403
-    liste = {b["name"]: b for b in client.get("/api/admin/benutzer", headers=client.als()).json()}
+    liste = {b["name"]: b for b in client.get("/api/admin/personen", headers=client.als()).json()["personen"]}
     assert liste["seb"]["cloudflare"] is None
     assert liste["seb"]["nieAngemeldet"] is True                                  # noch nichts getan
     client.get("/api/me", headers=client.als())
-    liste = {b["name"]: b for b in client.get("/api/admin/benutzer", headers=client.als()).json()}
+    liste = {b["name"]: b for b in client.get("/api/admin/personen", headers=client.als()).json()["personen"]}
     assert liste["seb"]["nieAngemeldet"] is False
     assert liste["paul"]["nieAngemeldet"] is False                              # hat hochgeladen (Upload-Ereignis)
 

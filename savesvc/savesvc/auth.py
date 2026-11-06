@@ -57,7 +57,10 @@ class Benutzerliste:
         zeilen = "".join(f"{yaml.safe_dump({e: n}, allow_unicode=True).strip()}\n" for e, n in sorted(zuordnung.items(), key=lambda x: x[1]))
         tmp = self.pfad.with_name(f".{self.pfad.name}.neu")
         tmp.write_text(kopf + zeilen, encoding="utf-8")
-        os.chmod(tmp, 0o660)   # Gruppenbits = ACL-Maske: Sebi und der Upload-Dienst behalten ihre Rechte
+        # Gruppenbits = ACL-Maske: Sebi und der Upload-Dienst behalten ihre Rechte (live per ACL). „other“ darf lesen,
+        # damit der Upload-Dienst die Datei auch dort lesen kann, wo es keine ACL gibt (Teststand, Probe) – den Zugriff
+        # von außen verhindert der Ordner config/ (live 770).
+        os.chmod(tmp, 0o664)
         tmp.replace(self.pfad)
         with self._sperre:
             self._stand = None
@@ -109,6 +112,13 @@ class Pruefer:
             raise HTTPException(401, "keine E-Mail im Token")
         name = self.benutzerliste.benutzer(email)
         if not name:
+            # CRM (1.4.0): gesperrte Personen bekommen den Grund zu sehen – die Sperre wirkt sofort
+            gesperrt = getattr(self.benutzerliste, "gesperrt", None)
+            sperre = gesperrt(email) if gesperrt else None
+            if sperre and sperre["status"] == "gesperrt":
+                log.info("gesperrte Person abgelehnt")
+                raise HTTPException(403, "Konto gesperrt" + (f": {sperre['grund']}" if sperre.get("grund") else "")
+                                    + (f" (bis {sperre['bis'][:16].replace('T', ' ')} UTC)" if sperre.get("bis") else ""))
             log.info("unbekannte E-Mail abgelehnt")
             raise HTTPException(403, "kein Konto in der Spielebibliothek")
         # „Verbindung trennen“ (Zentrale 1.2.1): diese Anmeldung gilt nicht mehr – die Seite meldet das Gerät ab

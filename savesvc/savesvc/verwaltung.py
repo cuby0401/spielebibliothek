@@ -343,7 +343,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     @app.post("/api/entwickler/season/{user}/{game}")
     def neue_season(player: str = Depends(entwickler), user: str = P(...), game: str = P(...)):
-        if user != player and player not in e.admins:
+        if user != player and player not in rollen.admins(e):
             raise HTTPException(403, "nur für eigene Spiele")
         sid, _ = spiel_id(user, game)
         neu = aktuelle_season(sid) + 1
@@ -383,7 +383,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                 db.melden(besitzer, f"Antrag zu „{titel_von(spiel)}“ von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}",
                           wichtig=(art == "fehler"))
             return {"id": aid, "an": besitzer}
-        for a in sorted(e.admins):
+        for a in sorted(rollen.admins(e)):
             db.melden(a, f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}", wichtig=True)
         from . import waechter
         waechter.ha_senden(e, "antrag", f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}")
@@ -620,7 +620,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         except HTTPException as f:
             ereignisse = [{"fehler": f.detail}]
         return {
-            "spieler": len(benutzerliste.alle()),
+            "spieler": len(set(benutzerliste.alle().values())),
             # Testspiele (E38) sind keine Spiele für Spieler – getrennt zählen
             "spiele": sum(1 for x in alle_spiele if not einst_alle.get(x["id"], {}).get("testspiel")),
             "testspiele": sum(1 for x in alle_spiele if einst_alle.get(x["id"], {}).get("testspiel")),
@@ -687,15 +687,9 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         if not db.score_loeschen(score_id):
             raise HTTPException(404, "Score nicht gefunden")
 
-    # Benutzer
-    @app.get("/api/admin/benutzer")
-    def benutzer(_: str = Depends(admin)):
-        try:
-            entw = {z["player"]: z for z in upload("GET", "/intern/entwickler")}
-        except HTTPException:
-            entw = {}
-        # „Zuletzt aktiv“ = das Späteste aus Spielständen/Scores, Anmeldungen (auch reines Umsehen) und
-        # Upload-Ereignissen – wer nur hochlädt oder nur schaut, war trotzdem aktiv (06.11.2026)
+    # Personen (CRM, Zentrale 1.4.0) – ersetzt „Benutzer“. „Zuletzt aktiv“ = das Späteste aus Spielständen/Scores,
+    # Anmeldungen (auch reines Umsehen) und Upload-Ereignissen (06.11.2026)
+    def aktivitaet() -> dict[str, str]:
         aktiv: dict[str, str] = {}
 
         def merken(name: str, zeit: str | None) -> None:
@@ -712,17 +706,10 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                     merken(a.get("player", ""), a.get("zeit"))
         except HTTPException:
             pass
-        # Cloudflare-Abgleich (1.3.0, nur lesen): fehlt jemand in einer Richtlinie, kommt sein Code nie an
-        cf = cf_pruefung.ergebnis(cf_soll(set(entw)))
-        fehlt = {r["art"]: set(r["fehlt"]) for r in cf.get("richtlinien", [])}
-        return [{"email": mail, "name": name, "admin": name in e.admins, "ordner": ist_entwickler(name),
-                 "uploadKonto": name in entw, "zuletzt": aktiv.get(name),
-                 # noch nie angemeldet = keine Anmeldung, kein Spielstand, kein Score, kein Upload (1.3.0)
-                 "nieAngemeldet": name not in aktiv,
-                 "cloudflare": None if not cf.get("richtlinien") else
-                 {"kollegen": mail not in fehlt.get("kollegen", set()),
-                  "entwickler": (mail not in fehlt.get("entwickler", set())) if name in entw else None}}
-                for mail, name in sorted(benutzerliste.alle().items(), key=lambda x: x[1])]
+        return aktiv
+
+    from . import personen
+    personen.registrieren(app, e, db, admin, spieler, benutzerliste, upload, cf_pruefung, cf_soll, aktivitaet)
 
     auftraege.registrieren(app, e, db, admin)   # Aufgaben: Tests und Zeitplan (1.3.0)
 
@@ -735,57 +722,9 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             return {"eingerichtet": cf_pruefung.eingerichtet(), "fehler": f"Upload-Dienst: {f.detail}", "richtlinien": []}
         return cf_pruefung.ergebnis(cf_soll(entw), neu=neu)
 
-    @app.post("/api/admin/benutzer", status_code=201)
-    def benutzer_anlegen(admin_name: str = Depends(admin), body: dict[str, Any] = Body(...)):
-        mail = str(body.get("email", "")).strip().lower()
-        name = str(body.get("name", "")).strip()
-        if not EMAIL.match(mail):
-            raise HTTPException(422, "E-Mail-Adresse ungültig")
-        if not BENUTZER_MUSTER.match(name):
-            raise HTTPException(422, "Benutzername: klein, a–z, 0–9, _ und -, max. 32 Zeichen")
-        zuordnung = benutzerliste.alle()
-        if mail in zuordnung:
-            raise HTTPException(409, f"E-Mail ist schon {zuordnung[mail]!r} zugeordnet")
-        if name in zuordnung.values():
-            raise HTTPException(409, "Benutzername ist vergeben")
-        zuordnung[mail] = name
-        benutzerliste.speichern(zuordnung)
-        ergebnis = {"email": mail, "name": name}
-        if body.get("entwickler") is True:
-            ergebnis["passwort"] = upload("POST", "/intern/entwickler", {"name": name})["passwort"]
-        log.info("%s hat Benutzer %s angelegt (Entwickler: %s)", admin_name, name, "passwort" in ergebnis)
-        return ergebnis
-
-    @app.delete("/api/admin/benutzer/{name}")
-    def benutzer_entfernen(admin_name: str = Depends(admin), name: str = P(...)):
-        if name in e.admins:
-            raise HTTPException(409, "Admins können hier nicht entfernt werden")
-        zuordnung = benutzerliste.alle()
-        neu = {m: n for m, n in zuordnung.items() if n != name}
-        if len(neu) == len(zuordnung):
-            raise HTTPException(404, "Benutzer nicht gefunden")
-        benutzerliste.speichern(neu)
-        try:
-            upload("DELETE", f"/intern/entwickler/{name}")
-        except HTTPException:
-            pass
-        log.info("%s hat Benutzer %s entfernt", admin_name, name)
-        return {"ok": True}
-
-    @app.post("/api/admin/entwickler/{name}")
-    def entwickler_machen(_: str = Depends(admin), name: str = P(...)):
-        if name not in benutzerliste.alle().values():
-            raise HTTPException(404, "erst als Benutzer anlegen")
-        return upload("POST", "/intern/entwickler", {"name": name})
-
     @app.post("/api/admin/entwickler/{name}/passwort")
     def neues_passwort(_: str = Depends(admin), name: str = P(...)):
         return upload("POST", f"/intern/entwickler/{name}/passwort")
-
-    @app.delete("/api/admin/entwickler/{name}")
-    def entwickler_entziehen(_: str = Depends(admin), name: str = P(...)):
-        upload("DELETE", f"/intern/entwickler/{name}")
-        return {"ok": True}
 
     # Spielstände
     @app.get("/api/admin/spielstaende")

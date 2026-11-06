@@ -62,7 +62,16 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     if e.backup_ziel:
         from . import sicherung
         sicherung.starten(db, e.backup_ziel, e.backup_uhrzeit)
-    benutzerliste = Benutzerliste(e.users_file)
+    # CRM (Zentrale 1.4.0): Personen in der Datenbank, users.yaml nur noch als Export (crm.py)
+    from . import crm as crm_modul
+    crm = crm_modul.Crm(db, e.admins)
+    crm_modul.uebernehmen(crm, e.users_file, e.db_path.parent / "backup", e.admins, e.spiele_dir)
+    benutzerliste = crm_modul.CrmBenutzerliste(e.users_file, crm, e.spiele_dir)
+    try:
+        benutzerliste.exportieren()
+    except OSError as f:
+        logging.getLogger("savesvc").warning("users.yaml konnte nicht geschrieben werden: %s", f)
+    rollen.QUELLE = crm
     spieler = Pruefer(e, benutzerliste, schluessel_quelle)
     spieler.getrennt = db.getrennte_sitzungen()
     app = FastAPI(title="Spielebibliothek – Speicher-Dienst", docs_url=None, redoc_url=None, openapi_url=None)
@@ -143,6 +152,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         # „Ansicht als …“ (rollen.py): echte Admins können Spieler- oder Entwickler-Sicht simulieren.
         r = rollen.rolle(e, request, player)
         anmeldung_merken(request, player)
+        crm.angemeldet(player)          # eingeladen → aktiv bei der ersten Anmeldung (CRM)
         return {"player": player, "uploader": r["uploader"], "admin": r["admin"], "probe": e.probe,
                 "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"],
                 "sitzungBis": getattr(request.state, "sitzung_bis", None)}

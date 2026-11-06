@@ -104,13 +104,22 @@ def entpacken(tar: Path, ziel: Path) -> None:
 
 # ---------- 2. Live-Deploy nach Freigabe ----------
 
+def nummer(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in v.split("."))
+
+
 def deploy_nach_freigabe() -> None:
     freigabe, release = lesen(PROBE / "data/freigabe.json"), lesen(PROBE / "release.json")
     version, commit = str(release.get("version", "")), str(release.get("commit", ""))
     if not (VERSION.match(version) and COMMIT.match(commit)) or freigabe.get("commit") != commit:
         return
-    if lesen(LIVE / "site/zentrale.json").get("commit") == commit:
+    live = lesen(LIVE / "site/zentrale.json")
+    if live.get("commit") == commit:
         return                                                     # schon live
+    # Nie zurück auf eine ältere oder gleich alte Version (06.11.2026: 1.3.1 kam direkt live, danach spielte der
+    # Dienst die alte Freigabe 1.3.0 wieder darüber). Zurück geht nur von Hand: scripts/deploy.sh --zurueck.
+    if VERSION.match(str(live.get("version", ""))) and nummer(version) <= nummer(str(live["version"])):
+        return
     # Pro Freigabe nur EIN Versuch – schlägt er fehl, nicht endlos wiederholen. Neuer Versuch: in der Probe
     # „Freigabe zurücknehmen“ und erneut freigeben (neue Freigabe-Zeit).
     versuch = PROBE / "deploy-versuch.json"

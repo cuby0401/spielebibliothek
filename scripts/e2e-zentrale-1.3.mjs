@@ -64,7 +64,7 @@ const dialoge = [];
   await eval_(`fetch("/api/admin/spiele/seb/spike",{method:"PATCH",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({testspiel:true})}).then(r=>r.status)`);
   await gehe(G + "/#/profil", 3500);
   const h2 = await eval_(`[...document.querySelectorAll("#seite h2")].map(h=>h.textContent).join("|")`);
-  ok(h2 === "Spiele|Spielstände|Anmeldungen", "Profil: Spiele, Spielstände, Anmeldungen");
+  ok(h2 === "Spiele|Meine Angaben|Spielstände|Anmeldungen", "Profil: Spiele, Meine Angaben (1.4.0), Spielstände, Anmeldungen: " + h2);
   ok(await eval_(`document.querySelector("#spielstaende").textContent.includes("Zähler")`), "Profil: Spielstand von Zähler");
   ok(await eval_(`!document.querySelector("#seite table").textContent.includes("Sandbox-Spike")`), "Profil: Testspiel Spike zählt nicht");
   ok(await eval_(`document.querySelector("#anmeldungen").textContent.includes("dieses Gerät")`), "Profil: Anmeldung dieses Geräts");

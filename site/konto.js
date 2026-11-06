@@ -376,13 +376,40 @@ SEITEN_REG["profil"] = async (c) => {
 				s.erfolge.length ? h("div", { class: "leise", text: s.erfolge.map((e) => "🏆 " + e.titel).join(" · ") }) : null)))))));
 	// Nur im eigenen Profil: Spielstände und Anmeldungen (privat)
 	if (!d.ich) return;
+	const angaben = h("section", { class: "profil-abschnitt", id: "angaben" }, h("h2", { text: "Meine Angaben" }));
 	const spielstaende = h("section", { class: "profil-abschnitt", id: "spielstaende" }, h("h2", { text: "Spielstände" }));
 	const anmeldungen = h("section", { class: "profil-abschnitt", id: "anmeldungen" }, h("h2", { text: "Anmeldungen" }));
-	c.append(spielstaende, anmeldungen);
-	const sInhalt = h("div"), aInhalt = h("div");
-	spielstaende.append(sInhalt); anmeldungen.append(aInhalt);
-	await Promise.all([spielstaendeAbschnitt(sInhalt), anmeldungenAbschnitt(aInhalt)]);
+	c.append(angaben, spielstaende, anmeldungen);
+	const gInhalt = h("div"), sInhalt = h("div"), aInhalt = h("div");
+	angaben.append(gInhalt); spielstaende.append(sInhalt); anmeldungen.append(aInhalt);
+	await Promise.all([angabenAbschnitt(gInhalt), spielstaendeAbschnitt(sInhalt), anmeldungenAbschnitt(aInhalt)]);
 };
+
+// ---------- Meine Angaben (CRM, Zentrale 1.4.0): sieht und ändert nur die Person selbst (und der Admin) ----------
+const ROLLEN_NAMEN = { spieler: "Spieler", entwickler: "Entwickler", admin: "Admin", tester: "Tester" };
+async function angabenAbschnitt(c) {
+	const k = await Bridge.json("GET", "/api/mein/konto").catch(() => null);
+	if (!k || k.simuliert) return c.append(h("p", { class: "leise", text: "In der Ansicht als Spieler/Entwickler gibt es keine eigenen Angaben." }));
+	const f = {};
+	for (const [feld, max] of [["anzeigename", 40], ["vorname", 60], ["nachname", 60]]) f[feld] = h("input", { value: k[feld] || "", maxlength: String(max) });
+	f.geburtstag = h("input", { type: "date", value: k.geburtstag || "" });
+	const ds = h("input", { type: "checkbox", checked: !!k.datenschutz_bestaetigt, disabled: !!k.datenschutz_bestaetigt });
+	c.append(h("p", { class: "leise", text: "Alles freiwillig. Den Anzeigenamen sehen andere, Name und Geburtstag nur du und Seb." }),
+		h("form", { class: "karte", onsubmit: async (e) => {
+			e.preventDefault();
+			try {
+				await Bridge.json("PATCH", "/api/mein/konto", { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value,
+					geburtstag: f.geburtstag.value || null, datenschutz: ds.checked });
+				meldung("Gespeichert.");
+			} catch (x) { if (!(x instanceof Bridge.SitzungAbgelaufen)) meldung(x.message); }
+		} },
+			h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname),
+				h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag)),
+			h("p", { class: "leise", text: `Benutzername ${k.name} · Login-E-Mail ${k.emails.join(", ")} · Rollen: ${k.rollen.map((r) => ROLLEN_NAMEN[r] || r).join(", ")} · dabei seit ${datumZeit(k.angelegt)}` }),
+			h("label", { class: "haken" }, ds, " Ich habe gelesen, welche Daten die Bibliothek speichert (",
+				h("a", { href: "/hilfe/#daten", target: "_blank", rel: "noopener", text: "Hilfe → Deine Daten" }), ")."),
+			h("div", {}, h("button", { type: "submit", class: "knopf klein", text: "Speichern" }))));
+}
 
 // ---------- Anmeldungen (E55) mit „Trennen“ (Zentrale 1.2.1) ----------
 async function anmeldungenAbschnitt(c) {

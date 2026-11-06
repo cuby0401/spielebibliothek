@@ -5,6 +5,20 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.4.0 – 06.11.2026
+
+**Großer Umbau der Benutzerverwaltung: CRM** (E67/E68). Anleitung: `docs/crm.md`.
+
+- **Neu:** Reiter „Personen“ im Admin-Panel statt „Benutzer“. Personen haben Stammdaten (Anzeigename, Vor- und Nachname, Geburtstag, alles freiwillig), mehrere Login-E-Mails, Rollen (Spieler, Entwickler, Admin, Tester) und einen Status (eingeladen, aktiv, verwarnt, gesperrt, archiviert). Liste mit Suche und Filtern, eigene Seite je Person mit Zeitleiste (Anmeldungen, Anträge, Uploads, Maßnahmen), Notizen nur für Admins und Anmeldungen.
+- **Neu:** Verwarnen (die Person bekommt den Grund rot in die Glocke), Sperren (sofort, für Bibliothek und Upload, optional bis Datum, die Person sieht den Grund), Entsperren, Archivieren (persönliche Angaben werden gelöscht, nur der Benutzername bleibt an Spielständen und Spielen), Auskunft als Export.
+- **Neu:** Einladen nur mit Einladung. Nach dem Cloudflare-Abgleich am Mac verschickt das Panel die Einladungsmail über ein vorhandenes Postfach (SMTP, in der `.env`). Bei der ersten Anmeldung wird die Person „aktiv“.
+- **Neu:** Prüfprotokoll: Jede Änderung an Personen mit wer, was, wann, vorher und nachher.
+- **Neu:** „Meine Angaben“ im eigenen Profil: Anzeigename, Name und Geburtstag selbst pflegen, Datenschutzhinweis bestätigen. Neuer Hilfe-Abschnitt „Deine Daten“.
+- **Geändert:** Rollen werden im CRM ausdrücklich vergeben. Die Entwickler-Rolle legt das Upload-Konto an bzw. entfernt es. `ADMINS` bleibt als Notfall-Admin.
+- **Geändert:** `config/users.yaml` ist nur noch ein Export aus dem CRM (für den Upload-Dienst und als Rückweg). Beim ersten Start werden alle Einträge übernommen, die Datei vorher gesichert (`data/backup/users-vor-crm-…`).
+- **Behoben:** Der Auftragsdienst spielte nach dem direkten Deploy von 1.3.1 die alte Freigabe 1.3.0 wieder live ein. Er spielt jetzt nie eine ältere oder gleich alte Version ein, zurück geht nur von Hand (`deploy.sh --zurueck`).
+- **Tests:** `tests/test_crm.py` (Übernahme mit gleichen Rechten, Sichtbarkeit der Admin-Felder, Sperre mit Ablauf, Protokoll, Mail ohne Zugangsdaten in Fehlern), Ende-zu-Ende `scripts/e2e-zentrale-1.4-crm.mjs`.
+
 ## 1.3.1 – 06.11.2026
 
 Bugfix-Update (Seb, 06.11.2026): Anträge leichter finden und öffnen, Bilder an Anträgen, Fehler von Emil beim Entwurf-Testen.

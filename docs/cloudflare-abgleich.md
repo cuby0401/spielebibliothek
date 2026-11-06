@@ -2,7 +2,7 @@
 
 Cloudflare verschickt den E-Mail-Code **nur an Adressen, die in einer Access-Richtlinie stehen** – bei allen anderen zeigt
 es trotzdem „Code wurde gesendet“. Steht eine Adresse falsch in „Kollegen“, kommt der Code nie an (so am 06.11.2026 bei Emil).
-Der Abgleich sorgt dafür, dass die Richtlinien **„Kollegen“** (alle Benutzer) und **„Entwickler“** (alle mit Upload-Konto)
+Der Abgleich sorgt dafür, dass die Richtlinien **„Kollegen“** (alle Personen mit Zugang laut CRM, siehe `docs/crm.md`) und **„Entwickler“** (alle mit Upload-Konto)
 genau zur Benutzerliste der Bibliothek passen.
 
 ## Warum zwei Schlüssel – und warum die NAS nie schreibt
@@ -77,7 +77,7 @@ Benutzer → Sitzung widerrufen (oder im Admin-Panel „Trennen“).
 
 ## Im Admin-Panel
 
-Reiter **Benutzer**: Spalte „Cloudflare“ (✓ / fehlt in Kollegen / fehlt in Entwickler) und darüber eine Liste aller
+Reiter **Personen**: Spalte „Cloudflare“ (✓ / fehlt in Kollegen / fehlt in Entwickler) und darüber eine Liste aller
 Abweichungen. Der Stand wird höchstens alle 5 Minuten neu gelesen. Unabhängig davon zeigt die Spalte „Zuletzt aktiv“
 **„noch nie angemeldet“**, wenn jemand weder angemeldet war noch gespielt oder hochgeladen hat – der typische Fall, wenn
 der Code nicht ankommt.

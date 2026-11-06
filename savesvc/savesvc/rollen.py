@@ -9,10 +9,26 @@ from fastapi import Request
 
 ANSICHTEN = ("spieler", "entwickler")
 
+# CRM (Zentrale 1.4.0): Rollen kommen ausdrücklich aus dem CRM. Wird beim Start des Speicher-Dienstes gesetzt
+# (app.erstellen). Ohne CRM (Upload-Dienst, alte Tests) gilt wie bisher: Admin = ADMINS, Entwickler = hat Ordner.
+QUELLE = None   # crm.Crm
+
+
+def crm_rollen(player: str) -> set[str]:
+    return QUELLE.rollen(player) if QUELLE is not None else set()
+
+
+def admins(e) -> set[str]:
+    """Alle Admins: Notfall-Admins aus ADMINS und alle mit der CRM-Rolle admin."""
+    extra = {p["name"] for p in QUELLE.personen() if "admin" in p["rollen"] and p["status"] in ("aktiv", "verwarnt", "eingeladen")} \
+        if QUELLE is not None else set()
+    return set(e.admins) | extra
+
 
 def rolle(e, request: Request, player: str) -> dict:
-    echter_admin = player in e.admins
-    hat_ordner = (e.spiele_dir / player).is_dir()
+    crm = crm_rollen(player)
+    echter_admin = player in e.admins or "admin" in crm
+    hat_ordner = (e.spiele_dir / player).is_dir() or "entwickler" in crm
     ansicht = request.headers.get("x-ansicht")
     if echter_admin and ansicht in ANSICHTEN:
         return {"admin": False, "entwickler": ansicht == "entwickler", "uploader": ansicht == "entwickler" and hat_ordner,

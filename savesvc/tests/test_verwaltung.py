@@ -70,7 +70,7 @@ def test_versteckte_spiele_nur_fuer_admin(client, upload):
 
 
 def test_admin_nur_fuer_admins(client, upload):
-    for pfad in ["/api/admin/uebersicht", "/api/admin/spiele", "/api/admin/benutzer", "/api/admin/antraege", "/api/admin/spielstaende"]:
+    for pfad in ["/api/admin/uebersicht", "/api/admin/spiele", "/api/admin/personen", "/api/admin/antraege", "/api/admin/spielstaende"]:
         assert client.get(pfad, headers=client.als(PAUL)).status_code == 403
         assert client.get(pfad, headers=client.als()).status_code == 200, pfad
 
@@ -101,28 +101,40 @@ def test_antraege(client, umgebung):
     assert mein[0]["status"] == "erledigt" and mein[0]["antwort"] == "Ist drin!"
 
 
-def test_benutzer_anlegen_und_entfernen(client, umgebung, upload):
-    r = client.post("/api/admin/benutzer", json={"email": "Emil@Example.com", "name": "emil", "entwickler": True}, headers=client.als())
-    assert r.status_code == 201 and r.json()["passwort"] == "X" * 20
+def test_person_einladen_sperren_archivieren(client, umgebung, upload):
+    r = client.post("/api/admin/personen", json={"email": "Emil@Example.com", "name": "emil", "rollen": ["entwickler"]}, headers=client.als())
+    assert r.status_code == 201 and r.json()["passwort"] == "X" * 20 and r.json()["person"]["status"] == "eingeladen"
     inhalt = umgebung.users.read_text()
-    assert "emil@example.com: emil" in inhalt and "seb@example.com: seb" in inhalt
+    assert "emil@example.com: emil" in inhalt and "seb@example.com: seb" in inhalt          # Export für den Upload-Dienst
     assert client.get("/api/me", headers=client.als("emil@example.com")).json()["player"] == "emil"   # wirkt sofort
-    assert client.post("/api/admin/benutzer", json={"email": "x@y.de", "name": "emil"}, headers=client.als()).status_code == 409
-    assert client.post("/api/admin/benutzer", json={"email": "kaputt", "name": "neu"}, headers=client.als()).status_code == 422
-    liste = {b["name"]: b for b in client.get("/api/admin/benutzer", headers=client.als()).json()}
-    assert liste["emil"]["uploadKonto"] is True and liste["seb"]["admin"] is True
-    assert client.delete("/api/admin/benutzer/seb", headers=client.als()).status_code == 409      # Admin nicht löschbar
-    assert client.delete("/api/admin/benutzer/emil", headers=client.als()).status_code == 200
+    assert client.get("/api/admin/personen/emil", headers=client.als()).json()["status"] == "aktiv"    # erste Anmeldung
+    assert client.post("/api/admin/personen", json={"email": "x@y.de", "name": "emil"}, headers=client.als()).status_code == 409
+    assert client.post("/api/admin/personen", json={"email": "kaputt", "name": "neu"}, headers=client.als()).status_code == 422
+    assert client.post("/api/admin/personen", json={"email": "a@b.de", "name": "neu", "rollen": ["gott"]}, headers=client.als()).status_code == 422
+    liste = {p["name"]: p for p in client.get("/api/admin/personen", headers=client.als()).json()["personen"]}
+    assert liste["emil"]["uploadKonto"] is True and "admin" in liste["seb"]["rollen"] and liste["seb"]["notfallAdmin"] is True
+    # Sperren wirkt sofort, auch beim Upload-Export; Admin nicht sperrbar
+    assert client.post("/api/admin/personen/seb/sperren", json={"grund": "Test"}, headers=client.als()).status_code == 409
+    assert client.post("/api/admin/personen/emil/sperren", json={"grund": "Spam im Antrag"}, headers=client.als()).status_code == 200
+    r = client.get("/api/me", headers=client.als("emil@example.com"))
+    assert r.status_code == 403 and "Konto gesperrt: Spam im Antrag" in r.json()["detail"]
+    assert "emil" not in umgebung.users.read_text()
+    assert client.post("/api/admin/personen/emil/entsperren", headers=client.als()).status_code == 200
+    assert client.get("/api/me", headers=client.als("emil@example.com")).status_code == 200
+    # Archivieren: nur mit Bestätigung, danach kein Zugang, persönliche Angaben weg
+    assert client.post("/api/admin/personen/emil/archivieren", json={}, headers=client.als()).status_code == 422
+    assert client.post("/api/admin/personen/emil/archivieren", json={"bestaetigung": "emil"}, headers=client.als()).status_code == 200
     assert client.get("/api/me", headers=client.als("emil@example.com")).status_code == 403
+    assert client.get("/api/admin/personen/emil", headers=client.als()).json()["emails"] == []
     assert ("DELETE", "/intern/entwickler/emil", None) in upload.aufrufe
 
 
 def test_zuletzt_aktiv_auch_ohne_spielstand(client, upload):
     """Paul hat nur hochgeladen, Eli sich nur umgesehen – beide waren aktiv (06.11.2026)."""
-    liste = {b["name"]: b for b in client.get("/api/admin/benutzer", headers=client.als()).json()}
+    liste = {b["name"]: b for b in client.get("/api/admin/personen", headers=client.als()).json()["personen"]}
     assert liste["paul"]["zuletzt"] == "2026-11-05T10:00:00+00:00"          # aus Upload-Ereignis
     client.get("/api/me", headers=client.als(PAUL))                          # Anmeldung, jetzt
-    liste = {b["name"]: b for b in client.get("/api/admin/benutzer", headers=client.als()).json()}
+    liste = {b["name"]: b for b in client.get("/api/admin/personen", headers=client.als()).json()["personen"]}
     assert liste["paul"]["zuletzt"] > "2026-11-05T10:00:00+00:00"            # Anmeldung ist später
 
 

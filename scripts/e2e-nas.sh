@@ -17,7 +17,7 @@ docker build -q -t sb-e2e "$REPO/scripts/e2e-container" >/dev/null
 python3 -I "$REPO/scripts/e2e-vorbereiten.py" "$TMP"
 chmod -R a+rwX "$TMP"
 FEHLER=""
-for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege boese}; do
+for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm boese}; do
 	echo "→ Ende-zu-Ende: $t"
 	PW=$(sh "$REPO/scripts/e2e-teststand.sh" "$REPO")
 	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"

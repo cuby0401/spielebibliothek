@@ -25,7 +25,7 @@ async function uebersicht(c) {
 	const d = await api("GET", "/uebersicht");
 	const kz = (wert, text) => h("div", { class: "kennzahl" }, h("div", { class: "wert", text: String(wert) }), h("div", { class: "text", text }));
 	c.append(h("div", { class: "kacheln-klein" },
-		kz(d.spieler, "Spieler (users.yaml)"),
+		kz(d.spieler, "Personen mit Zugang"),
 		kz(d.spiele, "Spiele" + (d.testspiele ? ` (+${d.testspiele} Testspiele)` : "") + (d.offline ? ` · ${d.offline} offline` : "")),
 		kz(d.zaehler.saves, "Spielstände"),
 		kz(d.zaehler.scores, "Bestenlisten-Einträge"), kz(d.offeneAntraege, "offene Anträge"),
@@ -184,55 +184,196 @@ async function bestenlisteDetail(c, s) {
 			h("td", {}, knopf("Löschen", async () => { await api("DELETE", "/scores/" + e.id); bestenlisteDetail(c, s); }, "gefahr"))))));
 }
 
-// ---------- Benutzer ----------
-async function benutzerSeite(c) {
-	const [liste, cf] = await Promise.all([api("GET", "/benutzer"), api("GET", "/cloudflare").catch(() => ({ eingerichtet: false }))]);
-	const passwortZeigen = (name, pw) => {
-		c.prepend(h("div", { class: "karte" }, h("strong", { text: `Upload-Passwort für ${name} (wird nur jetzt angezeigt):` }),
-			h("div", { class: "passwort-box", text: pw }), h("span", { class: "leise", text: "Persönlich weitergeben, nicht per Mail." })));
-		window.scrollTo(0, 0);
-	};
+// ---------- Personen (CRM, Zentrale 1.4.0) ----------
+const STATUS_TEXTE = { eingeladen: "eingeladen", aktiv: "aktiv", verwarnt: "verwarnt", gesperrt: "gesperrt", archiviert: "archiviert" };
+const STATUS_KLASSE = { eingeladen: "offen", aktiv: "erledigt", verwarnt: "offen", gesperrt: "abgelehnt", archiviert: "" };
+const ROLLEN_TEXT = { spieler: "Spieler", entwickler: "Entwickler", admin: "Admin", tester: "Tester" };
+const anzeige = (p) => p.anzeigename || [p.vorname, p.nachname].filter(Boolean).join(" ") || "";
+function passwortKarte(name, pw) {
+	return h("div", { class: "karte" }, h("strong", { text: `Upload-Passwort für ${name} (wird nur jetzt angezeigt):` }),
+		h("div", { class: "passwort-box", text: pw }), h("span", { class: "leise", text: "Persönlich weitergeben, nicht per Mail." }));
+}
+const rollenWahl = (aktuell, gesperrt = []) => {
+	const boxen = {};
+	const el = h("div", { class: "zeile" }, ...Object.entries(ROLLEN_TEXT).map(([r, t]) => {
+		boxen[r] = h("input", { type: "checkbox", checked: aktuell.includes(r) || r === "spieler", disabled: r === "spieler" || gesperrt.includes(r) });
+		return h("label", { class: "haken" }, boxen[r], t);
+	}));
+	return { el, werte: () => Object.keys(boxen).filter((r) => boxen[r].checked) };
+};
+
+async function personenSeite(c) {
+	const [d, cf] = await Promise.all([api("GET", "/personen"), api("GET", "/cloudflare").catch(() => ({ eingerichtet: false }))]);
+	// Einladen
 	const mail = h("input", { type: "email", required: true, placeholder: "name@beispiel.de" });
 	const name = h("input", { required: true, pattern: "[a-z0-9][a-z0-9_\\-]{0,31}", placeholder: "z. B. paul" });
-	const entw = h("input", { type: "checkbox" });
-	c.append(h("h2", { text: "Neuer Benutzer" }),
-		h("form", { class: "karte", onsubmit: (e) => { e.preventDefault(); sicher(async () => {
-			const r = await api("POST", "/benutzer", { email: mail.value, name: name.value, entwickler: entw.checked });
-			await zeigen();
-			meldung(`${r.name} angelegt.`);
-			if (r.passwort) passwortZeigen(r.name, r.passwort);
+	const vorname = h("input", { placeholder: "optional" });
+	const wahl = rollenWahl(["spieler"]);
+	c.append(h("details", { class: "karte" }, h("summary", { text: "➕ Person einladen" }),
+		h("form", { onsubmit: (e) => { e.preventDefault(); sicher(async () => {
+			const r = await api("POST", "/personen", { email: mail.value, name: name.value, vorname: vorname.value || null, rollen: wahl.werte() });
+			location.hash = "#person/" + r.person.name;
+			meldung(`${r.person.name} eingeladen. Nächster Schritt: am Mac „python3 scripts/cloudflare.py abgleichen“, dann hier „Einladung senden“.`);
+			if (r.passwort) setTimeout(() => $("inhalt").prepend(passwortKarte(r.person.name, r.passwort)), 300);
 		}); } },
-			h("div", { class: "zeile" }, h("label", {}, "E-Mail (Cloudflare-Login) ", mail), h("label", {}, "Benutzername ", name),
-				h("label", { class: "haken" }, entw, "Entwickler (darf hochladen)")),
-			h("div", { class: "hinweis-box", text: (cf.eingerichtet
-				? "Danach am Mac „python3 scripts/cloudflare.py abgleichen“ ausführen – das trägt die E-Mail in „Kollegen“ (und bei Entwicklern in „Entwickler“) ein. "
-				: "Danach in Cloudflare Zero Trust die E-Mail in die Richtlinie „Kollegen“ eintragen – bei Entwicklern zusätzlich in „Entwickler“ (oder am Mac: python3 scripts/cloudflare.py abgleichen). ")
-				+ "Ohne diesen Eintrag verschickt Cloudflare keinen Code. Benutzernamen danach nie mehr ändern." }),
-			h("div", {}, h("button", { type: "submit", class: "knopf", text: "Anlegen" }))));
-	c.append(h("h2", { text: "Alle Benutzer" }), cloudflareBox(cf), tabelle(["Name", "E-Mail", "Rolle", "Zuletzt aktiv", ...(cf.richtlinien && cf.richtlinien.length ? ["Cloudflare"] : []), ""], liste.map((b) => h("tr", {},
-		h("td", {}, h("strong", { text: b.name })), h("td", { text: b.email }),
-		h("td", { text: [b.admin && "Admin", b.uploadKonto && "Entwickler", !b.uploadKonto && b.ordner && "Ordner ohne Upload-Konto", !b.admin && !b.uploadKonto && !b.ordner && "Spieler"].filter(Boolean).join(", ") }),
-		b.nieAngemeldet
-			? h("td", { class: "warn", title: "Noch keine Anmeldung, kein Spielstand, kein Upload. Kommt der E-Mail-Code nicht an? Dann fehlt die Adresse meist in der Cloudflare-Richtlinie „Kollegen“ – genau so geschrieben wie hier.", text: "noch nie angemeldet" })
-			: h("td", { text: datumZeit(b.zuletzt) }),
-		...(b.cloudflare ? [h("td", { class: b.cloudflare.kollegen && b.cloudflare.entwickler !== false ? "" : "warn",
-			text: !b.cloudflare.kollegen ? "fehlt in Kollegen" : b.cloudflare.entwickler === false ? "fehlt in Entwickler" : "✓" })]
-			: cf.richtlinien && cf.richtlinien.length ? [h("td", {})] : []),
-		h("td", {}, h("div", { class: "zeile" },
-			b.uploadKonto ? knopf("Neues Passwort", async () => {
-				if (!confirm(`Neues Upload-Passwort für ${b.name}? Das alte gilt sofort nicht mehr.`)) return;
-				const r = await api("POST", `/entwickler/${encodeURIComponent(b.name)}/passwort`); passwortZeigen(b.name, r.passwort);
-			}) : knopf("Upload-Konto anlegen", async () => {
-				const r = await api("POST", `/entwickler/${encodeURIComponent(b.name)}`); await zeigen(); passwortZeigen(b.name, r.passwort);
-			}),
-			b.uploadKonto && !b.admin ? knopf("Upload entziehen", async () => {
-				if (!confirm(`${b.name} das Upload-Konto entziehen? Die Spiele bleiben.`)) return;
-				await api("DELETE", `/entwickler/${encodeURIComponent(b.name)}`); meldung("Upload-Konto entfernt."); zeigen();
-			}, "gefahr") : null,
-			!b.admin ? knopf("Entfernen", async () => {
-				if (!confirm(`${b.name} entfernen? Danach kein Zugang mehr zur Bibliothek. Spiele, Spielstände und Scores bleiben.\nIn Cloudflare zusätzlich die E-Mail aus den Richtlinien nehmen und Sitzungen widerrufen.`)) return;
-				await api("DELETE", `/benutzer/${encodeURIComponent(b.name)}`); meldung(`${b.name} entfernt.`); zeigen();
-			}, "gefahr") : null))))));
+			h("div", { class: "zeile" }, h("label", {}, "E-Mail (Cloudflare-Login) ", mail), h("label", {}, "Benutzername ", name), h("label", {}, "Vorname ", vorname)),
+			h("p", {}, "Rollen: ", wahl.el),
+			h("p", { class: "leise", text: "Der Benutzername lässt sich danach nicht mehr ändern. Eingeladene kommen erst rein, wenn ihre E-Mail in Cloudflare steht (scripts/cloudflare.py abgleichen am Mac)." }),
+			h("div", {}, h("button", { type: "submit", class: "knopf", text: "Einladen" })))));
+	// Filter
+	const suche = h("input", { type: "search", placeholder: "Name oder E-Mail" });
+	const status = h("select", {}, h("option", { value: "", text: "alle außer archiviert" }), ...d.status.map((s) => h("option", { value: s, text: STATUS_TEXTE[s] })));
+	const rolle = h("select", {}, h("option", { value: "", text: "alle Rollen" }), ...d.rollen.map((r) => h("option", { value: r, text: ROLLEN_TEXT[r] })));
+	const tbody = h("tbody", {});
+	const mitCf = d.cloudflare.geprueft;
+	const fuellen = () => {
+		const q = suche.value.trim().toLowerCase();
+		tbody.replaceChildren(...d.personen.filter((p) => (status.value ? p.status === status.value : p.status !== "archiviert")
+			&& (!rolle.value || p.rollen.includes(rolle.value))
+			&& (!q || [p.name, anzeige(p), ...p.emails].some((x) => x.toLowerCase().includes(q)))).map((p) => h("tr", {},
+			h("td", {}, h("a", { href: "#person/" + p.name }, h("strong", { text: p.name })), anzeige(p) ? h("div", { class: "leise", text: anzeige(p) }) : null),
+			h("td", { text: p.emails.join(", ") || "–" }),
+			h("td", { text: p.rollen.filter((r) => r !== "spieler").map((r) => ROLLEN_TEXT[r]).join(", ") || "Spieler" }),
+			h("td", {}, h("span", { class: "status " + STATUS_KLASSE[p.status], text: STATUS_TEXTE[p.status] }),
+				p.status === "eingeladen" ? h("div", { class: "leise", text: p.einladungGesendet ? "Mail " + datumZeit(p.einladungGesendet) : "noch keine Mail" }) : null),
+			p.nieAngemeldet && p.status !== "archiviert"
+				? h("td", { class: "warn", title: "Noch keine Anmeldung, kein Spielstand, kein Upload. Kommt der E-Mail-Code nicht an? Dann fehlt die Adresse meist in der Cloudflare-Richtlinie „Kollegen“.", text: "noch nie angemeldet" })
+				: h("td", { text: datumZeit(p.zuletzt) }),
+			...(mitCf ? [p.cloudflare ? h("td", { class: p.cloudflare.kollegen && p.cloudflare.entwickler !== false ? "" : "warn",
+				text: !p.cloudflare.kollegen ? "fehlt in Kollegen" : p.cloudflare.entwickler === false ? "fehlt in Entwickler" : "✓" }) : h("td", {})] : []))));
+	};
+	for (const x of [suche, status, rolle]) x.addEventListener("input", fuellen);
+	fuellen();
+	c.append(h("h2", { text: `Personen (${d.personen.filter((p) => p.status !== "archiviert").length})` }), cloudflareBox(cf),
+		d.mail ? null : h("p", { class: "leise", text: "E-Mail-Versand nicht eingerichtet (SMTP_* in der .env) – Einladungen dann selbst verschicken." }),
+		h("div", { class: "filter" }, h("label", {}, "Suche", suche), h("label", {}, "Status", status), h("label", {}, "Rolle", rolle)),
+		h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
+			h("thead", {}, h("tr", {}, ...["Person", "E-Mail", "Rollen", "Status", "Zuletzt aktiv", ...(mitCf ? ["Cloudflare"] : [])].map((t) => h("th", { text: t })))), tbody)),
+		h("p", {}, h("a", { href: "#protokoll", text: "Prüfprotokoll aller Änderungen →" })));
+	const liste = await api("GET", "/anmeldungen");
+	c.append(h("h2", { text: "Letzte Anmeldungen" }),
+		h("p", { class: "leise", text: "Je Cloudflare-Sitzung und Gerät. Unbekanntes Gerät? „Trennen“ meldet es bei der nächsten Anfrage ab (neuer E-Mail-Code nötig)." }),
+		liste.length ? anmeldeTabelle(liste, true, async (a) => {
+			if (!confirm(`Anmeldung von ${a.player} („${a.geraet}“) beenden? Das Gerät wird beim nächsten Klick abgemeldet.`)) return;
+			await api("POST", "/anmeldungen/trennen", { player: a.player, sitzung: a.sitzung }); meldung(`${a.player}: ${a.geraet} getrennt.`); zeigen();
+		}) : h("p", { class: "leise", text: "Noch keine Anmeldungen aufgezeichnet." }));
+}
+
+async function personSeite(c, name) {
+	const p = await api("GET", "/personen/" + encodeURIComponent(name));
+	const pfad = "/personen/" + encodeURIComponent(name);
+	const neu = () => zeigen();
+	const tun = (fn, text) => sicher(async () => { const r = await fn(); if (text) meldung(text); await neu(); return r; });
+	c.append(h("p", {}, h("a", { href: "#personen", text: "← alle Personen" })),
+		h("h2", {}, p.name, " ", h("span", { class: "status " + STATUS_KLASSE[p.status], text: STATUS_TEXTE[p.status] }),
+			p.notfallAdmin ? h("span", { class: "leise", text: " · Notfall-Admin (ADMINS)" }) : null),
+		p.status === "gesperrt" ? h("p", { class: "hinweis-box", text: `Gesperrt: ${p.sperrgrund || "–"}${p.gesperrt_bis ? " · bis " + datumZeit(p.gesperrt_bis) : " · unbefristet"}. Aus Cloudflare entfernt das erst „python3 scripts/cloudflare.py abgleichen --entfernen“ am Mac – hinein kommt die Person aber schon jetzt nicht mehr.` }) : null);
+
+	// Stammdaten
+	const f = {};
+	for (const k of ["anzeigename", "vorname", "nachname"]) f[k] = h("input", { value: p[k] || "", maxlength: k === "anzeigename" ? "40" : "60" });
+	f.geburtstag = h("input", { type: "date", value: p.geburtstag || "" });
+	c.append(h("h3", { text: "Stammdaten" }), h("form", { class: "karte", onsubmit: (e) => { e.preventDefault();
+		tun(() => api("PATCH", pfad, { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value, geburtstag: f.geburtstag.value || null }), "Gespeichert."); } },
+		h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag)),
+		h("p", { class: "leise", text: `Angelegt ${datumZeit(p.angelegt)}${p.eingeladen_von ? " von " + p.eingeladen_von : ""} · erste Anmeldung ${datumZeit(p.erste_anmeldung)} · Datenschutzhinweis ${p.datenschutz_bestaetigt ? "bestätigt " + datumZeit(p.datenschutz_bestaetigt) : "noch nicht bestätigt"} · 2FA: kommt in einer späteren Version` }),
+		h("div", {}, h("button", { type: "submit", class: "knopf klein", text: "Speichern" }))));
+
+	// E-Mails
+	const neueMail = h("input", { type: "email", placeholder: "weitere Login-E-Mail" });
+	c.append(h("h3", { text: "Login-E-Mails" }), h("div", { class: "karte" },
+		h("ul", {}, p.emails.map((m) => h("li", {}, m, " ", p.emails.length > 1 ? knopf("Entfernen", async () => {
+			if (!confirm(`${m} entfernen? Mit dieser Adresse kommt ${p.name} dann nicht mehr hinein.`)) return;
+			await api("DELETE", `${pfad}/emails/${encodeURIComponent(m)}`); meldung("E-Mail entfernt."); neu();
+		}, "gefahr") : null))),
+		p.status !== "archiviert" ? h("div", { class: "zeile" }, neueMail, knopf("Hinzufügen", async () => {
+			await api("POST", pfad + "/emails", { email: neueMail.value }); meldung("E-Mail hinzugefügt – danach Cloudflare-Abgleich am Mac."); neu();
+		})) : null));
+
+	// Rollen
+	if (p.status !== "archiviert") {
+		const wahl = rollenWahl(p.rollen, p.notfallAdmin ? ["admin"] : []);
+		c.append(h("h3", { text: "Rollen" }), h("div", { class: "karte" }, wahl.el,
+			h("p", { class: "leise", text: "Entwickler bekommt ein Upload-Konto (Passwort wird einmal angezeigt), ohne Entwickler wird es entfernt – die Spiele bleiben. Tester: für Testkonten." }),
+			h("div", { class: "zeile" }, knopf("Rollen speichern", async () => {
+				const r = await api("PUT", pfad + "/rollen", { rollen: wahl.werte() });
+				await neu();
+				meldung(r.dazu.length || r.weg.length ? `Rollen geändert: ${[...r.dazu.map((x) => "+" + ROLLEN_TEXT[x]), ...r.weg.map((x) => "−" + ROLLEN_TEXT[x])].join(", ")}.` + (r.hinweis ? " " + r.hinweis : "") : "Keine Änderung.");
+				if (r.passwort) $("inhalt").prepend(passwortKarte(p.name, r.passwort));
+			}, ""),
+			p.uploadKonto ? knopf("Neues Upload-Passwort", async () => {
+				if (!confirm(`Neues Upload-Passwort für ${p.name}? Das alte gilt sofort nicht mehr.`)) return;
+				const r = await api("POST", `/entwickler/${encodeURIComponent(p.name)}/passwort`); $("inhalt").prepend(passwortKarte(p.name, r.passwort)); scrollTo(0, 0);
+			}) : null)));
+	}
+
+	// Status: einladen, verwarnen, sperren, archivieren
+	const grund = h("input", { placeholder: "Grund (sieht die Person)", maxlength: "500", size: "40" });
+	const bis = h("input", { type: "datetime-local", title: "leer = unbefristet" });
+	const aktionen = [];
+	if (p.status === "eingeladen" || (p.status !== "gesperrt" && p.status !== "archiviert" && !p.erste_anmeldung)) {
+		const senden = async (ohnePruefung) => {
+			await api("POST", pfad + "/einladung", { ohnePruefung }); meldung(`Einladung an ${p.emails[0]} verschickt.`); neu();
+		};
+		aktionen.push(knopf(p.einladung_gesendet ? "Einladung erneut senden" : "Einladung senden", async () => {
+			try { await senden(false); } catch (e) {
+				if (e.status === 409 && e.message.includes("trotzdem senden") && confirm(e.message + "\n\nSteht die E-Mail sicher in Cloudflare? Dann trotzdem senden.")) return senden(true);
+				throw e;
+			}
+		}, ""));
+	}
+	if (["aktiv", "eingeladen", "verwarnt"].includes(p.status)) aktionen.push(knopf("Verwarnen", async () => {
+		if (!grund.value.trim()) return meldung("Erst einen Grund eintragen.", true);
+		await api("POST", pfad + "/verwarnen", { grund: grund.value }); meldung(`${p.name} verwarnt – die Meldung steht in der Glocke.`); neu();
+	}));
+	if (p.status === "verwarnt") aktionen.push(knopf("Verwarnung aufheben", async () => { await api("POST", pfad + "/verwarnung-aufheben"); meldung("Verwarnung aufgehoben."); neu(); }));
+	if (!p.notfallAdmin && p.status !== "archiviert" && p.status !== "gesperrt") aktionen.push(knopf("Sperren", async () => {
+		if (!grund.value.trim()) return meldung("Erst einen Grund eintragen.", true);
+		if (!confirm(`${p.name} sperren? Gilt sofort für Bibliothek und Upload.`)) return;
+		await api("POST", pfad + "/sperren", { grund: grund.value, bis: bis.value ? new Date(bis.value).toISOString() : null }); meldung(`${p.name} gesperrt.`); neu();
+	}, "gefahr"));
+	if (p.status === "gesperrt") aktionen.push(knopf("Entsperren", async () => { await api("POST", pfad + "/entsperren"); meldung("Entsperrt."); neu(); }));
+	if (!p.notfallAdmin && p.status !== "archiviert") aktionen.push(knopf("Archivieren (anonymisieren) …", async () => {
+		const b = prompt(`${p.name} archivieren? Kein Zugang mehr, Name, Geburtstag, E-Mails, Notizen und Rollen werden gelöscht – nur der Benutzername bleibt (an Spielständen und Spielen). Nicht rückgängig zu machen.\n\nZur Bestätigung den Benutzernamen eingeben:`);
+		if (b === null) return;
+		await api("POST", pfad + "/archivieren", { bestaetigung: b }); meldung(`${p.name} archiviert.`); neu();
+	}, "gefahr"));
+	aktionen.push(knopf("Auskunft (Export)", async () => {
+		const daten = await api("GET", pfad + "/export");
+		const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" })), download: `auskunft-${p.name}.json` });
+		document.body.append(a); a.click(); a.remove();
+	}));
+	c.append(h("h3", { text: "Status und Maßnahmen" }), h("div", { class: "karte" },
+		h("div", { class: "zeile" }, h("label", {}, "Grund ", grund), h("label", { title: "nur fürs Sperren, leer = unbefristet" }, "gesperrt bis ", bis)),
+		h("div", { class: "zeile" }, ...aktionen)));
+
+	// Notizen (nur Admin)
+	const notiz = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Interne Notiz – sieht nur der Admin" });
+	c.append(h("h3", { text: "Notizen (nur für Admins)" }), h("div", { class: "karte" },
+		h("div", { class: "zeile" }, notiz, knopf("Notiz speichern", async () => { await api("POST", pfad + "/notizen", { text: notiz.value }); meldung("Notiz gespeichert."); neu(); })),
+		p.notizen.length ? h("ul", {}, p.notizen.map((n) => h("li", {}, h("span", { class: "leise", text: `${datumZeit(n.zeit)} · ${n.von}: ` }), h("span", { class: "antrag-text", text: n.text }))))
+			: h("p", { class: "leise", text: "Noch keine Notizen." })));
+
+	// Zeitleiste, Anmeldungen, Protokoll
+	c.append(h("h3", { text: "Zeitleiste" }), p.zeitleiste.length ? tabelle(["Zeit", "Was", ""], p.zeitleiste.map((z) => h("tr", {},
+		h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.art }), h("td", { text: z.text + (z.von ? ` (${z.von})` : "") })))) : h("p", { class: "leise", text: "Noch nichts." }));
+	c.append(h("h3", { text: "Anmeldungen" }), p.anmeldungen.length ? anmeldeTabelle(p.anmeldungen, false, async (a) => {
+		if (!confirm(`Anmeldung „${a.geraet}“ beenden?`)) return;
+		await api("POST", "/anmeldungen/trennen", { player: p.name, sitzung: a.sitzung }); meldung("Getrennt."); neu();
+	}) : h("p", { class: "leise", text: "Keine." }));
+	c.append(h("details", {}, h("summary", { text: `Prüfprotokoll zu ${p.name} (${p.protokoll.length})` }), protokollTabelle(p.protokoll)));
+}
+
+function protokollTabelle(liste) {
+	const kurz = (x) => x === null || x === undefined ? "" : String(x).length > 120 ? String(x).slice(0, 120) + " …" : String(x);
+	return tabelle(["Zeit", "Wer", "Aktion", "Person", "Vorher", "Nachher"], liste.map((z) => h("tr", {},
+		h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.von }), h("td", { text: z.aktion }), h("td", {}, z.ziel ? h("a", { href: "#person/" + z.ziel, text: z.ziel }) : ""),
+		h("td", { class: "leise", text: kurz(z.vorher) }), h("td", { text: kurz(z.nachher) }))));
+}
+async function protokollSeite(c) {
+	c.append(h("p", {}, h("a", { href: "#personen", text: "← Personen" })), h("h2", { text: "Prüfprotokoll" }),
+		h("p", { class: "leise", text: "Jede Änderung an Personen – wer, was, wann, vorher und nachher. Wird nie gelöscht." }),
+		protokollTabelle(await api("GET", "/protokoll")));
 }
 
 // Cloudflare-Abgleich (1.3.0): nur anzeigen – geschrieben wird am Mac mit scripts/cloudflare.py (Schreib-Schlüssel nie auf der NAS)
@@ -318,18 +459,6 @@ async function antraegeSeite(c) {
 }
 
 // ---------- Navigation ----------
-// Benutzer + letzte Anmeldungen aller (E55)
-async function benutzerMitAnmeldungen(c) {
-	await benutzerSeite(c);
-	const liste = await api("GET", "/anmeldungen");
-	c.append(h("h2", { text: "Letzte Anmeldungen" }),
-		h("p", { class: "leise", text: "Je Cloudflare-Sitzung und Gerät. Unbekanntes Gerät? „Trennen“ meldet es bei der nächsten Anfrage ab (neuer E-Mail-Code nötig). Stadt und Region erscheinen erst mit der Managed Transform „Add visitor location headers“ in Cloudflare, sonst nur das Land." }),
-		liste.length ? anmeldeTabelle(liste, true, async (a) => {
-			if (!confirm(`Anmeldung von ${a.player} („${a.geraet}“) beenden? Das Gerät wird beim nächsten Klick abgemeldet.`)) return;
-			await api("POST", "/anmeldungen/trennen", { player: a.player, sitzung: a.sitzung }); meldung(`${a.player}: ${a.geraet} getrennt.`); zeigen();
-		}) : h("p", { class: "leise", text: "Noch keine Anmeldungen aufgezeichnet." }));
-}
-
 // ---------- Aufgaben (1.3.0): Tests per Knopf oder Zeitplan, Live-Deploy nach Freigabe ----------
 const STATUS_TEXT = { wartet: "wartet", laeuft: "läuft …", ok: "✓ ok", fehler: "✗ Fehler" };
 async function aufgabenSeite(c) {
@@ -375,14 +504,17 @@ async function aufgabenSeite(c) {
 	if (d.laeufe.some((l) => l.status === "wartet" || l.status === "laeuft")) setTimeout(() => { if (location.hash === "#aufgaben") zeigen(); }, 15000);
 }
 
-const SEITEN = { uebersicht, spiele: spieleSeite, benutzer: benutzerMitAnmeldungen, spielstaende: spielstaendeSeite, antraege: antraegeSeite, aufgaben: aufgabenSeite };
+const SEITEN = { uebersicht, spiele: spieleSeite, personen: personenSeite, protokoll: protokollSeite, spielstaende: spielstaendeSeite, antraege: antraegeSeite, aufgaben: aufgabenSeite };
 
 async function zeigen() {
-	const name = SEITEN[location.hash.slice(1)] ? location.hash.slice(1) : "uebersicht";
-	for (const a of $("reiter").querySelectorAll("a")) a.classList.toggle("aktiv", a.getAttribute("href") === "#" + name);
+	if (location.hash === "#benutzer") return location.replace("#personen");   // alte Adresse (vor 1.4.0)
+	const person = location.hash.match(/^#person\/([a-z0-9][a-z0-9_-]{0,31})$/);
+	const name = person ? "personen" : SEITEN[location.hash.slice(1)] ? location.hash.slice(1) : "uebersicht";
+	const reiter = name === "protokoll" ? "personen" : name;
+	for (const a of $("reiter").querySelectorAll("a")) a.classList.toggle("aktiv", a.getAttribute("href") === "#" + reiter);
 	const c = $("inhalt");
 	c.replaceChildren();
-	await sicher(() => SEITEN[name](c));
+	await sicher(() => person ? personSeite(c, person[1]) : SEITEN[name](c));
 	// Rückkehr aus „Ansicht als …“: an die alte Scrollposition (1.3.0)
 	try {
 		const y = sessionStorage.getItem("admin-scroll");

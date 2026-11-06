@@ -22,7 +22,7 @@ teststand() {
 
 FEHLER=""
 # Einzelne Tests: E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh
-for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege boese}; do
+for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm boese}; do
 	echo "→ Ende-zu-Ende: $t"
 	PW=$(teststand)
 	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"

@@ -66,13 +66,20 @@ services:
       # Cloudflare-Abgleich (nur lesen) im Admin-Panel, siehe docs/cloudflare-abgleich.md. Leer = aus.
       # Der Nur-Lese-Schlüssel liegt in /data/cloudflare-lesen.token (nur für diesen Dienst lesbar), nie hier oder in .env.
       CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
+      # Einladungsmails aus dem CRM (Zentrale 1.4.0) über ein vorhandenes Postfach, siehe docs/crm.md. Leer = aus.
+      # Zugangsdaten nur in .env (Modus 600) – nie ins Git, nie in Logs.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_VERSCHLUESSELUNG: ${SMTP_VERSCHLUESSELUNG:-starttls}
+      SMTP_BENUTZER: ${SMTP_BENUTZER:-}
+      SMTP_PASSWORT: ${SMTP_PASSWORT:-}
+      SMTP_ABSENDER: ${SMTP_ABSENDER:-}
       # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
     volumes:
       - /volume1/games/data:/data
       - /volume1/games/spiele:/spiele:ro
       # config/users.yaml: E-Mail → Benutzername; nur auf der NAS, nicht im Git (Vorlage: users.example.yaml).
-      # Ordner statt Einzeldatei, damit Editoren, die die Datei ersetzen (sed -i, vim), sofort wirken.
-      # Schreibbar: das Admin-Panel legt hier Benutzer an.
+      # Seit 1.4.0 ein Export aus dem CRM (Datenbank) – für den Upload-Dienst und als Notfall-Rückweg. Schreibbar.
       - ./config:/config
     networks: [intern]
 
