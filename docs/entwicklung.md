@@ -98,7 +98,7 @@ Richtlinien „Kollegen“/„Entwickler“ ↔ Benutzerliste: Prüfen im Admin-
 
 ## Auftragsdienst (Zentrale 1.3.0)
 
-`scripts/auftragsdienst.py` läuft jede Minute als Cron-Job unter Sebi (einrichten: `sh scripts/auftragsdienst-einrichten.sh`, Log `/tmp/sb-auftragsdienst.log`). Er
+`scripts/auftragsdienst.py` läuft jede Minute als Cron-Job unter Sebi über `/etc/cron.d/spielebibliothek-auftragsdienst` (einrichten im normalen Terminal, einmal mit sudo-Passwort: `sh scripts/auftragsdienst-einrichten.sh`; eine eigene crontab darf Sebi auf UGOS nicht anlegen. Log `/tmp/sb-auftragsdienst.log`). Er
 1. meldet ein Lebenszeichen (Admin-Panel → Aufgaben, Wächter),
 2. spielt nach „Für Live freigeben“ in der Probe genau den dort abgelegten `release.tar` mit `scripts/nas-deploy.sh` live ein (pro Freigabe ein Versuch; neuer Versuch = Freigabe zurücknehmen und neu freigeben),
 3. führt Aufträge aus dem Admin-Panel aus – nur `unit-tests` und `e2e-tests`, Ziel `live` (vollständiger Stand in `/volume1/docker/spielebibliothek-quelle`) oder `probe` (`release.tar`).
