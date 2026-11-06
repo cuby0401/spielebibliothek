@@ -3,7 +3,9 @@
 #
 #   scripts/deploy.sh --probe            neue Version zuerst in die PROBE-Zentrale (Kopie der echten Daten, nur über Tailscale)
 #   scripts/deploy.sh --probe --daten-behalten   Probe aktualisieren, ohne die Daten neu zu kopieren
-#   scripts/deploy.sh                    neue Version LIVE – nur wenn genau dieser Commit in der Probe freigegeben wurde (E56)
+#   scripts/deploy.sh                    neue Version LIVE – nur wenn genau dieser Commit in der Probe freigegeben wurde (E56).
+#                                        Seit 1.3.0 meist unnötig: „Für Live freigeben“ in der Probe spielt automatisch ein
+#                                        (Auftragsdienst auf der NAS, scripts/auftragsdienst.py). deploy.sh holt dann nur den Git-Tag nach.
 #   scripts/deploy.sh --ohne-probe       Live ohne Freigabe (nur im Notfall, z. B. dringender Hotfix)
 #   scripts/deploy.sh --examples         zusätzlich examples/* nach /volume1/games/spiele/seb/ kopieren
 #   scripts/deploy.sh --no-start         nur übertragen, nicht starten
@@ -59,6 +61,18 @@ done
 
 cd "$(dirname "$0")/.."
 export COPYFILE_DISABLE=1 # keine ._-Dateien von macOS
+
+# Git-Tags für Versionen nachholen, die der Auftragsdienst nach einer Freigabe live eingespielt hat (1.3.0)
+tag_nachholen() {
+	LIVE_JSON=$(ssh -o LogLevel=ERROR "$NAS" "cat $ZIEL/site/zentrale.json 2>/dev/null" || true)
+	LV=$(printf '%s' "$LIVE_JSON" | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p')
+	LC=$(printf '%s' "$LIVE_JSON" | sed -n 's/.*"commit": *"\([^"]*\)".*/\1/p')
+	[ -n "$LV" ] && [ -n "$LC" ] || return 0
+	git rev-parse -q --verify "refs/tags/zentrale-v$LV" >/dev/null && return 0
+	git cat-file -e "$LC^{commit}" 2>/dev/null || return 0
+	git tag -a "zentrale-v$LV" "$LC" -m "Zentrale $LV live (Auftragsdienst nach Freigabe)" && echo "  Tag zentrale-v$LV nachgeholt (live per Freigabe)"
+	git push -q origin "zentrale-v$LV" || echo "Hinweis: Tag zentrale-v$LV lokal angelegt, Push fehlgeschlagen"
+}
 
 # Gemeinsame Nacharbeiten auf der NAS (nach Deploy und nach --zurueck): Rechte, Konfiguration, Token
 NACHARBEIT='
@@ -142,6 +156,15 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
 	echo "  (Version $VERSION_ZENTRALE, Commit $COMMIT wird erneut deployt)"
 fi
 
+tag_nachholen
+# Schon live (z. B. vom Auftragsdienst nach der Freigabe)? Dann nichts mehr zu tun.
+if [ "$PROBE" = 0 ]; then
+	if [ "$(ssh -o LogLevel=ERROR "$NAS" "sed -n 's/.*\"commit\": *\"\([^\"]*\)\".*/\1/p' $ZIEL/site/zentrale.json 2>/dev/null" || true)" = "$COMMIT" ]; then
+		echo "✓ Zentrale $VERSION_ZENTRALE (Commit $COMMIT) ist bereits live."
+		exit 0
+	fi
+fi
+
 # Live nur mit Freigabe aus der Probe (früh prüfen, damit niemand umsonst auf Tests wartet)
 if [ "$PROBE" = 0 ] && [ "$OHNE_PROBE" = 0 ]; then
 	FREIGABE=$(ssh "$NAS" "cat $PROBE_DIR/data/freigabe.json 2>/dev/null" || true)
@@ -174,42 +197,34 @@ fi
 # ---------- Probe-Zentrale aufsetzen ----------
 if [ "$PROBE" = 1 ]; then
 	echo "→ Probe-Zentrale $VERSION_ZENTRALE (Commit $COMMIT) mit ${BEHALTEN:+bisherigen Daten}${BEHALTEN:-frischer Kopie der echten Daten}"
-	git ls-files | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+	git ls-files | grep -vx -e '.env' -e 'config/users.yaml' | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
 		set -e
-		rm -rf /tmp/sb-probe-repo && mkdir -p /tmp/sb-probe-repo && tar -xf - -C /tmp/sb-probe-repo
+		cat > /tmp/sb-probe.tar
+		rm -rf /tmp/sb-probe-repo && mkdir -p /tmp/sb-probe-repo && tar -xf /tmp/sb-probe.tar -C /tmp/sb-probe-repo
 		ART=probe ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_ZENTRALE sh /tmp/sb-probe-repo/scripts/teststand.sh up /tmp/sb-probe-repo $BEHALTEN
+		# unveränderter Stand für den Live-Deploy nach der Freigabe (die Probe selbst läuft mit ersetzten Hostnamen)
+		mv /tmp/sb-probe.tar $PROBE_DIR/release.tar && chmod 644 $PROBE_DIR/release.tar
+		printf '{\"version\": \"%s\", \"commit\": \"%s\"}\n' '$VERSION_ZENTRALE' '$COMMIT' > $PROBE_DIR/release.json
 		rm -rf /tmp/sb-probe-repo"
 	echo "✓ Probe läuft: $PROBE_URL  (nur über Tailscale; angemeldet als seb, Upload mit deinem normalen Upload-Passwort)"
-	echo "  Testen, dann dort Admin-Panel → „Für Live freigeben“, danach: scripts/deploy.sh"
+	echo "  Testen, dann dort Admin-Panel → „Für Live freigeben“ – der Auftragsdienst spielt dann innerhalb einer Minute live ein."
+	echo "  (Ohne eingerichteten Auftragsdienst danach: scripts/deploy.sh)"
 	exit 0
 fi
 
-# Versionskennung gegen Browser-/CDN-Cache: Commit plus Zeitstempel, ersetzt __VERSION__ in site/**/*.html
-CACHE="$COMMIT-$(date +%s)"
-ZEIT="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
-LISTE=$(git ls-files | grep -v '^examples/' | grep -vx -e '.env' -e 'config/users.yaml')
+LISTE=$(git ls-files | grep -vx -e '.env' -e 'config/users.yaml')
 
 echo "→ Zentrale $VERSION_ZENTRALE (Commit $COMMIT) nach $NAS:$ZIEL"
+# Seit 1.3.0: gleicher Ablauf wie der Auftragsdienst – Release-Tar übertragen, scripts/nas-deploy.sh daraus ausführen
 # shellcheck disable=SC2086
-tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "
+tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "cat > /tmp/sb-release.tar"
+ssh "$NAS" "
 	set -e
-	ANLASS=vor-$VERSION_ZENTRALE
-	$VORHER
-	mkdir -p $ZIEL && cd $ZIEL
-	tar --no-same-owner -xf -
-	# Was nicht mehr im Repo ist, entfernen (nur Dateien, .env und config/users.yaml bleiben)
-	printf '%s\n' $(printf '%s ' $LISTE) .env config/users.yaml users.yaml site/zentrale.json site/admin/CHANGELOG.md > .deploy-liste
-	find . -type f ! -name .deploy-liste | sed 's|^\./||' | grep -vxF -f .deploy-liste | while IFS= read -r f; do
-		echo \"  entfernt: \$f\"; rm -f -- \"\$f\"
-	done
-	find . -mindepth 1 -type d -empty -delete
-	rm -f .deploy-liste
-	find site -name '*.html' -exec sed -i 's/__VERSION__/$CACHE/g' {} +
-	# Version der Zentrale für Fußzeile und Admin-Panel
-	printf '{\"version\": \"%s\", \"commit\": \"%s\", \"zeit\": \"%s\"}\n' '$VERSION_ZENTRALE' '$COMMIT' '$ZEIT' > site/zentrale.json
-	cp CHANGELOG.md site/admin/CHANGELOG.md
-	$NACHARBEIT
+	tar -xOf /tmp/sb-release.tar scripts/nas-deploy.sh > /tmp/sb-nas-deploy.sh
+	STARTEN=$STARTEN sh /tmp/sb-nas-deploy.sh /tmp/sb-release.tar '$VERSION_ZENTRALE' '$COMMIT'
+	rm -f /tmp/sb-release.tar /tmp/sb-nas-deploy.sh
 "
+ZEIT="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
 
 if [ "$BEISPIELE" = 1 ]; then
 	for d in examples/*/; do
@@ -222,12 +237,6 @@ if [ "$BEISPIELE" = 1 ]; then
 			chmod -R ug+rwX,o= '$SPIELE/$name'
 		"
 	done
-fi
-
-if [ "$STARTEN" = 1 ]; then
-	# Caddyfile ist als Einzeldatei eingebunden: tar ersetzt sie, der laufende Container sähe
-	# weiter die alte. Deshalb caddy immer neu starten (admin ist aus, also kein reload).
-	ssh "$NAS" "$STARTBEFEHL"
 fi
 
 if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then

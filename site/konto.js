@@ -101,7 +101,8 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 		h("p", {}, "Hochladen, Entwürfe veröffentlichen, alte Versionen zurückholen: ",
 			h("a", { href: "https://upload.cuby0401.uk", target: "_blank", rel: "noopener", text: "upload.cuby0401.uk" }),
 			" · Anleitung: ", h("a", { href: "/handbuch/", text: "Entwickler-Handbuch" })));
-	const [liste, fehler] = await Promise.all([Bridge.json("GET", "/api/entwickler/spiele"), Bridge.json("GET", "/api/entwickler/fehler")]);
+	const [liste, fehler, antraege] = await Promise.all([Bridge.json("GET", "/api/entwickler/spiele"), Bridge.json("GET", "/api/entwickler/fehler"),
+		Bridge.json("GET", "/api/entwickler/antraege").catch(() => [])]);
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
 	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
@@ -144,6 +145,8 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 					} }) : null));
 		})))));
 
+	antraegeProSpiel(c, antraege);
+
 	c.append(h("h2", { text: "Fehlerberichte" }),
 		h("p", { class: "leise", text: "JavaScript-Fehler, die beim Spielen in deinen Spielen auftreten – automatisch gemeldet, gleiche Fehler zusammengefasst, ohne Spielernamen. „Erledigt“ entfernt einen Eintrag; tritt der Fehler wieder auf, erscheint er neu." }));
 	if (!fehler.length) return c.append(h("p", { class: "leise", text: "Keine Fehler gemeldet. 🎉" }));
@@ -159,6 +162,37 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 		} })))));
 };
 
+// Anträge zu den eigenen Spielen (1.3.0): pro Spiel, offen zuerst, geschlossene eingeklappt. Nur der Entwickler (und der Antragsteller) sieht sie.
+function antraegeProSpiel(c, antraege) {
+	c.append(h("h2", { id: "antraege", text: "Anträge zu deinen Spielen" }));
+	if (!antraege.length) return c.append(h("p", { class: "leise", text: "Keine Anträge – Spieler können unter Menü → Anträge Fehler und Wünsche zu deinen Spielen schicken." }));
+	const proSpiel = new Map();
+	for (const a of antraege) { if (!proSpiel.has(a.spiel)) proSpiel.set(a.spiel, []); proSpiel.get(a.spiel).push(a); }
+	const karte = (a) => {
+		const antwort = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Antwort an " + a.player });
+		antwort.value = a.antwort || "";
+		const setzen = async (status) => {
+			try {
+				await Bridge.json("PATCH", "/api/entwickler/antraege/" + a.id, { status, antwort: antwort.value || null });
+				meldung(`Antrag von ${a.player}: ${status}.`);
+				c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
+			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+		};
+		const k = (text, fn, art = "leise") => h("button", { type: "button", class: "knopf klein " + art, text, onclick: fn });
+		return h("div", { class: "karte" },
+			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
+				h("span", { class: "leise", text: ` · von ${a.player} · ${datumZeit(a.erstellt)}` })),
+			h("div", { text: a.text }), antwort,
+			h("div", { class: "zeile" }, k("Erledigt", () => setzen("erledigt"), ""), k("Ablehnen", () => setzen("abgelehnt"), "gefahr"),
+				a.status !== "offen" ? k("Wieder öffnen", () => setzen("offen")) : null));
+	};
+	for (const [spiel, liste] of proSpiel) {
+		const offen = liste.filter((a) => a.status === "offen"), zu = liste.filter((a) => a.status !== "offen");
+		c.append(h("h3", { text: `${liste[0].title || spiel} – ${offen.length} offen, ${zu.length} geschlossen` }), ...offen.map(karte));
+		if (zu.length) c.append(h("details", {}, h("summary", { text: `Geschlossen (${zu.length})` }), ...zu.map(karte)));
+	}
+}
+
 // ---------- Anträge (Entwickler) ----------
 SEITEN_REG["antraege"] = async (c) => {
 	const [arten, meine] = await Promise.all([Bridge.json("GET", "/api/antraege/arten"), Bridge.json("GET", "/api/antraege")]);
@@ -170,17 +204,18 @@ SEITEN_REG["antraege"] = async (c) => {
 	const formular = h("form", { class: "karte", onsubmit: async (e) => {
 		e.preventDefault();
 		try {
-			await Bridge.json("POST", "/api/antraege", { art: art.value, spiel: spiel.value || null, text: text.value });
-			meldung("Antrag verschickt – Seb sieht ihn im Admin-Panel. Antwort und Status erscheinen hier.");
+			const r = await Bridge.json("POST", "/api/antraege", { art: art.value, spiel: spiel.value || null, text: text.value });
+			meldung(r.an && r.an !== "admin"
+				? `Antrag verschickt – er geht an ${r.an === ich.player ? "dich als Entwickler (unter „Meine Spiele“)" : r.an + ", den Entwickler des Spiels"}. Antwort und Status erscheinen hier.`
+				: "Antrag verschickt – Seb bekommt ihn. Antwort und Status erscheinen hier.");
 			c.replaceChildren(); SEITEN_REG["antraege"](c);
 		} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
 	} },
 		h("label", {}, "Art", art), h("label", {}, "Spiel", spiel), h("label", {}, "Beschreibung", text),
 		h("div", {}, h("button", { type: "submit", class: "knopf", text: "Antrag senden" })));
 	c.append(h("h1", { text: "Anträge" }),
-		h("p", { class: "leise", text: ich.uploader || ich.admin
-			? "Fehler, Wünsche oder Dinge, die nur Seb erledigen kann (z. B. Bestenliste zurücksetzen, Spielstand wiederherstellen, Spiel umbenennen)."
-			: "Dir ist ein Fehler aufgefallen, du hast eine Idee oder dein Spielstand ist weg? Schreib es hier – Seb bekommt es direkt." }),
+		h("p", { class: "leise", text: "Fehler, Wünsche und Sonstiges zu einem bestimmten Spiel gehen direkt an dessen Entwickler – nur er und du sehen den Antrag. "
+			+ "Alles andere bekommt Seb: Fehler in der Bibliothek, Spielstand wiederherstellen" + (ich.uploader || ich.admin ? ", Bestenliste zurücksetzen, Spiel umbenennen." : ".") }),
 		formular, h("h2", { text: "Meine Anträge" }));
 	if (!meine.length) return c.append(h("p", { class: "leise", text: "Noch keine Anträge." }));
 	c.append(...meine.map((a) => h("div", { class: "karte" },
@@ -188,7 +223,8 @@ SEITEN_REG["antraege"] = async (c) => {
 			h("strong", { text: arten[a.art] || a.art }), a.spiel ? h("span", { class: "leise", text: " · " + titelVon(a.spiel) }) : null,
 			h("span", { class: "leise", text: " · " + datumZeit(a.erstellt) })),
 		h("div", { text: a.text }),
-		a.antwort ? h("div", { class: "antwort" }, h("strong", { text: "Antwort von Seb: " }), a.antwort) : null)));
+		h("div", { class: "leise", text: a.zustaendig && a.zustaendig !== "admin" ? "geht an " + a.zustaendig + " (Entwickler)" : "geht an Seb" }),
+		a.antwort ? h("div", { class: "antwort" }, h("strong", { text: `Antwort von ${a.beantwortet_von || "Seb"}: ` }), a.antwort) : null)));
 };
 
 // ---------- Profil (Zentrale 1.2.0): Spielzeit, Erfolge, Bestplätze ----------

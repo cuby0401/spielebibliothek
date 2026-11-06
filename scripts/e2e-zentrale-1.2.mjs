@@ -2,10 +2,11 @@
 // Ende-zu-Ende-Test der Versionierung im Teststand (Chrome headless über DevTools-Protokoll)
 import { spawn } from "node:child_process";
 import { setTimeout as warte } from "node:timers/promises";
-const G = "http://<NAS_GH>:18088", U = "http://<NAS_UH>:18090";
+// Auf der NAS (Auftragsdienst, 1.3.0) setzt scripts/e2e-nas.sh Hostnamen und Chrome per Umgebung
+const G = process.env.E2E_G || "http://<NAS_GH>:18088", U = process.env.E2E_U || "http://<NAS_UH>:18090";
 const DIR = process.argv[2], PW = process.argv[3];
-const chrome = spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  ["--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${DIR}/chrome-profil`, "--no-first-run", "about:blank"], { stdio: "ignore" });
+const chrome = spawn(process.env.CHROME_BIN || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  [...(process.env.CHROME_BIN ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] : []), "--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${DIR}/chrome-profil`, "--no-first-run", "about:blank"], { stdio: "ignore" });
 process.on("exit", () => chrome.kill());   // Chrome nie hängen lassen, auch bei Abbruch
 let ws, nr = 0; const offen = new Map(); const fehler = []; const ergebnis = [];
 const ok = (bed, text) => { ergebnis.push((bed ? "✓ " : "✗ ") + text); if (!bed) process.exitCode = 1; };
@@ -92,8 +93,9 @@ const dialoge = [];
   await gehe(G + "/#/spielstaende", 2500);
   // (Spalte „Deine Spielzeit“ erscheint nur, wenn es Spielstände gibt)
 
-  // 4b) Wichtige Meldung (Antrag → Admin): rote, wackelnde Glocke + Einblendung
-  await eval_(`fetch("/api/antraege",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({art:"fehler",spiel:"paul/raetsel",text:"Stürzt beim Start ab"})}).then(r=>r.status)`);
+  // 4b) Wichtige Meldung (Antrag an die Bibliothek → Admin): rote, wackelnde Glocke + Einblendung.
+  //     Seit 1.3.0 ohne Spiel – Anträge zu einem Spiel gehen an dessen Entwickler (E64), geprüft in e2e-zentrale-1.3-steckbrief.mjs
+  await eval_(`fetch("/api/antraege",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({art:"fehler",text:"Bibliothek stürzt beim Start ab"})}).then(r=>r.status)`);
   await gehe(G + "/", 3500);
   ok(await eval_(`document.getElementById("glocke-knopf").classList.contains("alarm")`), "Glocke rot/wackelnd bei wichtiger Meldung");
   ok(await eval_(`!document.getElementById("alarm").hidden && document.getElementById("alarm").textContent.includes("Neuer Antrag")`), "Einblendung „Wichtige Meldung“");

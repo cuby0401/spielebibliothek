@@ -95,3 +95,13 @@ Wächter und Anträge melden sich per Webhook (`HA_WEBHOOK_URL` in der `.env`). 
 ## Cloudflare-Abgleich
 
 Richtlinien „Kollegen“/„Entwickler“ ↔ Benutzerliste: Prüfen im Admin-Panel (Nur-Lese-Schlüssel auf der NAS), Schreiben nur am Mac mit `python3 scripts/cloudflare.py abgleichen` (Schreib-Schlüssel im Schlüsselbund). Warum so und wie einrichten: `docs/cloudflare-abgleich.md`. **Live-Datenbank nie mit `sqlite3` auf dem NAS-Host öffnen**, nur per `docker exec` im Container (sonst gehören die WAL-Dateien dem falschen Benutzer → Fehler 500, 06.11.2026).
+
+## Auftragsdienst (Zentrale 1.3.0)
+
+`scripts/auftragsdienst.py` läuft jede Minute als Cron-Job unter Sebi (einrichten: `sh scripts/auftragsdienst-einrichten.sh`, Log `/tmp/sb-auftragsdienst.log`). Er
+1. meldet ein Lebenszeichen (Admin-Panel → Aufgaben, Wächter),
+2. spielt nach „Für Live freigeben“ in der Probe genau den dort abgelegten `release.tar` mit `scripts/nas-deploy.sh` live ein (pro Freigabe ein Versuch; neuer Versuch = Freigabe zurücknehmen und neu freigeben),
+3. führt Aufträge aus dem Admin-Panel aus – nur `unit-tests` und `e2e-tests`, Ziel `live` (vollständiger Stand in `/volume1/docker/spielebibliothek-quelle`) oder `probe` (`release.tar`).
+
+Er spricht mit dem Speicher-Dienst nur über `docker exec … python -m savesvc auftraege-holen | auftrag-fertig | lebenszeichen | live-status` und öffnet die Datenbank nie selbst. Testen gegen den Teststand: Umgebung `SB_LIVE`, `SB_QUELLE`, `SB_PROBE`, `SB_LIVE_C`, `SB_PROBE_C`, `SB_SPERRE` umlenken und `STARTEN=0 SICHERN=0 RELEASES=/tmp/…` setzen.
+

@@ -15,15 +15,9 @@ trap aufraeumen EXIT
 python3 -I scripts/e2e-vorbereiten.py "$TMP"
 git ls-files -co --exclude-standard | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$NAS" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
 
-# Teststand frisch aufbauen, Spiel von „paul“ mit Kategorien/Erfolgen/Bestenliste anlegen, Upload-Passwort zurückgeben
+# Teststand frisch aufbauen, Spiel von „paul“ anlegen, Upload-Passwort zurückgeben (gemeinsam mit dem Auftragsdienst)
 teststand() {
-	ssh -o LogLevel=ERROR "$NAS" '
-		sh /tmp/sb-repo/scripts/teststand.sh up /tmp/sb-repo >/dev/null 2>&1; sleep 3
-		d=/tmp/sb-teststand/spiele/paul/raetsel; mkdir -p $d
-		printf "%s" "{\"title\":\"Rätselspaß\",\"description\":\"Test\",\"tags\":[\"Puzzle\",\"Wörter\"],\"leaderboard\":{\"enabled\":true},\"erfolge\":[{\"id\":\"start\",\"titel\":\"Losgelegt\"},{\"id\":\"profi\",\"titel\":\"Profi\",\"geheim\":true}]}" > $d/game.json
-		printf "%s" "<!doctype html><script src=\"/lib/gamesave.js\"></script><p>R</p><script>setTimeout(()=>GameSave.erfolg(\"start\"),800)</script>" > $d/index.html
-		chmod -R a+rwX /tmp/sb-teststand/spiele/paul
-		docker exec sbtest-upload python -m savesvc entwickler anlegen seb 2>&1 | sed -n "s/^Passwort: *//p"' 2>/dev/null
+	ssh -o LogLevel=ERROR "$NAS" 'sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo' 2>/dev/null
 }
 
 FEHLER=""

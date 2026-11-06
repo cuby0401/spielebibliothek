@@ -65,6 +65,12 @@ CREATE TABLE IF NOT EXISTS meldung_status (player TEXT NOT NULL, id INTEGER NOT 
 CREATE TABLE IF NOT EXISTS getrennte_sitzungen (player TEXT NOT NULL, sitzung INTEGER NOT NULL, zeit TEXT NOT NULL, von TEXT, PRIMARY KEY (player, sitzung));
 -- Zentrale 1.3.0: Wächter schreibt hier alle 5 Minuten – merkt so, wenn die Datenbank schreibgeschützt ist
 CREATE TABLE IF NOT EXISTS waechter_probe (id INTEGER PRIMARY KEY CHECK (id = 1), zeit TEXT NOT NULL);
+-- Zentrale 1.3.0: Aufträge für den Auftragsdienst auf der NAS (Tests, Deploy nach Freigabe) und Zeitplan
+CREATE TABLE IF NOT EXISTS auftraege (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, art TEXT NOT NULL, ziel TEXT NOT NULL, quelle TEXT NOT NULL, von TEXT,
+    angelegt TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'wartet', start TEXT, ende TEXT, zusammenfassung TEXT, log TEXT);
+CREATE TABLE IF NOT EXISTS zeitplan (art TEXT NOT NULL, ziel TEXT NOT NULL, uhrzeit TEXT NOT NULL, zuletzt TEXT, PRIMARY KEY (art, ziel));
+CREATE TABLE IF NOT EXISTS dienst_status (name TEXT PRIMARY KEY, wert TEXT, zeit TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS erfolge (
     player TEXT NOT NULL, game TEXT NOT NULL, erfolg TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game, erfolg));
 CREATE TABLE IF NOT EXISTS spiel_der_woche (
@@ -112,6 +118,8 @@ class Datenbank:
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline INTEGER NOT NULL DEFAULT 0")
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline_grund TEXT")
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline_seit TEXT")
+            if "beantwortet_von" not in {z["name"] for z in v.execute("PRAGMA table_info(antraege)")}:
+                v.execute("ALTER TABLE antraege ADD COLUMN beantwortet_von TEXT")   # 1.3.0: Entwickler beantworten Spiel-Anträge
 
     @contextmanager
     def verbindung(self):
@@ -577,6 +585,91 @@ class Datenbank:
         with self.verbindung() as v:
             v.execute("INSERT INTO waechter_probe (id, zeit) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET zeit=excluded.zeit", (jetzt(),))
 
+    # --- Aufträge und Zeitplan (Zentrale 1.3.0) ---
+
+    AUFTRAG_MAX_LAUFZEIT = timedelta(hours=2)
+
+    def auftrag_anlegen(self, art: str, ziel: str, quelle: str, von: str | None) -> int | None:
+        """None, wenn derselbe Auftrag schon wartet oder läuft."""
+        with self.verbindung() as v:
+            v.execute("BEGIN IMMEDIATE")
+            if v.execute("SELECT 1 FROM auftraege WHERE art=? AND ziel=? AND status IN ('wartet','laeuft')", (art, ziel)).fetchone():
+                v.execute("COMMIT")
+                return None
+            aid = v.execute("INSERT INTO auftraege (art, ziel, quelle, von, angelegt) VALUES (?,?,?,?,?)",
+                            (art, ziel, quelle, von, jetzt())).lastrowid
+            v.execute("COMMIT")
+            return aid
+
+    def auftraege_holen(self) -> list[dict]:
+        """Für den Auftragsdienst: wartende Aufträge übernehmen (→ läuft). Hängengebliebene werden abgeschlossen."""
+        grenze = (datetime.now(timezone.utc) - self.AUFTRAG_MAX_LAUFZEIT).isoformat(timespec="seconds")
+        with self.verbindung() as v:
+            v.execute("BEGIN IMMEDIATE")
+            v.execute("UPDATE auftraege SET status='fehler', ende=?, zusammenfassung='abgebrochen (keine Rückmeldung nach 2 h)' "
+                      "WHERE status='laeuft' AND start < ?", (jetzt(), grenze))
+            liste = [dict(z) for z in v.execute("SELECT id, art, ziel FROM auftraege WHERE status='wartet' ORDER BY id")]
+            v.execute("UPDATE auftraege SET status='laeuft', start=? WHERE status='wartet'", (jetzt(),))
+            v.execute("COMMIT")
+        return liste
+
+    def auftrag_fertig(self, auftrag_id: int | None, status: str, zusammenfassung: str, log: str,
+                       art: str | None = None, ziel: str | None = None, start: str | None = None) -> int:
+        """Ergebnis eintragen. Ohne ID wird ein neuer Eintrag angelegt (z. B. Live-Deploy nach Freigabe)."""
+        log = log[-20000:]
+        with self.verbindung() as v:
+            if auftrag_id is None:
+                return v.execute("INSERT INTO auftraege (art, ziel, quelle, angelegt, status, start, ende, zusammenfassung, log) "
+                                 "VALUES (?,?,?,?,?,?,?,?,?)", (art, ziel, "dienst", jetzt(), status, start or jetzt(), jetzt(),
+                                                                zusammenfassung, log)).lastrowid
+            v.execute("UPDATE auftraege SET status=?, ende=?, zusammenfassung=?, log=? WHERE id=?",
+                      (status, jetzt(), zusammenfassung, log, auftrag_id))
+            return auftrag_id
+
+    def auftraege(self, limit: int = 30) -> list[dict]:
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute(
+                "SELECT id, art, ziel, quelle, von, angelegt, status, start, ende, zusammenfassung FROM auftraege ORDER BY id DESC LIMIT ?",
+                (limit,))]
+
+    def auftrag(self, auftrag_id: int) -> dict | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT * FROM auftraege WHERE id=?", (auftrag_id,)).fetchone()
+        return dict(z) if z else None
+
+    def zeitplan(self) -> list[dict]:
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute("SELECT * FROM zeitplan ORDER BY art, ziel")]
+
+    def zeitplan_setzen(self, art: str, ziel: str, uhrzeit: str | None) -> None:
+        with self.verbindung() as v:
+            if uhrzeit:
+                v.execute("INSERT INTO zeitplan (art, ziel, uhrzeit) VALUES (?,?,?) ON CONFLICT (art, ziel) DO UPDATE SET uhrzeit=excluded.uhrzeit",
+                          (art, ziel, uhrzeit))
+            else:
+                v.execute("DELETE FROM zeitplan WHERE art=? AND ziel=?", (art, ziel))
+
+    def zeitplan_faellig(self, heute: str, uhrzeit: str) -> list[dict]:
+        """Einträge, deren Uhrzeit heute erreicht ist und die heute noch nicht dran waren – werden dabei als erledigt markiert."""
+        with self.verbindung() as v:
+            v.execute("BEGIN IMMEDIATE")
+            liste = [dict(z) for z in v.execute("SELECT * FROM zeitplan WHERE uhrzeit <= ? AND (zuletzt IS NULL OR zuletzt < ?)",
+                                                (uhrzeit, heute))]
+            for z in liste:
+                v.execute("UPDATE zeitplan SET zuletzt=? WHERE art=? AND ziel=?", (heute, z["art"], z["ziel"]))
+            v.execute("COMMIT")
+        return liste
+
+    def dienst_setzen(self, name: str, wert: str) -> None:
+        with self.verbindung() as v:
+            v.execute("INSERT INTO dienst_status (name, wert, zeit) VALUES (?,?,?) ON CONFLICT (name) DO UPDATE SET wert=excluded.wert, zeit=excluded.zeit",
+                      (name, wert, jetzt()))
+
+    def dienst(self, name: str) -> dict | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT * FROM dienst_status WHERE name=?", (name,)).fetchone()
+        return dict(z) if z else None
+
     def zaehlen(self) -> dict:
         with self.verbindung() as v:
             return {t: v.execute(f"SELECT COUNT(*) FROM {t} WHERE {ECHT}").fetchone()[0]
@@ -693,10 +786,10 @@ class Datenbank:
             return [dict(z) for z in v.execute(
                 "SELECT * FROM antraege ORDER BY CASE status WHEN 'offen' THEN 0 ELSE 1 END, id DESC")]
 
-    def antrag_bearbeiten(self, antrag_id: int, status: str, antwort: str | None) -> bool:
+    def antrag_bearbeiten(self, antrag_id: int, status: str, antwort: str | None, von: str | None = None) -> bool:
         with self.verbindung() as v:
-            return v.execute("UPDATE antraege SET status=?, antwort=?, geaendert=? WHERE id=?",
-                             (status, antwort, jetzt(), antrag_id)).rowcount > 0
+            return v.execute("UPDATE antraege SET status=?, antwort=?, geaendert=?, beantwortet_von=? WHERE id=?",
+                             (status, antwort, jetzt(), von, antrag_id)).rowcount > 0
 
     # --- Admin ---
 

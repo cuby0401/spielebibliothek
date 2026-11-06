@@ -7,6 +7,12 @@
   python -m savesvc cloudflare-soll               Welche E-Mails in „Kollegen“/„Entwickler“ gehören (JSON, für scripts/cloudflare.py)
   python -m savesvc cloudflare-lesetoken          Nur-Lese-Schlüssel von stdin prüfen und nach /data legen (Modus 600)
 
+Für den Auftragsdienst (scripts/auftragsdienst.py, 1.3.0) – nur per docker exec von der NAS aus:
+  python -m savesvc auftraege-holen               wartende Aufträge als JSON, werden dabei auf „läuft“ gesetzt
+  python -m savesvc auftrag-fertig                Ergebnis von stdin (JSON) eintragen, bei Fehler Glocke + Home Assistant
+  python -m savesvc lebenszeichen <version>       „Auftragsdienst läuft“ fürs Admin-Panel und den Wächter
+  python -m savesvc live-status                   (Probe) Stand des Live-Deploys nach der Freigabe von stdin (JSON)
+
 Im Upload-Container (spielebibliothek-upload):
   python -m savesvc entwickler anlegen <name>     Upload-Konto + Spielordner; Passwort wird EINMAL angezeigt
   python -m savesvc entwickler passwort <name>    neues Passwort
@@ -39,7 +45,14 @@ def main(argv=None) -> int:
     en.add_argument("name", nargs="?")
     sub.add_parser("cloudflare-soll", help="Soll-Stand der Cloudflare-Richtlinien als JSON")
     sub.add_parser("cloudflare-lesetoken", help="Nur-Lese-Schlüssel von stdin hinterlegen")
+    sub.add_parser("auftraege-holen", help="für den Auftragsdienst")
+    sub.add_parser("auftrag-fertig", help="für den Auftragsdienst")
+    lz = sub.add_parser("lebenszeichen", help="für den Auftragsdienst")
+    lz.add_argument("version")
+    sub.add_parser("live-status", help="für den Auftragsdienst (Probe)")
     a = p.parse_args(argv)
+    if a.befehl in ("auftraege-holen", "auftrag-fertig", "lebenszeichen", "live-status"):
+        return auftragsdienst(a, sys.stdin)
 
     if a.befehl == "entwickler":
         return entwickler(a.aktion, a.name)
@@ -102,6 +115,43 @@ def entwickler(aktion: str, name: str | None) -> int:
     print(f"Ordner:    {ordner}")
     print()
     print("Passwort jetzt notieren und persönlich weitergeben – es wird nur als Hash gespeichert.")
+    return 0
+
+
+def auftragsdienst(a, eingabe) -> int:
+    import json
+    from . import auftraege
+    from .auth import BENUTZER_MUSTER
+    e = laden()
+    db = Datenbank(e.db_path)
+    if a.befehl == "auftraege-holen":
+        print(json.dumps(db.auftraege_holen()))
+    elif a.befehl == "lebenszeichen":
+        db.dienst_setzen("auftragsdienst", a.version[:40])
+    elif a.befehl == "live-status":
+        d = json.loads(eingabe.read())
+        erlaubt = {k: str(d[k])[:4000] for k in ("status", "zeit", "version", "commit", "text") if k in d}
+        ziel = e.db_path.parent / "live-status.json"
+        tmp = ziel.with_suffix(".tmp")
+        tmp.write_text(json.dumps(erlaubt, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(ziel)
+    elif a.befehl == "auftrag-fertig":
+        d = json.loads(eingabe.read())
+        status = d.get("status")
+        if status not in ("ok", "fehler", "laeuft"):
+            print("status: ok, fehler oder laeuft", file=sys.stderr)
+            return 2
+        art = d.get("art") if d.get("art") in auftraege.ANZEIGE else None
+        ziel = d.get("ziel") if d.get("ziel") in auftraege.ZIELE else None
+        aid = db.auftrag_fertig(d.get("id") if isinstance(d.get("id"), int) else None, status,
+                                str(d.get("zusammenfassung", ""))[:500], str(d.get("log", "")), art=art, ziel=ziel, start=d.get("start"))
+        if status == "fehler":
+            from .waechter import ha_senden
+            text = f"{auftraege.ANZEIGE.get(art or (db.auftrag(aid) or {}).get('art'), 'Aufgabe')} fehlgeschlagen: {str(d.get('zusammenfassung', ''))[:150]}"
+            for admin_name in sorted(n for n in e.admins if BENUTZER_MUSTER.match(n)):
+                db.melden(admin_name, text, "/admin/#aufgaben", wichtig=True)
+            ha_senden(e, "problem", "Spielebibliothek: " + text)
+        print(json.dumps({"id": aid}))
     return 0
 
 

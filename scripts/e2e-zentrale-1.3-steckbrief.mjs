@@ -1,13 +1,15 @@
 // Ende-zu-Ende-Test für Zentrale 1.3.0: Beschreibung und Vorschaubild auf der Upload-Seite (Steckbrief, E61),
-// „noch nie angemeldet“ und Cloudflare-Abgleich im Admin-Panel. Aufbau wie e2e-zentrale-1.3.mjs.
+// „noch nie angemeldet“ und Cloudflare-Abgleich im Admin-Panel, Anträge an Entwickler, Simulation endet im Admin-Panel,
+// Reiter „Aufgaben“. Aufbau wie e2e-zentrale-1.3.mjs.
 // Aufruf (macht scripts/e2e-alle.sh): node scripts/e2e-zentrale-1.3-steckbrief.mjs <ordner> <upload-passwort>
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { setTimeout as warte } from "node:timers/promises";
-const G = "http://<NAS_GH>:18088", U = "http://<NAS_UH>:18090";
+// Auf der NAS (Auftragsdienst, 1.3.0) setzt scripts/e2e-nas.sh Hostnamen und Chrome per Umgebung
+const G = process.env.E2E_G || "http://<NAS_GH>:18088", U = process.env.E2E_U || "http://<NAS_UH>:18090";
 const DIR = process.argv[2], PW = process.argv[3];
-const chrome = spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  ["--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${DIR}/chrome-profil`, "--no-first-run", "about:blank"], { stdio: "ignore" });
+const chrome = spawn(process.env.CHROME_BIN || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  [...(process.env.CHROME_BIN ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] : []), "--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${DIR}/chrome-profil`, "--no-first-run", "about:blank"], { stdio: "ignore" });
 process.on("exit", () => chrome.kill());   // Chrome nie hängen lassen, auch bei Abbruch
 let ws, nr = 0; const offen = new Map(); const fehler = []; const ergebnis = [];
 const ok = (bed, text) => { ergebnis.push((bed ? "✓ " : "✗ ") + text); if (!bed) process.exitCode = 1; };
@@ -103,6 +105,33 @@ async function bildWaehlen(datei) {
   ok(await eval_(`[...document.querySelectorAll("tr")].find(t=>t.textContent.startsWith("seb"))?.textContent.includes("noch nie angemeldet")`) === false, "Admin: seb ist angemeldet");
   ok(await eval_(`document.body.textContent.includes("Cloudflare-Abgleich nicht eingerichtet")`), "Admin: Hinweis „Cloudflare-Abgleich nicht eingerichtet“");
   ok(await eval_(`document.body.textContent.includes("scripts/cloudflare.py abgleichen")`), "Admin: Hinweis auf scripts/cloudflare.py beim Anlegen");
+
+  // 6) Anträge: Antrag zu pauls Spiel geht an paul – im Admin-Panel ohne Zahl, nur eingeklappt zur Info
+  await gehe(G + "/", 3000);
+  const an = await eval_(`fetch("/api/antraege",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},
+    body:JSON.stringify({art:"fehler",spiel:"paul/raetsel",text:"E2E: Knopf reagiert nicht"})}).then(r=>r.json()).then(d=>d.an)`);
+  ok(an === "paul", "Antrag zu pauls Spiel geht an paul");
+  await gehe(G + "/#/antraege", 3000);
+  ok(await eval_(`document.body.textContent.includes("geht an paul (Entwickler)")`), "Antragsteller sieht: geht an paul");
+  await gehe(G + "/admin/#antraege", 3500);
+  ok(await eval_(`document.getElementById("offen-zahl").hidden`), "Admin-Panel: keine Zahl für Spiel-Anträge");
+  ok(await eval_(`[...document.querySelectorAll("details summary")].some(s=>s.textContent.includes("Anträge zu Spielen") && s.textContent.includes("1 offen"))`),
+    "Admin-Panel: Spiel-Antrag nur eingeklappt zur Info");
+
+  // 7) Simulation: Beenden führt zurück ins Admin-Panel
+  await gehe(G + "/admin/#uebersicht", 3500);
+  await eval_(`[...document.querySelectorAll("button")].find(b=>b.textContent==="Ansicht als Spieler").click(); true`);
+  ok(await bis(`location.pathname==="/" && !document.getElementById("ansicht-band").hidden`, 8000), "Simulation startet im Hauptmenü");
+  await eval_(`document.getElementById("ansicht-ende").click(); true`);
+  ok(await bis(`location.pathname==="/admin/" && location.hash==="#uebersicht"`, 8000), "Simulation beenden → zurück ins Admin-Panel (Übersicht)");
+
+  // 8) Aufgaben: Auftragsdienst nicht eingerichtet, Auftrag anlegen, Zeitplan
+  await gehe(G + "/admin/#aufgaben", 3500);
+  ok(await eval_(`document.body.textContent.includes("Noch nicht eingerichtet")`), "Aufgaben: Hinweis „Auftragsdienst noch nicht eingerichtet“");
+  await eval_(`[...document.querySelectorAll("button")].find(b=>b.textContent==="Jetzt starten").click(); true`);
+  ok(await bis(`[...document.querySelectorAll("td")].some(t=>t.textContent==="wartet")`), "Aufgaben: Unit-Tests gestartet (wartet)");
+  await eval_(`{ const i=document.querySelector('input[type="time"]'); i.value="03:30"; i.closest("td").querySelector("button").click(); } true`);
+  ok(await bis(`document.getElementById("meldung").textContent.includes("täglich um 03:30")`), "Aufgaben: Zeitplan täglich 03:30");
 
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
   console.log(ergebnis.join("\n"));

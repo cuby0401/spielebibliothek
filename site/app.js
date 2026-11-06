@@ -544,6 +544,14 @@ function menueEinrichten() {
 
 function ansichtWechseln(rolle) {
 	Bridge.ansicht = rolle;
+	// Beenden: zurück an die Stelle im Admin-Panel, an der die Ansicht gestartet wurde (1.3.0)
+	let zurueck = null;
+	try { zurueck = JSON.parse(sessionStorage.getItem("ansicht-zurueck") || "null"); sessionStorage.removeItem("ansicht-zurueck"); } catch { /* egal */ }
+	if (!rolle && zurueck && typeof zurueck.url === "string" && zurueck.url.startsWith("/admin/")) {
+		try { sessionStorage.setItem("admin-scroll", String(zurueck.y || 0)); } catch { /* egal */ }
+		location.href = zurueck.url;
+		return;
+	}
 	location.hash = "#/";
 	location.reload();
 }

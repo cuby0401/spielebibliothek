@@ -1,9 +1,10 @@
 // Sicherheitstest „Böse“ im Teststand: alle Angriffe müssen abgewehrt sein. Aufruf: node scripts/e2e-boese.mjs <ordner>
 import { spawn } from "node:child_process";
 import { setTimeout as warte } from "node:timers/promises";
-const G = "http://<NAS_GH>:18088";
-const chrome = spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  ["--headless=new", "--remote-debugging-port=9334", `--user-data-dir=${process.argv[2]}/chrome-profil2`, "--no-first-run", "about:blank"], { stdio: "ignore" });
+// Auf der NAS (Auftragsdienst, 1.3.0) setzt scripts/e2e-nas.sh Hostnamen und Chrome per Umgebung
+const G = process.env.E2E_G || "http://<NAS_GH>:18088";
+const chrome = spawn(process.env.CHROME_BIN || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  [...(process.env.CHROME_BIN ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] : []), "--headless=new", "--remote-debugging-port=9334", `--user-data-dir=${process.argv[2]}/chrome-profil2`, "--no-first-run", "about:blank"], { stdio: "ignore" });
 process.on("exit", () => chrome.kill());   // Chrome nie hängen lassen, auch bei Abbruch
 let ws, nr = 0; const offen = new Map(); const rahmen = [];
 const cdp = (method, params = {}, sessionId) => { const id = ++nr; ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) })); return new Promise((ja) => offen.set(id, ja)); };

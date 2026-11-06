@@ -49,6 +49,8 @@ async function uebersicht(c) {
 		await api("POST", `/ansicht/${rolle}/zuruecksetzen`);
 		try { for (const k of Object.keys(localStorage)) if (k.startsWith("sb-puffer:") && k.endsWith(":" + rolle)) localStorage.removeItem(k); } catch { /* egal */ }
 		Bridge.ansicht = rolle;
+		// Beim Beenden zurück an genau diese Stelle im Admin-Panel (1.3.0)
+		try { sessionStorage.setItem("ansicht-zurueck", JSON.stringify({ url: location.pathname + location.hash, y: Math.round(scrollY) })); } catch { /* egal */ }
 		location.href = "/#/";
 	};
 	c.append(h("h2", { text: "Bibliothek als Rolle ansehen" }),
@@ -88,7 +90,9 @@ async function probeZeigen(c) {
 	const f = p.freigabe;
 	c.append(h("p", {}, `Version ${p.version || "?"} · Commit ${p.commit || "?"}` + (p.kopieVon ? ` · Daten kopiert ${datumZeit(p.kopieVon)}` : "")),
 		h("p", { class: f && f.commit === p.commit ? "hinweis-box" : "leise" },
-			f && f.commit === p.commit ? `✓ Freigegeben am ${datumZeit(f.zeit)}${f.notiz ? " – " + f.notiz : ""}. Jetzt live einspielen: scripts/deploy.sh` : "Noch nicht freigegeben."),
+			f && f.commit === p.commit ? `✓ Freigegeben am ${datumZeit(f.zeit)}${f.notiz ? " – " + f.notiz : ""}.` : "Noch nicht freigegeben."),
+		// Live-Deploy nach der Freigabe (1.3.0): meldet der Auftragsdienst
+		f && f.commit === p.commit ? liveStatus(p) : null,
 		h("div", { class: "zeile" },
 			f && f.commit === p.commit
 				? knopf("Freigabe zurücknehmen", async () => { await api("DELETE", "/probe/freigeben"); meldung("Freigabe zurückgenommen."); zeigen(); }, "gefahr")
@@ -96,9 +100,22 @@ async function probeZeigen(c) {
 					const notiz = prompt("Für Live freigeben? Was hast du getestet? (optional, steht in der Freigabe)", "");
 					if (notiz === null) return;
 					await api("POST", "/probe/freigeben", { notiz });
-					meldung("Freigegeben – jetzt auf dem Mac: scripts/deploy.sh");
+					meldung("Freigegeben – der Auftragsdienst spielt diese Version innerhalb einer Minute live ein.");
 					zeigen();
 				}, "")));
+}
+
+function liveStatus(p) {
+	const l = p.live && p.live.commit === p.commit ? p.live : null;
+	if (!l) {
+		setTimeout(() => { if (!location.hash || location.hash === "#uebersicht") zeigen(); }, 10000);
+		return h("p", { class: "leise", text: "Wartet auf den Auftragsdienst (spätestens nach einer Minute) … Ohne eingerichteten Auftragsdienst: auf dem Mac scripts/deploy.sh" });
+	}
+	if (l.status === "laeuft") setTimeout(() => { if (!location.hash || location.hash === "#uebersicht") zeigen(); }, 10000);
+	return h("div", { class: l.status === "fehler" ? "hinweis-box" : "karte" },
+		h("strong", { text: l.status === "ok" ? `✓ Live eingespielt (${datumZeit(l.zeit)})` : l.status === "fehler" ? "✗ Live-Deploy fehlgeschlagen – die bisherige Version läuft weiter" : "Wird gerade live eingespielt …" }),
+		l.status === "fehler" ? h("p", { class: "leise", text: "Neuer Versuch: „Freigabe zurücknehmen“ und erneut freigeben." }) : null,
+		l.text ? h("details", {}, h("summary", { text: "Ausgabe" }), h("pre", { class: "log", text: l.text })) : null);
 }
 
 // ---------- Spiele ----------
@@ -271,20 +288,31 @@ async function spielstandDetail(c, s, filter) {
 
 // ---------- Anträge ----------
 async function antraegeSeite(c) {
-	const liste = await api("GET", "/antraege");
-	if (!liste.length) return c.append(h("p", { class: "leise", text: "Keine Anträge." }));
+	const alle = await api("GET", "/antraege");
+	// 1.3.0: Hier nur, was der Admin erledigt (Bibliothek). Anträge zu Spielen bearbeitet deren Entwickler – nur zur Info, ohne Zahl.
+	const liste = alle.filter((a) => a.zustaendig === "admin"), spielAntraege = alle.filter((a) => a.zustaendig !== "admin");
+	c.append(h("h2", { text: "Anträge an die Bibliothek" }));
+	if (!liste.length) c.append(h("p", { class: "leise", text: "Keine Anträge." }));
 	c.append(...liste.map((a) => {
 		const antwort = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Antwort an " + a.player });
 		antwort.value = a.antwort || "";
 		const setzen = (status) => sicher(async () => { await api("PATCH", "/antraege/" + a.id, { status, antwort: antwort.value || null }); meldung(`Antrag ${a.id}: ${status}.`); zeigen(); });
 		return h("div", { class: "karte" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
-				h("span", { class: "leise", text: ` · von ${a.player}` + (a.spiel ? ` · ${a.spiel}` : "") + ` · ${datumZeit(a.erstellt)}` })),
+				h("span", { class: "leise", text: ` · von ${a.player}` + (a.spiel ? ` · ${a.title || a.spiel}` : "") + ` · ${datumZeit(a.erstellt)}` })),
 			h("div", { text: a.text }),
 			antwort,
 			h("div", { class: "zeile" }, knopf("Erledigt", () => setzen("erledigt"), ""), knopf("Ablehnen", () => setzen("abgelehnt"), "gefahr"),
 				a.status !== "offen" ? knopf("Wieder öffnen", () => setzen("offen")) : null));
 	}));
+	if (spielAntraege.length) {
+		const offen = spielAntraege.filter((a) => a.status === "offen").length;
+		c.append(h("details", { class: "karte" }, h("summary", { text: `Anträge zu Spielen – bearbeitet der jeweilige Entwickler (${offen} offen, ${spielAntraege.length - offen} geschlossen, nur zur Info)` }),
+			tabelle(["Spiel", "Entwickler", "Art", "Von", "Status", "Erstellt", "Text"], spielAntraege.map((a) => h("tr", {},
+				h("td", { text: a.title || a.spiel }), h("td", { text: a.zustaendig }), h("td", { text: a.artText }), h("td", { text: a.player }),
+				h("td", {}, h("span", { class: "status " + a.status, text: a.status })), h("td", { text: datumZeit(a.erstellt) }),
+				h("td", { text: a.text.length > 120 ? a.text.slice(0, 120) + " …" : a.text }))))));
+	}
 }
 
 // ---------- Navigation ----------
@@ -300,7 +328,52 @@ async function benutzerMitAnmeldungen(c) {
 		}) : h("p", { class: "leise", text: "Noch keine Anmeldungen aufgezeichnet." }));
 }
 
-const SEITEN = { uebersicht, spiele: spieleSeite, benutzer: benutzerMitAnmeldungen, spielstaende: spielstaendeSeite, antraege: antraegeSeite };
+// ---------- Aufgaben (1.3.0): Tests per Knopf oder Zeitplan, Live-Deploy nach Freigabe ----------
+const STATUS_TEXT = { wartet: "wartet", laeuft: "läuft …", ok: "✓ ok", fehler: "✗ Fehler" };
+async function aufgabenSeite(c) {
+	const d = await api("GET", "/auftraege");
+	const dienst = d.dienst;
+	c.append(h("h2", { text: "Auftragsdienst" }),
+		h("p", { class: dienst.aktiv ? "leise" : "hinweis-box", text: !dienst.eingerichtet
+			? "Noch nicht eingerichtet – Aufträge bleiben liegen. Einmalig am Mac: sh scripts/auftragsdienst-einrichten.sh (Cron-Job auf der NAS, jede Minute)."
+			: dienst.aktiv ? `✓ läuft – zuletzt gemeldet ${datumZeit(dienst.zuletzt)} (Live-Stand ${dienst.version})`
+				: `✗ meldet sich nicht mehr seit ${datumZeit(dienst.zuletzt)} – Cron-Job auf der NAS prüfen (crontab -l), Log: /tmp/sb-auftragsdienst.log` }),
+		h("p", { class: "leise", text: "Der Dienst führt nur fest eingebaute Aufgaben aus. Live-Deploy passiert ausschließlich nach „Für Live freigeben“ in der Probe – nicht von hier." }));
+
+	// Jetzt starten + Zeitplan
+	const plan = (art, ziel) => (d.zeitplan.find((z) => z.art === art && z.ziel === ziel) || {}).uhrzeit || "";
+	const zeilen = [];
+	for (const [art, artText] of Object.entries(d.arten)) for (const [ziel, zielText] of Object.entries(d.ziele)) {
+		const uhr = h("input", { type: "time", value: plan(art, ziel) });
+		zeilen.push(h("tr", {}, h("td", { text: artText }), h("td", { text: zielText }),
+			h("td", {}, knopf("Jetzt starten", () => sicher(async () => { await api("POST", "/auftraege", { art, ziel }); meldung(`${artText} (${zielText}) gestartet – Ergebnis unten.`); zeigen(); }), "")),
+			h("td", {}, h("div", { class: "zeile" }, uhr,
+				knopf("Täglich", () => sicher(async () => { if (!uhr.value) return meldung("Erst eine Uhrzeit wählen.", true); await api("PUT", "/zeitplan", { art, ziel, uhrzeit: uhr.value }); meldung(`${artText} (${zielText}) läuft täglich um ${uhr.value}.`); zeigen(); })),
+				plan(art, ziel) ? knopf("Aus", () => sicher(async () => { await api("PUT", "/zeitplan", { art, ziel, uhrzeit: null }); meldung("Zeitplan entfernt."); zeigen(); }), "gefahr") : null))));
+	}
+	c.append(h("h2", { text: "Aufgaben" }),
+		h("p", { class: "leise", text: "Unit-Tests ca. 4 Minuten, Ende-zu-Ende-Tests ca. 10 Minuten (im Teststand, die echte Bibliothek wird nicht angefasst). „Live-Stand“ = was gerade live läuft, „Probe“ = was in der Probe zum Testen liegt. Bei Fehlern: rote Glocke und Home Assistant." }),
+		tabelle(["Aufgabe", "Ziel", "", "Zeitplan (täglich)"], zeilen));
+
+	// Verlauf
+	c.append(h("h2", { text: "Letzte Läufe" }));
+	if (!d.laeufe.length) return c.append(h("p", { class: "leise", text: "Noch keine." }));
+	c.append(tabelle(["Aufgabe", "Ziel", "Auslöser", "Gestartet", "Dauer", "Status", "Ergebnis", ""], d.laeufe.map((l) => {
+		const dauer = l.start && l.ende ? Math.max(1, Math.round((new Date(l.ende) - new Date(l.start)) / 1000)) : null;
+		const zelle = h("div", {});
+		return h("tr", {}, h("td", { text: d.anzeige[l.art] || l.art }), h("td", { text: d.ziele[l.ziel] || l.ziel }),
+			h("td", { text: l.quelle === "plan" ? "Zeitplan" : l.quelle === "dienst" ? "Freigabe" : l.von || "Knopf" }),
+			h("td", { text: datumZeit(l.start || l.angelegt) }), h("td", { text: dauer ? (dauer >= 60 ? Math.round(dauer / 60) + " min" : dauer + " s") : "" }),
+			h("td", { class: l.status === "fehler" ? "warn" : "", text: STATUS_TEXT[l.status] || l.status }), h("td", { text: l.zusammenfassung || "" }),
+			h("td", {}, l.ende ? knopf("Log", async () => {
+				const voll = await api("GET", "/auftraege/" + l.id);
+				zelle.replaceChildren(h("pre", { class: "log", text: voll.log || "(leer)" }));
+			}) : null, zelle));
+	})));
+	if (d.laeufe.some((l) => l.status === "wartet" || l.status === "laeuft")) setTimeout(() => { if (location.hash === "#aufgaben") zeigen(); }, 15000);
+}
+
+const SEITEN = { uebersicht, spiele: spieleSeite, benutzer: benutzerMitAnmeldungen, spielstaende: spielstaendeSeite, antraege: antraegeSeite, aufgaben: aufgabenSeite };
 
 async function zeigen() {
 	const name = SEITEN[location.hash.slice(1)] ? location.hash.slice(1) : "uebersicht";
@@ -308,9 +381,20 @@ async function zeigen() {
 	const c = $("inhalt");
 	c.replaceChildren();
 	await sicher(() => SEITEN[name](c));
+	// Rückkehr aus „Ansicht als …“: an die alte Scrollposition (1.3.0)
+	try {
+		const y = sessionStorage.getItem("admin-scroll");
+		if (y !== null) { sessionStorage.removeItem("admin-scroll"); requestAnimationFrame(() => scrollTo(0, Number(y) || 0)); }
+	} catch { /* egal */ }
 	sicher(async () => {
-		const offen = (await api("GET", "/antraege")).filter((a) => a.status === "offen").length;
+		const offen = (await api("GET", "/antraege")).filter((a) => a.status === "offen" && a.zustaendig === "admin").length;
 		$("offen-zahl").textContent = String(offen); $("offen-zahl").hidden = !offen;
+		// Aufgaben: Zahl = wie viele Aufgaben zuletzt fehlgeschlagen sind (je Aufgabe und Ziel der neueste Lauf)
+		const auf = await api("GET", "/auftraege");
+		const neueste = new Map();
+		for (const l of auf.laeufe) if (!neueste.has(l.art + l.ziel)) neueste.set(l.art + l.ziel, l);
+		const rot = [...neueste.values()].filter((l) => l.status === "fehler").length + (auf.dienst.eingerichtet && !auf.dienst.aktiv ? 1 : 0);
+		$("aufgaben-zahl").textContent = String(rot); $("aufgaben-zahl").hidden = !rot;
 	});
 }
 

@@ -31,6 +31,9 @@ ARTEN = {
     "sonstiges": "Sonstiges",
 }
 NUR_ENTWICKLER = {"bestenliste", "spiel"}   # betreffen eigene Spiele
+# Zentrale 1.3.0: Diese Arten gehen mit einem gewählten Spiel an dessen Entwickler – nicht an den Admin.
+# Alles andere (Spielstand, Bestenliste, Spiel löschen/umbenennen, Anträge ohne Spiel) kann nur der Admin erledigen.
+SPIEL_ARTEN = {"fehler", "wunsch", "sonstiges"}
 STATUS = ("offen", "erledigt", "abgelehnt")
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -73,7 +76,7 @@ def browser_von(ua: str) -> str:
 
 def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, aktuelle_season, upload: UploadDienst | None = None):
     upload = upload or UploadDienst(e.upload_url, e.intern_token)
-    from . import cloudflare
+    from . import auftraege, cloudflare
     cf_pruefung = cloudflare.Pruefung(e.cloudflare_schluessel, e.cloudflare_konto,
                                       {"kollegen": e.richtlinie_kollegen, "entwickler": e.richtlinie_entwickler})
 
@@ -352,20 +355,69 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             raise HTTPException(422, "spiel ungültig")
         aid = db.antrag_anlegen(player, art, spiel, text.strip())
         log.info("neuer Antrag %d von %s (%s)", aid, player, art)
-        # Glocke: Admins bekommen jeden Antrag, Entwickler Fehlermeldungen zu ihren Spielen – beides auffällig
         kurz = " ".join(text.split())[:100]
+        besitzer = zustaendig({"art": art, "spiel": spiel})
+        if besitzer:
+            # Spiel-Antrag (1.3.0): nur der Entwickler bekommt ihn – der Admin nicht (keine Glocke, keine Zahl, kein Push)
+            if besitzer != player:
+                db.melden(besitzer, f"Antrag zu „{titel_von(spiel)}“ von {player} ({ARTEN[art]}): {kurz}", "#/meine-spiele",
+                          wichtig=(art == "fehler"))
+            return {"id": aid, "an": besitzer}
         for a in sorted(e.admins):
-            db.melden(a, f"Neuer Antrag von {player} ({art}): {kurz}", "/admin/#antraege", wichtig=True)
-        besitzer = spiel.split("/", 1)[0] if spiel and "/" in spiel else None
-        if art == "fehler" and besitzer and besitzer != player and besitzer not in e.admins:
-            db.melden(besitzer, f"{player} meldet einen Fehler in „{titel_von(spiel)}“: {kurz}", "#/meine-spiele", wichtig=True)
+            db.melden(a, f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}", "/admin/#antraege", wichtig=True)
         from . import waechter
-        waechter.ha_senden(e, "antrag", f"Neuer Antrag von {player} ({art}): {kurz}")
-        return {"id": aid}
+        waechter.ha_senden(e, "antrag", f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}")
+        return {"id": aid, "an": "admin"}
+
+    def zustaendig(a: dict) -> str | None:
+        """Entwickler, der einen Antrag bearbeitet – None = Admin."""
+        spiel = a.get("spiel") or ""
+        if a.get("art") not in SPIEL_ARTEN or "/" not in spiel:
+            return None
+        besitzer, ordner = spiel.split("/", 1)
+        if not (games.spielordner(e.spiele_dir, besitzer, ordner) or
+                games.spielordner(e.spiele_dir, besitzer, ordner + versionen.ENTWURF)):
+            return None
+        return besitzer
+
+    def mit_infos(a: dict) -> dict:
+        z = zustaendig(a)
+        return {**a, "artText": ARTEN.get(a["art"], a["art"]), "zustaendig": z or "admin",
+                "title": titel_von(a["spiel"]) if a.get("spiel") else None}
 
     @app.get("/api/antraege")
     def meine_antraege(player: str = Depends(ich_daten)):
-        return db.antraege(player)
+        return [mit_infos(a) for a in db.antraege(player)]
+
+    # Spiel-Anträge für den Entwickler (1.3.0): pro Spiel, offen und geschlossen
+    @app.get("/api/entwickler/antraege")
+    def entwickler_antraege(request: Request, player: str = Depends(entwickler)):
+        if rollen.simuliert(e, request, player):
+            return []
+        return [mit_infos(a) for a in db.antraege() if zustaendig(a) == player]
+
+    @app.patch("/api/entwickler/antraege/{antrag_id}")
+    def entwickler_antwort(request: Request, player: str = Depends(entwickler), antrag_id: int = P(...),
+                           body: dict[str, Any] = Body(...)):
+        if rollen.simuliert(e, request, player):
+            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Anträge beantwortet")
+        a = db.antrag(antrag_id)
+        if not a or zustaendig(a) != player:
+            raise HTTPException(404, "Antrag nicht gefunden")
+        return antworten(a, body, player)
+
+    def antworten(a: dict, body: dict, von: str) -> dict:
+        status, antwort = body.get("status"), body.get("antwort")
+        if status not in STATUS:
+            raise HTTPException(422, f"status: {', '.join(STATUS)}")
+        if antwort is not None and (not isinstance(antwort, str) or len(antwort) > 4000):
+            raise HTTPException(422, "antwort zu lang")
+        db.antrag_bearbeiten(a["id"], status, antwort, von)
+        if status != "offen" and a["player"] != von:   # Glocke: Antragsteller erfährt die Antwort
+            zu = f" zu „{titel_von(a['spiel'])}“" if a.get("spiel") else ""
+            db.melden(a["player"], f"Dein Antrag{zu} wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'} ({von})"
+                                   + (f": {antwort[:120]}" if antwort else ""), "#/antraege")
+        return {"ok": True}
 
     # ---------- Anmeldungen (E55) ----------
 
@@ -422,7 +474,15 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         except (OSError, ValueError):
             freigabe = None
         return {"probe": e.probe, "commit": e.zentrale_commit, "version": e.zentrale_version,
-                "kopieVon": kopie.read_text().strip() if kopie.exists() else None, "freigabe": freigabe}
+                "kopieVon": kopie.read_text().strip() if kopie.exists() else None, "freigabe": freigabe,
+                "live": live_status()}
+
+    def live_status() -> dict | None:
+        """Was der Auftragsdienst nach der Freigabe gemeldet hat (1.3.0): wartet, läuft, ok oder fehler."""
+        try:
+            return json.loads((e.db_path.parent / "live-status.json").read_text())
+        except (OSError, ValueError):
+            return None
 
     @app.post("/api/admin/probe/freigeben")
     def probe_freigeben(player: str = Depends(admin), body: dict[str, Any] = Body(default={})):
@@ -479,7 +539,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             "testspiele": sum(1 for x in alle_spiele if einst_alle.get(x["id"], {}).get("testspiel")),
             "offline": sum(1 for x in alle_spiele if einst_alle.get(x["id"], {}).get("offline")),
             "zaehler": db.zaehlen(),
-            "offeneAntraege": sum(1 for a in db.antraege() if a["status"] == "offen"),
+            "offeneAntraege": sum(1 for a in db.antraege() if a["status"] == "offen" and not zustaendig(a)),
             "aktivitaet": [{**a, "title": titel_von(a["game"])} for a in db.letzte_aktivitaet()],
             "uploads": ereignisse,
             "speicher": speicher,
@@ -577,6 +637,8 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                   "entwickler": (mail not in fehlt.get("entwickler", set())) if name in entw else None}}
                 for mail, name in sorted(benutzerliste.alle().items(), key=lambda x: x[1])]
 
+    auftraege.registrieren(app, e, db, admin)   # Aufgaben: Tests und Zeitplan (1.3.0)
+
     @app.get("/api/admin/cloudflare")
     def cloudflare_stand(_: str = Depends(admin), neu: bool = Query(False)):
         """Vergleich Benutzerliste ↔ Cloudflare-Richtlinien. Liest nur – geändert wird mit scripts/cloudflare.py am Mac."""
@@ -664,20 +726,12 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     # Anträge
     @app.get("/api/admin/antraege")
     def alle_antraege(_: str = Depends(admin)):
-        return [{**a, "artText": ARTEN.get(a["art"], a["art"])} for a in db.antraege()]
+        # „zustaendig“: admin = Bibliothek (zählt, mit Glocke) – sonst der Entwickler (nur zur Info)
+        return [mit_infos(a) for a in db.antraege()]
 
     @app.patch("/api/admin/antraege/{antrag_id}")
-    def antrag_beantworten(_: str = Depends(admin), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):
-        status = body.get("status")
-        antwort = body.get("antwort")
-        if status not in STATUS:
-            raise HTTPException(422, f"status: {', '.join(STATUS)}")
-        if antwort is not None and (not isinstance(antwort, str) or len(antwort) > 4000):
-            raise HTTPException(422, "antwort zu lang")
-        if not db.antrag_bearbeiten(antrag_id, status, antwort):
-            raise HTTPException(404, "Antrag nicht gefunden")
+    def antrag_beantworten(admin_name: str = Depends(admin), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):
         a = db.antrag(antrag_id)
-        if a and status != "offen":   # Glocke: Antragsteller erfährt die Antwort (Zentrale 1.2.0)
-            db.melden(a["player"], f"Dein Antrag wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'}"
-                                   + (f": {antwort[:120]}" if antwort else ""), "#/antraege")
-        return {"ok": True}
+        if not a:
+            raise HTTPException(404, "Antrag nicht gefunden")
+        return antworten(a, body, admin_name)

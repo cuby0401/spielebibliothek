@@ -58,6 +58,13 @@ def pruefen(e, db, upload) -> list[str]:
         probleme.append(f"Datenbank nicht beschreibbar ({f}) – Spielstände gehen verloren. Besitzer/Rechte der Dateien "
                         "in /volume1/games/data prüfen (auch saves.db-wal und saves.db-shm)")
     try:
+        from .auftraege import dienst_zustand
+        d = dienst_zustand(db)
+        if d["eingerichtet"] and not d["aktiv"]:
+            probleme.append("Auftragsdienst meldet sich nicht mehr (Cron-Job auf der NAS?) – Tests und Live-Deploy nach Freigabe laufen nicht")
+    except Exception:   # noqa: BLE001
+        pass
+    try:
         upload("GET", "/intern/gesund")
     except Exception as f:   # noqa: BLE001
         probleme.append(f"Upload-Dienst: {getattr(f, 'detail', f)}")
