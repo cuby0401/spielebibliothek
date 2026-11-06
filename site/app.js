@@ -258,9 +258,10 @@ function kachel(spiel) {
 
 	const bild = document.createElement("div");
 	bild.className = "bild";
-	if (spiel.thumbnail) {
+	if (spiel.vorschau || spiel.thumbnail) {
 		const img = document.createElement("img");
-		img.src = spielPfad(spiel.id) + spiel.thumbnail.split("/").map(encodeURIComponent).join("/");
+		// Vorschaubild von der Upload-Seite (Steckbrief) gilt vor dem thumbnail aus der game.json
+		img.src = spiel.vorschau || spielPfad(spiel.id) + spiel.thumbnail.split("/").map(encodeURIComponent).join("/");
 		img.alt = "";
 		img.loading = "lazy";
 		img.onerror = () => { img.remove(); bild.textContent = "🎮"; };

@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Path as P, Query, Request, Response, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
-from . import games, release, versionen, zipinstall
+from . import games, release, steckbrief, versionen, zipinstall
 from .auth import BENUTZER_MUSTER, Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 
@@ -475,12 +475,70 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         store.ereignis(player, f"auf Version {vid} zurückgesetzt", ordner)
         return {"ok": True, "spielstaende": ergebnis}
 
+    # ---------- Steckbrief: Titel, Beschreibung, Vorschaubild (Zentrale 1.3.0) ----------
+
+    def spiel_basis(player: str, ordner: str) -> Path:
+        ziel = ordnerpfad(player, ordner)
+        if not (ziel.is_dir() or versionen.entwurf(ziel.parent, ordner).is_dir()):
+            raise HTTPException(404, "Spiel nicht gefunden")
+        return ziel.parent
+
+    def steckbrief_antwort(basis: Path, ordner: str) -> dict:
+        quelle = basis / ordner if (basis / ordner).is_dir() else versionen.entwurf(basis, ordner)
+        daten, _ = games.meta(quelle)
+        sb = steckbrief.lesen(basis, ordner)
+        bild = steckbrief.bild(basis, ordner)
+        return {"title": sb.get("title", ""), "description": sb.get("description", ""),
+                "gameJson": {"title": games._text(daten.get("title"), steckbrief.TITEL_MAX) or "",
+                             "description": games._text(daten.get("description"), steckbrief.BESCHREIBUNG_MAX) or "",
+                             "thumbnail": bool(daten.get("thumbnail"))},
+                "vorschaubild": {"bytes": bild.stat().st_size, "stand": int(bild.stat().st_mtime)} if bild else None}
+
+    @app.get("/api/upload/spiele/{ordner}/steckbrief")
+    def steckbrief_lesen(player: str = Depends(angemeldet), ordner: str = P(...)):
+        return steckbrief_antwort(spiel_basis(player, ordner), ordner)
+
+    @app.put("/api/upload/spiele/{ordner}/steckbrief")
+    def steckbrief_schreiben(player: str = Depends(angemeldet), ordner: str = P(...), body: dict[str, Any] = Body(...)):
+        basis = spiel_basis(player, ordner)
+        title, description = body.get("title"), body.get("description")
+        if not all(x is None or isinstance(x, str) for x in (title, description)):
+            raise HTTPException(422, "title und description müssen Text sein")
+        steckbrief.schreiben(basis, ordner, title, description)
+        store.ereignis(player, "Beschreibung geändert", ordner)
+        return steckbrief_antwort(basis, ordner)
+
+    @app.put("/api/upload/spiele/{ordner}/vorschaubild")
+    def vorschaubild_hochladen(player: str = Depends(angemeldet), ordner: str = P(...), datei: UploadFile = File(...)):
+        basis = spiel_basis(player, ordner)
+        inhalt = datei.file.read(steckbrief.BILD_MAX + 1)
+        try:
+            steckbrief.bild_speichern(basis, ordner, inhalt)
+        except steckbrief.UngueltigesBild as f:
+            raise HTTPException(422, str(f)) from None
+        store.ereignis(player, "Vorschaubild geändert", ordner)
+        return steckbrief_antwort(basis, ordner)
+
+    @app.delete("/api/upload/spiele/{ordner}/vorschaubild", status_code=204)
+    def vorschaubild_loeschen(player: str = Depends(angemeldet), ordner: str = P(...)):
+        steckbrief.bild_loeschen(spiel_basis(player, ordner), ordner)
+
+    @app.get("/api/upload/spiele/{ordner}/vorschaubild")
+    def vorschaubild_zeigen(player: str = Depends(angemeldet), ordner: str = P(...)):
+        bild = steckbrief.bild(spiel_basis(player, ordner), ordner)
+        if not bild:
+            raise HTTPException(404, "kein Vorschaubild")
+        return FileResponse(bild, media_type=steckbrief.ARTEN[bild.suffix[1:]],
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                                     "Content-Security-Policy": "default-src 'none'; sandbox"})
+
     @app.delete("/api/upload/spiele/{ordner}", status_code=204)
     def loeschen(player: str = Depends(angemeldet), ordner: str = P(...)):
         ziel = ordnerpfad(player, ordner)
         if not versionen.alles_loeschen(ziel.parent, ordner):
             raise HTTPException(404, "Spiel nicht gefunden")
         release.verlauf_loeschen(ziel.parent, ordner)
+        steckbrief.alles_loeschen(ziel.parent, ordner)
         log.info("%s hat %s gelöscht (inkl. Entwurf und Versionen)", player, ordner)
         store.ereignis(player, "gelöscht", ordner)
 
@@ -531,6 +589,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         if not versionen.alles_loeschen(ziel.parent, ordner):
             raise HTTPException(404, "Spiel nicht gefunden")
         release.verlauf_loeschen(ziel.parent, ordner)
+        steckbrief.alles_loeschen(ziel.parent, ordner)
         store.ereignis(user, "gelöscht (Admin)", ordner)
 
     @app.get("/intern/ereignisse", dependencies=[Depends(intern)])

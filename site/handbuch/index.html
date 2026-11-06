@@ -36,6 +36,7 @@
         <li><a href="#pruefung">Die Prüfung vor dem Veröffentlichen</a></li>
         <li><a href="#rollback">Zurücksetzen auf eine ältere Version</a></li>
         <li><a href="#bestenliste">Bestenliste gestalten</a></li>
+        <li><a href="#steckbrief">Beschreibung und Vorschaubild</a></li>
         <li><a href="#gamejson"><code>game.json</code></a></li>
         <li><a href="#erfolge">Erfolge, Kategorien, Spiel der Woche</a></li>
         <li><a href="#selbst">Was du selbst einstellen kannst – und was nicht</a></li>
@@ -226,6 +227,20 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
         Alte Seasons bleiben abrufbar.</li>
     </ul>
 
+    <h2 id="steckbrief">8b. Beschreibung und Vorschaubild</h2>
+    <p>Was in der Bibliothek auf der Kachel deines Spiels steht – <strong>Titel</strong>, <strong>Beschreibung</strong> (der Text unter dem Namen)
+      und das <strong>Vorschaubild</strong> – stellst du direkt auf der <a href="https://upload.cuby0401.uk" target="_blank" rel="noopener">Upload-Seite</a> ein:</p>
+    <ol class="schritte">
+      <li>Bei deinem Spiel auf <strong>„Beschreibung und Vorschaubild“</strong> klicken.</li>
+      <li>Titel und Beschreibung eintragen (ein, zwei Sätze, max. 300 Zeichen) und <strong>„Speichern“</strong>.</li>
+      <li><strong>„Bild wählen …“</strong> – PNG, JPG oder WebP, max. 2 MB, am besten im Format 16:9 (z. B. 640 × 360 Pixel).
+        Ein Bildschirmfoto aus deinem Spiel passt gut.</li>
+    </ol>
+    <p>Das gilt <strong>sofort</strong> – ohne Entwurf, ohne neue Version – und bleibt bei jedem Update erhalten.
+      Leere Felder bzw. kein eigenes Bild: Dann gilt, was in der <a href="#gamejson"><code>game.json</code></a> steht
+      (<code>title</code>, <code>description</code>, <code>thumbnail</code>). Was du auf der Upload-Seite einträgst, hat Vorrang.</p>
+    <p class="hinweis">Ohne Beschreibung bleibt die Kachel leer, ohne Bild zeigt sie nur ein Platzhalter-Symbol. Beides gehört zu jedem Spiel dazu.</p>
+
     <h2 id="gamejson">9. <code>game.json</code></h2>
 <pre><code>{
   "title": "Snake",
@@ -237,9 +252,9 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     <div class="tabelle-rahmen"><table class="tabelle">
       <thead><tr><th>Feld</th><th>Pflicht?</th><th>Bedeutung</th></tr></thead>
       <tbody>
-        <tr><td><code>title</code></td><td>ja</td><td>Name auf der Kachel (sonst der Ordnername), max. 80 Zeichen</td></tr>
-        <tr><td><code>description</code></td><td>ja</td><td>Ein Satz für die Kachel, max. 300 Zeichen</td></tr>
-        <tr><td><code>thumbnail</code></td><td>empfohlen</td><td>Vorschaubild 16:9 im Spielordner (png, jpg, webp, svg)</td></tr>
+        <tr><td><code>title</code></td><td>ja</td><td>Name auf der Kachel (sonst der Ordnername), max. 80 Zeichen. Auf der Upload-Seite änderbar (<a href="#steckbrief">Steckbrief</a>)</td></tr>
+        <tr><td><code>description</code></td><td>ja</td><td>Ein Satz für die Kachel, max. 300 Zeichen. Einfacher: auf der Upload-Seite eintragen (<a href="#steckbrief">Steckbrief</a>)</td></tr>
+        <tr><td><code>thumbnail</code></td><td>empfohlen</td><td>Vorschaubild 16:9 im Spielordner (png, jpg, webp, svg). Einfacher: auf der Upload-Seite hochladen (<a href="#steckbrief">Steckbrief</a>)</td></tr>
         <tr><td><code>saveVersion</code></td><td>ja</td><td>Aufbau des Spielstands, startet bei 1, steigt nur bei Strukturänderungen</td></tr>
         <tr><td><code>leaderboard</code></td><td>nein</td><td>Siehe <a href="#bestenliste">Bestenliste</a></td></tr>
         <tr><td><code>tags</code></td><td>empfohlen</td><td>Kategorien für Suche und Filter, z. B. <code>["Puzzle", "Wörter"]</code> – höchstens 5</td></tr>
@@ -285,7 +300,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       <thead><tr><th>Selbst</th><th>Nur über Antrag an Seb (Menü → Anträge)</th></tr></thead>
       <tbody><tr>
         <td><ul>
-          <li>Titel, Beschreibung, Vorschaubild</li>
+          <li>Titel, Beschreibung, Vorschaubild (<a href="#steckbrief">Upload-Seite</a>, gilt sofort)</li>
           <li>Bestenliste, Spalten, Formate, neue Season</li>
           <li>Speicherstruktur und Migrationen</li>
           <li>Entwürfe, Updates, Zurücksetzen, eigenes Spiel löschen</li>
@@ -322,6 +337,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       <li>☐ Keine neuen Fehlerberichte im Entwurf</li>
       <li>☐ Bestenliste anders? → neue Season ankreuzen</li>
       <li>☐ Änderungszeilen verständlich für Spieler</li>
+      <li>☐ Beschreibung und Vorschaubild noch aktuell?</li>
       <li>☐ Prüfung im Update-Fenster ohne ✗</li>
     </ul>
 
@@ -340,6 +356,8 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       <dt>Mein Spiel hat plötzlich viele Fehler – was tun?</dt>
       <dd>Menü → Meine Spiele → <strong>„Offline nehmen“</strong> (optional mit Grund). Andere sehen das Spiel dann nicht mehr, Spielstände und
         Bestenliste bleiben. Danach in Ruhe reparieren oder auf eine ältere Version <a href="#rollback">zurücksetzen</a> und wieder „online stellen“.</dd>
+      <dt>Wie ändere ich den Text unter meinem Spiel oder das Bild?</dt>
+      <dd>Upload-Seite → bei deinem Spiel „Beschreibung und Vorschaubild“, siehe <a href="#steckbrief">Beschreibung und Vorschaubild</a>. Gilt sofort, ohne Update.</dd>
       <dt>Kann ich ohne Update-Fenster veröffentlichen?</dt>
       <dd>Nein – jedes Update läuft über Entwurf und Prüfung. Das schützt die Spielstände aller Spieler.</dd>
       <dt>Was ist mit Spielen von vor der Versionierung?</dt>

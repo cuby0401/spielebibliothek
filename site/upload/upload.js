@@ -148,6 +148,7 @@ async function liste() {
 			d.append(sum, ul);
 			bereich.append(d);
 		}
+		bereich.append(steckbriefBereich(s));
 		bereich.append(div("zeile-klein", knopfK("Update hochladen", () => updateFuer(s), "")));
 		const weg = knopfK("Löschen", () => {
 			if (!confirm(`„${s.title}“ (${s.ordner}) komplett löschen – inklusive Entwurf, älterer Versionen und Versionsverlauf? Spielstände und Bestenliste bleiben erhalten.`)) return;
@@ -155,6 +156,83 @@ async function liste() {
 		}, "gefahr");
 		return div("eintrag", bereich, weg);
 	}));
+}
+
+// ---------- Steckbrief: Titel, Beschreibung, Vorschaubild (Zentrale 1.3.0) ----------
+// Gilt sofort, ohne neue Version, und übersteht Updates. Vorrang vor der game.json.
+function steckbriefBereich(s) {
+	const pfad = "/spiele/" + encodeURIComponent(s.ordner);
+	const d = document.createElement("details");
+	d.className = "verlauf steckbrief";
+	const sum = document.createElement("summary");
+	sum.textContent = "Beschreibung und Vorschaubild";
+	d.append(sum);
+	d.addEventListener("toggle", async () => {
+		if (!d.open || d.dataset.geladen) return;
+		d.dataset.geladen = "1";
+		let sb;
+		try { sb = await api("GET", pfad + "/steckbrief"); }
+		catch (e) { if (e.status === 401) return start(); return d.append(span(e.message, "warnung")); }
+		const feld = (beschriftung, wert, platzhalter, max, mehrzeilig) => {
+			const l = document.createElement("label");
+			l.className = "block";
+			l.append(document.createTextNode(beschriftung));
+			const f = document.createElement(mehrzeilig ? "textarea" : "input");
+			if (mehrzeilig) f.rows = 3; else f.type = "text";
+			f.maxLength = max; f.value = wert; f.placeholder = platzhalter;
+			l.append(f);
+			return [l, f];
+		};
+		const [lt, titel] = feld("Titel (max. 80 Zeichen)", sb.title, sb.gameJson.title || s.ordner, 80, false);
+		const [lb, text] = feld("Beschreibung – steht in der Bibliothek unter dem Spiel (max. 300 Zeichen)", sb.description,
+			sb.gameJson.description || "z. B. Weiche Hindernissen aus und sammle Sterne.", 300, true);
+		const zaehler = span("", "leise klein");
+		const zaehlen = () => { zaehler.textContent = `${text.value.length} / 300`; };
+		text.addEventListener("input", zaehlen); zaehlen();
+		const speichern = knopfK("Speichern", () => aktion(() => api("PUT", pfad + "/steckbrief",
+			{ title: titel.value, description: text.value }), `„${titel.value || s.title}“: Beschreibung gespeichert – gilt sofort.`), "");
+
+		const vorschau = div("vorschau-box");
+		const bildZeigen = (info) => {
+			vorschau.replaceChildren();
+			if (info) {
+				const img = document.createElement("img");
+				img.src = API + pfad + "/vorschaubild?v=" + info.stand;
+				img.alt = "Vorschaubild";
+				vorschau.append(img, span(groesse(info.bytes), "leise klein"));
+			} else {
+				vorschau.append(span(sb.gameJson.thumbnail ? "Kein eigenes Bild – es gilt das thumbnail aus der game.json." : "Noch kein Vorschaubild.", "leise klein"));
+			}
+		};
+		bildZeigen(sb.vorschaubild);
+		const wahl = document.createElement("input");
+		wahl.type = "file"; wahl.accept = "image/png,image/jpeg,image/webp"; wahl.hidden = true;
+		wahl.onchange = async () => {
+			const datei = wahl.files[0];
+			if (!datei) return;
+			if (datei.size > 2 * 1024 * 1024) return meldung("Das Vorschaubild ist größer als 2 MB.", "fehler");
+			const f = new FormData();
+			f.append("datei", datei);
+			const r = await fetch(API + pfad + "/vorschaubild", { method: "PUT", body: f, credentials: "same-origin", headers: { "X-Upload": "1" } });
+			const antwort = await r.json().catch(() => ({}));
+			if (r.status === 401) return start();
+			if (!r.ok) return meldung(typeof antwort.detail === "string" ? antwort.detail : "Fehler " + r.status, "fehler");
+			sb = antwort;
+			bildZeigen(sb.vorschaubild);
+			meldung(`Vorschaubild gespeichert – gilt sofort.`, "ok");
+			wahl.value = "";
+		};
+		const bildKnopf = knopfK("Bild wählen …", () => wahl.click(), "");
+		const bildWeg = knopfK("Bild entfernen", async () => {
+			if (!confirm("Vorschaubild entfernen?")) return;
+			try { await api("DELETE", pfad + "/vorschaubild"); sb.vorschaubild = null; bildZeigen(null); meldung("Vorschaubild entfernt.", "ok"); }
+			catch (e) { if (e.status === 401) return start(); meldung(e.message, "fehler"); }
+		}, "gefahr");
+		d.append(lt, lb, div("zeile-klein", zaehler, speichern),
+			span("Vorschaubild: am besten 16:9, z. B. 640 × 360 Pixel. PNG, JPG oder WebP, max. 2 MB.", "leise klein"),
+			vorschau, div("zeile-klein", bildKnopf, bildWeg), wahl);
+	});
+	return d;
 }
 
 // ---------- Update-Fenster (E35/E36) ----------

@@ -167,12 +167,13 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
     bild = daten.get("thumbnail")
     if not (isinstance(bild, str) and DATEI_MUSTER.match(bild) and ".." not in bild and (ordner / bild).is_file()):
         bild = None
-    return {
+    ergebnis = {
         "id": f"{benutzer}/{ordner_name}",
         "author": benutzer,                       # immer aus dem Ordner, nie aus game.json
         "title": _text(daten.get("title"), 80) or ordner_name,
         "description": _text(daten.get("description"), 300) or "",
         "thumbnail": bild,
+        "vorschau": None,
         "saveVersion": save_version(ordner),
         "leaderboard": bestenliste_einstellungen(ordner),
         "leaderboardSeason": season(ordner),
@@ -183,6 +184,26 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         "tags": tags(daten),
         "erfolgeAnzahl": len(erfolge(ordner)),
     }
+    return _steckbrief_anwenden(ergebnis, spiele_dir / benutzer, ordner_name)
+
+
+def _steckbrief_anwenden(b: dict, basis: Path, ordner_name: str) -> dict:
+    """Steckbrief von der Upload-Seite (Zentrale 1.3.0) gilt vor der game.json – auch für Entwurf und alte Versionen."""
+    from . import steckbrief
+    name = re.split(r"~", ordner_name, maxsplit=1)[0]
+    sb = steckbrief.lesen(basis, name)
+    if sb.get("title"):
+        b["title"] = sb["title"]
+    if sb.get("description"):
+        b["description"] = sb["description"]
+    bild = steckbrief.bild(basis, name)
+    if bild:
+        try:
+            stand = int(bild.stat().st_mtime)
+        except OSError:
+            stand = 0
+        b["vorschau"] = f"/api/vorschau/{basis.name}/{name}?v={stand}"
+    return b
 
 
 def alle(spiele_dir: Path) -> list[dict]:

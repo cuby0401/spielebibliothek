@@ -11,9 +11,9 @@ import time
 from typing import Any
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
-from . import games, rollen, versionen
+from . import games, rollen, steckbrief, versionen
 from .auth import Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 from .db import Datenbank, ZuGross
@@ -120,6 +120,18 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         # Ort: Land kommt von Cloudflare immer, Stadt/Region nur mit der Managed Transform „Add visitor location headers“
         ort = ", ".join(x for x in (h.get("cf-ipcity"), h.get("cf-region"), h.get("cf-ipcountry")) if x and x != "XX") or None
         db.anmeldung(player, sitzung, geraet, ip, ort)
+
+    @app.get("/api/vorschau/{user}/{ordner}")
+    def vorschau(_: str = Depends(spieler), user: str = P(...), ordner: str = P(...)):
+        """Vorschaubild aus dem Steckbrief (Zentrale 1.3.0) – nur PNG/JPG/WebP, Art an den ersten Bytes geprüft."""
+        if not games.BENUTZER_MUSTER.match(user) or not games.ORDNER_MUSTER.match(ordner):
+            raise HTTPException(404, "kein Vorschaubild")
+        bild = steckbrief.bild(e.spiele_dir / user, ordner)
+        if not bild:
+            raise HTTPException(404, "kein Vorschaubild")
+        return FileResponse(bild, media_type=steckbrief.ARTEN[bild.suffix[1:]],
+                            headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
+                                     "Content-Security-Policy": "default-src 'none'; sandbox"})
 
     @app.get("/api/me")
     def me(request: Request, player: str = Depends(spieler)):
