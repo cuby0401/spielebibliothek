@@ -57,7 +57,9 @@
         <strong>Upload-Passwort</strong> (nicht im Browser speichern). Ordnernamen wählen – <strong>für Updates beim Spiel auf „Update hochladen“ klicken</strong>, dann ist der Ordner festgelegt –
         und in einer Zeile schreiben, was du geändert hast. Jeder Upload landet als <strong>Entwurf</strong>; nur du siehst ihn.</li>
       <li><strong>Entwurf testen</strong> – „Testen“ auf der Upload-Seite. Der Entwurf startet mit einer <em>Kopie</em> deines Spielstands,
-        Bestenlisten-Einträge zählen noch nicht. Mehrmals hochladen ist normal – die Änderungszeilen werden gesammelt.</li>
+        Bestenlisten-Einträge zählen noch nicht. Mehrmals hochladen ist normal – die Änderungszeilen werden gesammelt.
+        Fertig getestet? <strong>„← Zurück zum Hochladen“</strong> (oben links im Spiel) bringt dich direkt zurück zu deinem Spiel auf der Upload-Seite –
+        neu hochladen musst du nichts, der Entwurf liegt schon dort.</li>
       <li><strong>Veröffentlichen …</strong> – öffnet das <a href="#updates">Update-Fenster</a>: Art des Updates wählen, Änderungen prüfen,
         die <a href="#pruefung">Prüfung</a> lesen, veröffentlichen. Dein Spiel bekommt seine Versionsnummer, alle Spieler sehen es.</li>
     </ol>
@@ -317,9 +319,11 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
 
     <h3 id="antraege">Anträge zu deinen Spielen</h3>
     <p>Fehler, Wünsche und Sonstiges, die Spieler zu einem deiner Spiele schicken, landen bei <strong>dir</strong> – nicht bei Seb.
-      Du bekommst eine Meldung in der Glocke (bei Fehlern rot) und findest sie unter Menü → Meine Spiele → <strong>„Anträge zu deinen Spielen“</strong>,
-      pro Spiel getrennt nach offen und geschlossen. Mit „Erledigt“ oder „Ablehnen“ und einer kurzen Antwort schließt du sie – der Spieler bekommt
-      deine Antwort in seine Glocke. Nur du und der Antragsteller sehen den Antrag.</p>
+      Du bekommst eine Meldung in der Glocke (bei Fehlern rot) – <strong>ein Klick darauf öffnet den Antrag</strong> mit Text, Bildern und Antwortfeld.
+      Alle offenen Anträge stehen außerdem oben unter Menü → <strong>Anträge</strong> („An dich“) und unter Menü → Meine Spiele
+      (Spalte „Anträge“ und „Anträge zu deinen Spielen“, pro Spiel getrennt nach offen und geschlossen).
+      Mit „Erledigt“ oder „Ablehnen“ und einer kurzen Antwort schließt du sie – der Spieler bekommt deine Antwort in seine Glocke.
+      Du kannst auch selbst Bilder anfügen, z. B. einen Screenshot nach dem Fix. Nur du, der Antragsteller und Seb sehen den Antrag.</p>
 
     <h2 id="werkzeuge">11. Fehler suchen</h2>
     <h3>Fehlerberichte</h3>

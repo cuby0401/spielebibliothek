@@ -107,7 +107,8 @@ async function liste() {
 		if (s.entwurf) {
 			const testen = document.createElement("a");
 			testen.href = `${GAMES}/#/entwurf/${encodeURIComponent($("benutzer").textContent)}/${encodeURIComponent(s.ordner)}`;
-			testen.target = "_blank"; testen.rel = "noopener"; testen.className = "knopf klein leise"; testen.textContent = "Testen";
+			// 1.3.1: im selben Tab – „Zurück zum Hochladen“ im Entwurf führt genau hierher zurück (#spiel-<ordner>)
+			testen.className = "knopf klein leise"; testen.textContent = "Testen";
 			const box = div("entwurf-box",
 				span(`Entwurf vom ${datum(s.entwurf.geaendert)} · ${s.entwurf.dateien} Dateien`),
 				div("zeile-klein", testen,
@@ -154,8 +155,19 @@ async function liste() {
 			if (!confirm(`„${s.title}“ (${s.ordner}) komplett löschen – inklusive Entwurf, älterer Versionen und Versionsverlauf? Spielstände und Bestenliste bleiben erhalten.`)) return;
 			aktion(() => api("DELETE", pfad), `${s.ordner} gelöscht.`);
 		}, "gefahr");
-		return div("eintrag", bereich, weg);
+		const eintrag = div("eintrag", bereich, weg);
+		eintrag.id = "spiel-" + s.ordner;
+		return eintrag;
 	}));
+	// Zurück vom Entwurf-Testen (1.3.1): zum Spiel springen und kurz hervorheben
+	const sprung = decodeURIComponent(location.hash.replace(/^#spiel-/, ""));
+	if (location.hash.startsWith("#spiel-") && document.getElementById("spiel-" + sprung)) {
+		const ziel = document.getElementById("spiel-" + sprung);
+		history.replaceState(null, "", location.pathname + location.search);
+		ziel.classList.add("hervorgehoben");
+		ziel.scrollIntoView({ behavior: "smooth", block: "start" });
+		setTimeout(() => ziel.classList.remove("hervorgehoben"), 4000);
+	}
 }
 
 // ---------- Steckbrief: Titel, Beschreibung, Vorschaubild (Zentrale 1.2.1) ----------

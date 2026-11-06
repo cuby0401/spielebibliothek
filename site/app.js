@@ -18,6 +18,9 @@ const seiten = {};   // Unterseiten aus dem Benutzermenü (konto.js): name → a
 let letzteRoute = "#/";   // wohin der Zurück-Pfeil einer Unterseite führt
 let suche = "", tagFilter = null;   // Suche und Kategorien in der Übersicht (Zentrale 1.2.0)
 let profilName = null;              // für #/profil/<name>
+let antragNr = null;                // für #/antrag/<id> (Zentrale 1.3.1)
+let antragZurueck = "#/";           // Zurück-Pfeil im Antrag: dorthin, wo man herkam (Anträge, Meine Spiele, Spiel)
+let bisherigeRoute = "";
 const idPfad = (id) => id.split("/").map(encodeURIComponent).join("/");
 
 async function einstellungenSpeichern(aenderung) {
@@ -431,9 +434,9 @@ async function zeigeSeite(name) {
 	el("seite").hidden = false;
 	const zurueck = document.createElement("a");
 	zurueck.className = "zurueck-pfeil";
-	zurueck.href = letzteRoute;
+	zurueck.href = name === "antrag" ? antragZurueck : letzteRoute;
 	zurueck.textContent = "←";
-	zurueck.title = letzteRoute.startsWith("#/spiel/") ? "Zurück zum Spiel" : "Zurück zur Übersicht";
+	zurueck.title = name === "antrag" ? "Zurück" : letzteRoute.startsWith("#/spiel/") ? "Zurück zum Spiel" : "Zurück zur Übersicht";
 	zurueck.setAttribute("aria-label", zurueck.title);
 	el("seite").replaceChildren();
 	meldung("");
@@ -447,7 +450,10 @@ async function zeigeSeite(name) {
 	else { kopf.append(zurueck); el("seite").prepend(kopf); }
 }
 
-async function zeigeSpiel(id, entwurfSpiel) {
+// Upload-Seite (für „Zurück zum Hochladen“ im Entwurf, 1.3.1) – Adresse aus dem Link in der Taskleiste
+const uploadAdresse = () => (el("upload-link").getAttribute("href") || "").replace(/\/+$/, "");
+
+async function zeigeSpiel(id, entwurfSpiel, eigenerOrdner = null) {
 	const spiel = entwurfSpiel || spiele.find((s) => s.id === id && s.complete);
 	if (!spiel) {
 		location.hash = "#/";
@@ -461,8 +467,18 @@ async function zeigeSpiel(id, entwurfSpiel) {
 	if (entwurfSpiel) {
 		el("entwurf-hinweis").textContent = "Entwurf – nur du siehst ihn. " +
 			(spiel.spielstaendeKopiert ? "Dein Spielstand wurde als Kopie übernommen. " : "Dein Spielstand im Entwurf ist getrennt vom echten. ") +
-			"Bestenlisten-Einträge werden erst nach dem Veröffentlichen gespeichert. Veröffentlichen auf der Upload-Seite.";
+			"Bestenlisten-Einträge werden erst nach dem Veröffentlichen gespeichert. ";
+		if (eigenerOrdner) {
+			const los = document.createElement("a");
+			los.href = `${uploadAdresse()}/#spiel-${encodeURIComponent(eigenerOrdner)}`;
+			los.textContent = "Zurück zum Hochladen und veröffentlichen →";
+			el("entwurf-hinweis").append(los);
+		} else el("entwurf-hinweis").append("Veröffentlichen auf der Upload-Seite.");
 	}
+	// Zurück-Knopf: im eigenen Entwurf zurück zur Upload-Seite (dort wird veröffentlicht), sonst zur Übersicht
+	const zurueckKnopf = el("spiel-zurueck");
+	zurueckKnopf.href = eigenerOrdner ? `${uploadAdresse()}/#spiel-${encodeURIComponent(eigenerOrdner)}` : entwurfSpiel ? "#/meine-spiele" : "#/";
+	zurueckKnopf.textContent = eigenerOrdner ? "← Zurück zum Hochladen" : entwurfSpiel ? "← Meine Spiele" : "← Übersicht";
 	const zeigeNeu = !entwurfSpiel && aktualisiert(spiel) && spiel.neu;
 	el("neu-hinweis").hidden = !zeigeNeu;
 	if (zeigeNeu) {
@@ -501,7 +517,7 @@ async function zeigeSpiel(id, entwurfSpiel) {
 async function zeigeEntwurf(user, ordner) {
 	try {
 		const d = await Bridge.json("POST", `/api/entwickler/entwurf/${encodeURIComponent(user)}/${encodeURIComponent(ordner)}`);
-		await zeigeSpiel(d.id, d);
+		await zeigeSpiel(d.id, d, user === ich.player ? ordner : null);
 	} catch (e) {
 		if (!(e instanceof Bridge.SitzungAbgelaufen)) { meldung("Entwurf nicht verfügbar: " + e.message); location.hash = "#/"; }
 	}
@@ -509,6 +525,8 @@ async function zeigeEntwurf(user, ordner) {
 
 function route() {
 	el("menue").hidden = true;
+	const vorher = bisherigeRoute;
+	bisherigeRoute = location.hash;
 	const ent = location.hash.match(/^#\/entwurf\/([a-z0-9][a-z0-9_-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*)$/);
 	if (ent) { letzteRoute = location.hash; return zeigeEntwurf(ent[1], ent[2]); }
 	const m = location.hash.match(/^#\/spiel\/(.+)$/);
@@ -516,6 +534,12 @@ function route() {
 	if (/^#\/(spielstaende|anmeldungen)$/.test(location.hash)) { location.replace("#/profil"); return; }
 	const pr = location.hash.match(/^#\/profil(?:\/([a-z0-9][a-z0-9_~-]*))?$/);
 	if (pr) { profilName = pr[1] ? decodeURIComponent(pr[1]) : (ich.ansicht ? `${ich.player}~${ich.ansicht}` : ich.player); return zeigeSeite("profil"); }
+	const an = location.hash.match(/^#\/antrag\/(\d{1,9})$/);
+	if (an) {
+		antragNr = +an[1];
+		if (!vorher.startsWith("#/antrag/")) antragZurueck = vorher || "#/";   // nach „Erledigt“ usw. bleibt das Ziel gleich
+		return zeigeSeite("antrag");
+	}
 	const s = location.hash.match(/^#\/([a-z-]+)(?:\?.*)?$/);
 	if (s && seiten[s[1]]) return zeigeSeite(s[1]);
 	letzteRoute = "#/";

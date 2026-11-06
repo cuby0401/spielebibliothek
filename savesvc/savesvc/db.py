@@ -82,6 +82,11 @@ CREATE TABLE IF NOT EXISTS anmeldungen (
 -- Daumen hoch je Spieler und Spiel (Idee „Bewertung“, 05.11.2026)
 CREATE TABLE IF NOT EXISTS daumen (
     player TEXT NOT NULL, game TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game));
+-- Zentrale 1.3.1: Bilder (Screenshots) an Anträgen – in der Datenbank, damit sie mit gesichert werden
+CREATE TABLE IF NOT EXISTS antrag_bilder (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, antrag_id INTEGER NOT NULL, art TEXT NOT NULL, daten BLOB NOT NULL,
+    von TEXT NOT NULL, erstellt TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS antrag_bilder_antrag ON antrag_bilder (antrag_id, id);
 """
 
 
@@ -785,6 +790,32 @@ class Datenbank:
                 return [dict(z) for z in v.execute("SELECT * FROM antraege WHERE player=? ORDER BY id DESC", (player,))]
             return [dict(z) for z in v.execute(
                 "SELECT * FROM antraege ORDER BY CASE status WHEN 'offen' THEN 0 ELSE 1 END, id DESC")]
+
+    def antrag_bild_anlegen(self, antrag_id: int, art: str, daten: bytes, von: str, maximal: int) -> int | None:
+        """None = schon `maximal` Bilder an diesem Antrag."""
+        with self.verbindung() as v:
+            if v.execute("SELECT COUNT(*) FROM antrag_bilder WHERE antrag_id=?", (antrag_id,)).fetchone()[0] >= maximal:
+                return None
+            return v.execute("INSERT INTO antrag_bilder (antrag_id, art, daten, von, erstellt) VALUES (?,?,?,?,?)",
+                             (antrag_id, art, daten, von, jetzt())).lastrowid
+
+    def antrag_bilder(self, antrag_id: int) -> list[dict]:
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute(
+                "SELECT id, art, length(daten) AS bytes, von, erstellt FROM antrag_bilder WHERE antrag_id=? ORDER BY id", (antrag_id,))]
+
+    def antrag_bild_zahlen(self) -> dict[int, int]:
+        with self.verbindung() as v:
+            return {z[0]: z[1] for z in v.execute("SELECT antrag_id, COUNT(*) FROM antrag_bilder GROUP BY antrag_id")}
+
+    def antrag_bild(self, antrag_id: int, bild_id: int) -> tuple[str, bytes] | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT art, daten FROM antrag_bilder WHERE id=? AND antrag_id=?", (bild_id, antrag_id)).fetchone()
+        return (z["art"], bytes(z["daten"])) if z else None
+
+    def antrag_bild_loeschen(self, antrag_id: int, bild_id: int) -> bool:
+        with self.verbindung() as v:
+            return v.execute("DELETE FROM antrag_bilder WHERE id=? AND antrag_id=?", (bild_id, antrag_id)).rowcount > 0
 
     def antrag_bearbeiten(self, antrag_id: int, status: str, antwort: str | None, von: str | None = None) -> bool:
         with self.verbindung() as v:

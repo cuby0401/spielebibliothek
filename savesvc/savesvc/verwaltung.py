@@ -4,6 +4,8 @@ Alles, was in spiele/ schreibt oder Upload-Konten betrifft, erledigt der Upload-
 Speicher-Dienst ruft ihn über die interne Schnittstelle /intern (geheimes Token, von außen nicht erreichbar).
 """
 
+import base64
+import binascii
 import json
 import logging
 import os
@@ -15,8 +17,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
+from fastapi.responses import Response
 
-from . import games, rollen, versionen
+from . import games, rollen, steckbrief, versionen
 from .auth import BENUTZER_MUSTER, Benutzerliste
 
 log = logging.getLogger("savesvc.verwaltung")
@@ -35,6 +38,22 @@ NUR_ENTWICKLER = {"bestenliste", "spiel"}   # betreffen eigene Spiele
 # Alles andere (Spielstand, Bestenliste, Spiel löschen/umbenennen, Anträge ohne Spiel) kann nur der Admin erledigen.
 SPIEL_ARTEN = {"fehler", "wunsch", "sonstiges"}
 STATUS = ("offen", "erledigt", "abgelehnt")
+BILDER_MAX = 5                    # Bilder je Antrag (1.3.1) – PNG/JPG/WebP, je höchstens 2 MB (die Seite verkleinert vorher)
+
+
+def bild_aus_daten_url(wert) -> tuple[str, bytes]:
+    """„data:image/…;base64,…“ → (Art, Bytes). Die Art wird an den Bytes erkannt, nicht an der Angabe."""
+    if not isinstance(wert, str) or not wert.startswith("data:image/") or ";base64," not in wert:
+        raise steckbrief.UngueltigesBild("Bild ungültig")
+    if len(wert) > (steckbrief.BILD_MAX * 4) // 3 + 200:
+        raise steckbrief.UngueltigesBild("Bild zu groß (max. 2 MB)")
+    try:
+        daten = base64.b64decode(wert.split(";base64,", 1)[1], validate=True)
+    except (binascii.Error, ValueError):
+        raise steckbrief.UngueltigesBild("Bild ungültig") from None
+    if not daten or len(daten) > steckbrief.BILD_MAX:
+        raise steckbrief.UngueltigesBild("Bild zu groß (max. 2 MB)")
+    return steckbrief.art_von(daten), daten
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -353,6 +372,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             raise HTTPException(422, "Beschreibung: 3 bis 4000 Zeichen")
         if spiel is not None and (not isinstance(spiel, str) or len(spiel) > 100):
             raise HTTPException(422, "spiel ungültig")
+        # Bilder kommen danach einzeln über POST /api/antraege/{id}/bilder (Grenze je Anfrage, 1.3.1)
         aid = db.antrag_anlegen(player, art, spiel, text.strip())
         log.info("neuer Antrag %d von %s (%s)", aid, player, art)
         kurz = " ".join(text.split())[:100]
@@ -360,11 +380,11 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         if besitzer:
             # Spiel-Antrag (1.3.0): nur der Entwickler bekommt ihn – der Admin nicht (keine Glocke, keine Zahl, kein Push)
             if besitzer != player:
-                db.melden(besitzer, f"Antrag zu „{titel_von(spiel)}“ von {player} ({ARTEN[art]}): {kurz}", "#/meine-spiele",
+                db.melden(besitzer, f"Antrag zu „{titel_von(spiel)}“ von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}",
                           wichtig=(art == "fehler"))
             return {"id": aid, "an": besitzer}
         for a in sorted(e.admins):
-            db.melden(a, f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}", "/admin/#antraege", wichtig=True)
+            db.melden(a, f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}", wichtig=True)
         from . import waechter
         waechter.ha_senden(e, "antrag", f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}")
         return {"id": aid, "an": "admin"}
@@ -380,21 +400,88 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             return None
         return besitzer
 
-    def mit_infos(a: dict) -> dict:
+    def mit_infos(a: dict, bildzahlen: dict | None = None) -> dict:
         z = zustaendig(a)
         return {**a, "artText": ARTEN.get(a["art"], a["art"]), "zustaendig": z or "admin",
-                "title": titel_von(a["spiel"]) if a.get("spiel") else None}
+                "title": titel_von(a["spiel"]) if a.get("spiel") else None,
+                "bilder": (bildzahlen if bildzahlen is not None else db.antrag_bild_zahlen()).get(a["id"], 0)}
+
+    def liste_mit_infos(antraege: list[dict]) -> list[dict]:
+        zahlen = db.antrag_bild_zahlen()
+        return [mit_infos(a, zahlen) for a in antraege]
+
+    # ---------- Ein Antrag als „Ticket“ (1.3.1): aus der Glocke, aus „Meine Spiele“ und aus „Anträge“ ----------
+    def sicht(request: Request, player: str, antrag_id: int) -> tuple[dict, bool]:
+        """(Antrag, darf antworten). Sehen dürfen: Antragsteller, zuständiger Entwickler, Admin. Sonst 404."""
+        a = db.antrag(antrag_id)
+        if not a:
+            raise HTTPException(404, "Antrag nicht gefunden")
+        r = rollen.rolle(e, request, player)
+        z = zustaendig(a)
+        darf_antworten = not r["ansicht"] and (z == player or (z is None and r["admin"]))
+        if not (a["player"] == rollen.daten_id(e, request, player) or darf_antworten or r["admin"]):
+            raise HTTPException(404, "Antrag nicht gefunden")
+        return a, darf_antworten
+
+    @app.get("/api/antraege/{antrag_id}")
+    def antrag_einzeln(request: Request, player: str = Depends(spieler), antrag_id: int = P(...)):
+        a, darf_antworten = sicht(request, player, antrag_id)
+        eigener = a["player"] == rollen.daten_id(e, request, player)
+        return {**mit_infos(a), "bilder": db.antrag_bilder(antrag_id), "darfAntworten": darf_antworten,
+                "eigener": eigener, "darfBilder": (eigener or darf_antworten) and not rollen.simuliert(e, request, player),
+                "bilderMax": BILDER_MAX}
+
+    @app.post("/api/antraege/{antrag_id}/bilder", status_code=201)
+    def antrag_bild_dazu(request: Request, player: str = Depends(spieler), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):
+        a, darf_antworten = sicht(request, player, antrag_id)
+        if rollen.simuliert(e, request, player) or not (a["player"] == player or darf_antworten):
+            raise HTTPException(403, "Nur Antragsteller und Bearbeiter können Bilder anfügen")
+        try:
+            bart, daten = bild_aus_daten_url(body.get("bild"))
+        except steckbrief.UngueltigesBild as f:
+            raise HTTPException(422, str(f)) from None
+        bid = db.antrag_bild_anlegen(antrag_id, bart, daten, player, BILDER_MAX)
+        if bid is None:
+            raise HTTPException(409, f"Schon {BILDER_MAX} Bilder an diesem Antrag")
+        return {"id": bid}
+
+    @app.get("/api/antraege/{antrag_id}/bilder/{bild_id}")
+    def antrag_bild_zeigen(request: Request, player: str = Depends(spieler), antrag_id: int = P(...), bild_id: int = P(...)):
+        sicht(request, player, antrag_id)
+        b = db.antrag_bild(antrag_id, bild_id)
+        if not b:
+            raise HTTPException(404, "Bild nicht gefunden")
+        return Response(b[1], media_type=steckbrief.ARTEN[b[0]],
+                        headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
+                                 "Content-Security-Policy": "default-src 'none'; sandbox"})
+
+    @app.delete("/api/antraege/{antrag_id}/bilder/{bild_id}", status_code=204)
+    def antrag_bild_weg(request: Request, player: str = Depends(spieler), antrag_id: int = P(...), bild_id: int = P(...)):
+        sicht(request, player, antrag_id)
+        bild = next((b for b in db.antrag_bilder(antrag_id) if b["id"] == bild_id), None)
+        if not bild:
+            raise HTTPException(404, "Bild nicht gefunden")
+        if rollen.simuliert(e, request, player) or not (bild["von"] == player or rollen.rolle(e, request, player)["admin"]):
+            raise HTTPException(403, "Nur wer das Bild angefügt hat, kann es entfernen")
+        db.antrag_bild_loeschen(antrag_id, bild_id)
+
+    @app.patch("/api/antraege/{antrag_id}")
+    def antrag_antworten(request: Request, player: str = Depends(spieler), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):
+        a, darf_antworten = sicht(request, player, antrag_id)
+        if not darf_antworten:
+            raise HTTPException(403, "Diesen Antrag bearbeitet " + (zustaendig(a) or "Seb"))
+        return antworten(a, body, player)
 
     @app.get("/api/antraege")
     def meine_antraege(player: str = Depends(ich_daten)):
-        return [mit_infos(a) for a in db.antraege(player)]
+        return liste_mit_infos(db.antraege(player))
 
     # Spiel-Anträge für den Entwickler (1.3.0): pro Spiel, offen und geschlossen
     @app.get("/api/entwickler/antraege")
     def entwickler_antraege(request: Request, player: str = Depends(entwickler)):
         if rollen.simuliert(e, request, player):
             return []
-        return [mit_infos(a) for a in db.antraege() if zustaendig(a) == player]
+        return liste_mit_infos([a for a in db.antraege() if zustaendig(a) == player])
 
     @app.patch("/api/entwickler/antraege/{antrag_id}")
     def entwickler_antwort(request: Request, player: str = Depends(entwickler), antrag_id: int = P(...),
@@ -416,7 +503,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         if status != "offen" and a["player"] != von:   # Glocke: Antragsteller erfährt die Antwort
             zu = f" zu „{titel_von(a['spiel'])}“" if a.get("spiel") else ""
             db.melden(a["player"], f"Dein Antrag{zu} wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'} ({von})"
-                                   + (f": {antwort[:120]}" if antwort else ""), "#/antraege")
+                                   + (f": {antwort[:120]}" if antwort else ""), f"/#/antrag/{a['id']}")
         return {"ok": True}
 
     # ---------- Anmeldungen (E55) ----------
@@ -727,7 +814,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.get("/api/admin/antraege")
     def alle_antraege(_: str = Depends(admin)):
         # „zustaendig“: admin = Bibliothek (zählt, mit Glocke) – sonst der Entwickler (nur zur Info)
-        return [mit_infos(a) for a in db.antraege()]
+        return liste_mit_infos(db.antraege())
 
     @app.patch("/api/admin/antraege/{antrag_id}")
     def antrag_beantworten(admin_name: str = Depends(admin), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):

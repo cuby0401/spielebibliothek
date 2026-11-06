@@ -104,9 +104,14 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 	const [liste, fehler, antraege] = await Promise.all([Bridge.json("GET", "/api/entwickler/spiele"), Bridge.json("GET", "/api/entwickler/fehler"),
 		Bridge.json("GET", "/api/entwickler/antraege").catch(() => [])]);
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
+	// 1.3.1: offene Anträge gleich oben sichtbar – ein Klick springt zu den Anträgen des Spiels
+	const offeneAntraege = antraege.filter((a) => a.status === "offen" && a.player !== ich.player);
+	const zuAntraegen = (spiel) => (e) => { e.preventDefault(); (document.getElementById("antraege-" + spiel) || document.getElementById("antraege"))?.scrollIntoView({ behavior: "smooth" }); };
+	if (offeneAntraege.length) c.append(h("p", { class: "karte hinweis-antraege" }, `📬 ${offeneAntraege.length} ${offeneAntraege.length === 1 ? "offener Antrag" : "offene Anträge"} zu deinen Spielen – `,
+		h("a", { href: "#/meine-spiele", text: "ansehen", onclick: zuAntraegen("") })));
 	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Daumen", "Spielzeit", "Zuletzt gespielt", "Bestenliste", "Fehler", ""].map((t) => h("th", { text: t })))),
+		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Daumen", "Spielzeit", "Zuletzt gespielt", "Bestenliste", "Fehler", "Anträge", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((s) => {
 			const [user, ordner] = s.id.split("/");
 			return h("tr", {},
@@ -122,6 +127,11 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 				h("td", { text: datumZeit(s.zuletzt) }),
 				h("td", { text: s.leaderboard.enabled ? `Season ${s.leaderboardSeason} · ${s.scores} Einträge` : "aus" }),
 				h("td", {}, fehlerText(s.fehler), s.fehlerEntwurf && s.fehlerEntwurf.arten ? h("div", { class: "leise", text: "Entwurf: " + fehlerText(s.fehlerEntwurf) }) : null),
+				h("td", {}, (() => {
+					const zuSpiel = antraege.filter((a) => a.spiel === s.id), offen = zuSpiel.filter((a) => a.status === "offen").length;
+					return zuSpiel.length ? h("a", { href: "#/meine-spiele", class: offen ? "status offen" : "", text: offen ? `${offen} offen` : `${zuSpiel.length} erledigt`,
+						onclick: zuAntraegen(s.id) }) : "–";
+				})()),
 				h("td", {}, s.live ? h("button", { type: "button", class: "knopf klein " + (s.offline ? "" : "leise"),
 					text: s.offline ? "Wieder online stellen" : "Offline nehmen",
 					title: s.offline ? "Spiel wieder für alle sichtbar machen" : "Spiel vorübergehend für alle anderen ausblenden – z. B. bei vielen Fehlern",
@@ -162,6 +172,52 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 		} })))));
 };
 
+// ---------- Bilder an Anträgen (Zentrale 1.3.1) ----------
+// Screenshots werden im Browser verkleinert (längste Seite 1600 px, WebP bzw. JPEG) – so passen auch Handy-Fotos unter 2 MB.
+const BILD_SEITE = 1600, BILD_MAX = 2 * 1024 * 1024;
+async function bildVorbereiten(datei) {
+	if (!datei || !/^image\/(png|jpeg|webp|gif|heic|heif)$/.test(datei.type)) throw new Error(`„${datei && datei.name}“ ist kein Bild (PNG, JPG oder WebP)`);
+	const bild = await createImageBitmap(datei).catch(() => { throw new Error(`„${datei.name}“ lässt sich nicht öffnen`); });
+	const f = Math.min(1, BILD_SEITE / Math.max(bild.width, bild.height));
+	const leinwand = document.createElement("canvas");
+	leinwand.width = Math.max(1, Math.round(bild.width * f)); leinwand.height = Math.max(1, Math.round(bild.height * f));
+	leinwand.getContext("2d").drawImage(bild, 0, 0, leinwand.width, leinwand.height);
+	for (const q of [0.88, 0.75, 0.6, 0.45]) {
+		let url = leinwand.toDataURL("image/webp", q);
+		if (!url.startsWith("data:image/webp")) url = leinwand.toDataURL("image/jpeg", q);   // Safari ohne WebP-Export
+		if (url.length * 0.75 < BILD_MAX - 1024) return url;
+	}
+	throw new Error(`„${datei.name}“ ist zu groß`);
+}
+// Bildauswahl mit Vorschau: Dateien wählen oder Screenshot einfügen (Strg/⌘+V im Textfeld). bilder() liefert die Daten-URLs.
+function bildAuswahl(max, einfuegenIn) {
+	const liste = [];
+	const vorschau = h("div", { class: "antrag-bilder" });
+	const eingabe = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", multiple: true, hidden: true });
+	const knopf = h("button", { type: "button", class: "knopf klein leise", text: "🖼 Bild anfügen", onclick: () => eingabe.click() });
+	const hinweis = h("span", { class: "leise", text: ` bis zu ${max} Bilder – Screenshot auch mit Strg/⌘+V einfügen` });
+	const zeigen = () => {
+		vorschau.replaceChildren(...liste.map((url, i) => h("figure", {}, h("img", { src: url, alt: `Bild ${i + 1}` }),
+			h("button", { type: "button", class: "knopf klein gefahr", text: "Entfernen", onclick: () => { liste.splice(i, 1); zeigen(); } }))));
+		knopf.disabled = liste.length >= max;
+	};
+	const dazu = async (dateien) => {
+		for (const d of dateien) {
+			if (liste.length >= max) { meldung(`Höchstens ${max} Bilder.`); break; }
+			try { liste.push(await bildVorbereiten(d)); } catch (f) { meldung(f.message); }
+		}
+		zeigen();
+	};
+	eingabe.addEventListener("change", () => { dazu([...eingabe.files]); eingabe.value = ""; });
+	if (einfuegenIn) einfuegenIn.addEventListener("paste", (e) => {
+		const dateien = [...(e.clipboardData?.files || [])].filter((d) => d.type.startsWith("image/"));
+		if (dateien.length) { e.preventDefault(); dazu(dateien); }
+	});
+	return { element: h("div", { class: "bild-auswahl" }, h("div", {}, knopf, hinweis), eingabe, vorschau), bilder: () => liste.slice(), leeren: () => { liste.length = 0; zeigen(); } };
+}
+const bildText = (n) => n ? ` · ${n} ${n === 1 ? "Bild" : "Bilder"}` : "";
+const oeffnen = (a) => h("a", { href: "#/antrag/" + a.id, class: "knopf klein leise", text: "Öffnen" + bildText(a.bilder) });
+
 // Anträge zu den eigenen Spielen (1.3.0): pro Spiel, offen zuerst, geschlossene eingeklappt. Nur der Entwickler (und der Antragsteller) sieht sie.
 function antraegeProSpiel(c, antraege) {
 	c.append(h("h2", { id: "antraege", text: "Anträge zu deinen Spielen" }));
@@ -181,50 +237,123 @@ function antraegeProSpiel(c, antraege) {
 		const k = (text, fn, art = "leise") => h("button", { type: "button", class: "knopf klein " + art, text, onclick: fn });
 		return h("div", { class: "karte" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
-				h("span", { class: "leise", text: ` · von ${a.player} · ${datumZeit(a.erstellt)}` })),
-			h("div", { text: a.text }), antwort,
+				h("span", { class: "leise", text: ` · von ${a.player} · ${datumZeit(a.erstellt)}` }), " ", oeffnen(a)),
+			h("div", { class: "antrag-text", text: a.text }), antwort,
 			h("div", { class: "zeile" }, k("Erledigt", () => setzen("erledigt"), ""), k("Ablehnen", () => setzen("abgelehnt"), "gefahr"),
 				a.status !== "offen" ? k("Wieder öffnen", () => setzen("offen")) : null));
 	};
 	for (const [spiel, liste] of proSpiel) {
 		const offen = liste.filter((a) => a.status === "offen"), zu = liste.filter((a) => a.status !== "offen");
-		c.append(h("h3", { text: `${liste[0].title || spiel} – ${offen.length} offen, ${zu.length} geschlossen` }), ...offen.map(karte));
+		c.append(h("h3", { id: "antraege-" + spiel, text: `${liste[0].title || spiel} – ${offen.length} offen, ${zu.length} geschlossen` }), ...offen.map(karte));
 		if (zu.length) c.append(h("details", {}, h("summary", { text: `Geschlossen (${zu.length})` }), ...zu.map(karte)));
 	}
 }
 
 // ---------- Anträge (Entwickler) ----------
 SEITEN_REG["antraege"] = async (c) => {
-	const [arten, meine] = await Promise.all([Bridge.json("GET", "/api/antraege/arten"), Bridge.json("GET", "/api/antraege")]);
+	const [arten, meine, anMich] = await Promise.all([Bridge.json("GET", "/api/antraege/arten"), Bridge.json("GET", "/api/antraege"),
+		ich.uploader ? Bridge.json("GET", "/api/entwickler/antraege").catch(() => []) : Promise.resolve([])]);
 	const eigene = spiele.slice().sort((x, y) => x.title.localeCompare(y.title, "de"));   // alle sichtbaren Spiele
 	const art = h("select", { required: true }, ...Object.entries(arten).map(([k, t]) => h("option", { value: k, text: t })));
 	const spiel = h("select", {}, h("option", { value: "", text: "– kein bestimmtes Spiel –" }),
 		...eigene.map((s) => h("option", { value: s.id, text: s.title })));
-	const text = h("textarea", { rows: "5", required: true, maxlength: "4000", placeholder: "Was soll passieren? Je genauer, desto schneller." });
+	const text = h("textarea", { rows: "5", required: true, maxlength: "4000", placeholder: "Was soll passieren? Je genauer, desto schneller. Ein Screenshot hilft oft am meisten." });
+	const auswahl = bildAuswahl(5, text);
 	const formular = h("form", { class: "karte", onsubmit: async (e) => {
 		e.preventDefault();
+		const senden = e.submitter || formular.querySelector("[type=submit]");
+		senden.disabled = true;
 		try {
 			const r = await Bridge.json("POST", "/api/antraege", { art: art.value, spiel: spiel.value || null, text: text.value });
+			let fehlt = 0;   // Bilder einzeln hinterher (je Anfrage ein Bild)
+			for (const bild of auswahl.bilder()) await Bridge.json("POST", `/api/antraege/${r.id}/bilder`, { bild }).catch((f) => { if (f instanceof Bridge.SitzungAbgelaufen) throw f; fehlt++; });
+			if (fehlt) alert(`${fehlt} Bild(er) konnten nicht angefügt werden. Du kannst sie im Antrag (Öffnen) noch einmal anfügen.`);
 			meldung(r.an && r.an !== "admin"
 				? `Antrag verschickt – er geht an ${r.an === ich.player ? "dich als Entwickler (unter „Meine Spiele“)" : r.an + ", den Entwickler des Spiels"}. Antwort und Status erscheinen hier.`
 				: "Antrag verschickt – Seb bekommt ihn. Antwort und Status erscheinen hier.");
 			c.replaceChildren(); SEITEN_REG["antraege"](c);
-		} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+		} catch (f) { senden.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
 	} },
-		h("label", {}, "Art", art), h("label", {}, "Spiel", spiel), h("label", {}, "Beschreibung", text),
+		h("label", {}, "Art", art), h("label", {}, "Spiel", spiel), h("label", {}, "Beschreibung", text), auswahl.element,
 		h("div", {}, h("button", { type: "submit", class: "knopf", text: "Antrag senden" })));
 	c.append(h("h1", { text: "Anträge" }),
 		h("p", { class: "leise", text: "Fehler, Wünsche und Sonstiges zu einem bestimmten Spiel gehen direkt an dessen Entwickler – nur er und du sehen den Antrag. "
 			+ "Alles andere bekommt Seb: Fehler in der Bibliothek, Spielstand wiederherstellen" + (ich.uploader || ich.admin ? ", Bestenliste zurücksetzen, Spiel umbenennen." : ".") }),
-		formular, h("h2", { text: "Meine Anträge" }));
+		formular);
+	// 1.3.1: Anträge zu den eigenen Spielen auch hier – offene oben, ein Klick öffnet den Antrag
+	const fremde = anMich.filter((a) => a.player !== ich.player);
+	if (fremde.length) {
+		const offen = fremde.filter((a) => a.status === "offen");
+		formular.before(h("div", { class: "karte antraege-an-mich" },
+			h("h2", { text: `An dich – Anträge zu deinen Spielen (${offen.length} offen)` }),
+			offen.length ? h("ul", { class: "antrag-liste" }, offen.map((a) => h("li", {},
+				h("a", { href: "#/antrag/" + a.id }, h("strong", { text: a.title || a.spiel }), ` · ${a.artText} von ${a.player} · ${datumZeit(a.erstellt)}${bildText(a.bilder)}`),
+				h("div", { class: "leise", text: a.text.length > 140 ? a.text.slice(0, 140) + " …" : a.text }))))
+				: h("p", { class: "leise", text: "Alles erledigt. 🎉" }),
+			h("p", {}, h("a", { href: "#/meine-spiele", text: `Alle ${fremde.length} Anträge pro Spiel → Meine Spiele` }))));
+	}
+	c.append(h("h2", { text: "Meine Anträge" }));
 	if (!meine.length) return c.append(h("p", { class: "leise", text: "Noch keine Anträge." }));
 	c.append(...meine.map((a) => h("div", { class: "karte" },
 		h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ",
 			h("strong", { text: arten[a.art] || a.art }), a.spiel ? h("span", { class: "leise", text: " · " + titelVon(a.spiel) }) : null,
-			h("span", { class: "leise", text: " · " + datumZeit(a.erstellt) })),
-		h("div", { text: a.text }),
+			h("span", { class: "leise", text: " · " + datumZeit(a.erstellt) }), " ", oeffnen(a)),
+		h("div", { class: "antrag-text", text: a.text }),
 		h("div", { class: "leise", text: a.zustaendig && a.zustaendig !== "admin" ? "geht an " + a.zustaendig + " (Entwickler)" : "geht an Seb" }),
 		a.antwort ? h("div", { class: "antwort" }, h("strong", { text: `Antwort von ${a.beantwortet_von || "Seb"}: ` }), a.antwort) : null)));
+};
+
+// ---------- Ein Antrag (Zentrale 1.3.1): #/antrag/<id> – aus der Glocke, „Anträge“ und „Meine Spiele“ ----------
+SEITEN_REG["antrag"] = async (c) => {
+	const id = antragNr;
+	const a = await Bridge.json("GET", "/api/antraege/" + id);
+	const neu = () => zeigeSeite("antrag");   // ganz neu aufbauen – mit Zurück-Pfeil
+	const an = a.zustaendig === "admin" ? "Seb (Bibliothek)" : a.zustaendig === ich.player ? "dich (Entwickler)" : a.zustaendig + " (Entwickler)";
+	c.append(h("h1", { text: `Antrag #${a.id}` }),
+		h("div", { class: "karte antrag-ticket" },
+			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
+				a.spiel ? h("span", {}, " · ", h("a", { href: "#/spiel/" + a.spiel, text: a.title || a.spiel })) : null),
+			h("div", { class: "leise", text: `von ${a.eigener ? "dir" : a.player} · ${datumZeit(a.erstellt)} · geht an ${an}` +
+				(a.geaendert !== a.erstellt ? ` · zuletzt geändert ${datumZeit(a.geaendert)}` : "") }),
+			h("div", { class: "antrag-text", text: a.text })));
+	// Bilder: Klick öffnet groß in neuem Tab
+	const galerie = h("div", { class: "antrag-bilder" }, a.bilder.map((b) => h("figure", {},
+		h("a", { href: `/api/antraege/${a.id}/bilder/${b.id}`, target: "_blank", rel: "noopener" },
+			h("img", { src: `/api/antraege/${a.id}/bilder/${b.id}`, alt: "Bild von " + b.von, loading: "lazy" })),
+		h("figcaption", { class: "leise", text: `${b.von === ich.player ? "von dir" : "von " + b.von} · ${groesse(b.bytes)}` },
+			b.von === ich.player || ich.admin ? h("button", { type: "button", class: "knopf klein leise", text: "Entfernen", onclick: async () => {
+				if (!confirm("Bild entfernen?")) return;
+				await Bridge.json("DELETE", `/api/antraege/${a.id}/bilder/${b.id}`); neu();
+			} }) : null))));
+	if (a.bilder.length || a.darfBilder) c.append(h("h2", { text: "Bilder" }), a.bilder.length ? galerie : h("p", { class: "leise", text: "Noch keine Bilder." }));
+	if (a.darfBilder && a.bilder.length < a.bilderMax) {
+		const auswahl = bildAuswahl(a.bilderMax - a.bilder.length);
+		c.append(auswahl.element, h("button", { type: "button", class: "knopf klein", text: "Bilder hochladen", onclick: async (e) => {
+			const bilder = auswahl.bilder();
+			if (!bilder.length) return meldung("Erst ein Bild auswählen.");
+			e.target.disabled = true;
+			try { for (const bild of bilder) await Bridge.json("POST", `/api/antraege/${a.id}/bilder`, { bild }); meldung("Bilder angefügt."); neu(); }
+			catch (f) { e.target.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+		} }));
+	}
+	c.append(h("h2", { text: "Antwort" }));
+	if (a.antwort) c.append(h("div", { class: "antwort antrag-text" }, h("strong", { text: `${a.beantwortet_von || "Seb"}: ` }), a.antwort));
+	else if (!a.darfAntworten) c.append(h("p", { class: "leise", text: "Noch keine Antwort." }));
+	if (a.darfAntworten) {
+		const antwort = h("textarea", { rows: "4", maxlength: "4000", placeholder: "Antwort an " + a.player });
+		antwort.value = a.antwort || "";
+		const setzen = async (status) => {
+			try {
+				await Bridge.json("PATCH", "/api/antraege/" + a.id, { status, antwort: antwort.value || null });
+				meldung(`Antrag #${a.id}: ${status}.` + (a.player !== ich.player && status !== "offen" ? ` ${a.player} bekommt eine Nachricht.` : ""));
+				neu();
+			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+		};
+		const k = (text, fn, art = "leise") => h("button", { type: "button", class: "knopf klein " + art, text, onclick: fn });
+		c.append(h("div", { class: "karte" }, antwort,
+			h("div", { class: "zeile" }, k("Erledigt", () => setzen("erledigt"), ""), k("Ablehnen", () => setzen("abgelehnt"), "gefahr"),
+				a.status !== "offen" ? k("Wieder öffnen", () => setzen("offen")) : k("Nur Antwort speichern", () => setzen("offen")))));
+	}
 };
 
 // ---------- Profil (Zentrale 1.2.0): Spielzeit, Erfolge, Bestplätze ----------

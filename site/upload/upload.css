@@ -57,3 +57,6 @@ progress { flex: 1; min-width: 8rem; }
 .steckbrief input[type="text"], .steckbrief textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .steckbrief .vorschau-box { display: flex; align-items: end; gap: 0.6rem; }
 .steckbrief .vorschau-box img { width: 240px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: #0003; }
+
+/* Zurück vom Entwurf-Testen (1.3.1) */
+.eintrag.hervorgehoben { outline: 3px solid #e9b949; outline-offset: 4px; border-radius: 8px; transition: outline-color 1s; }

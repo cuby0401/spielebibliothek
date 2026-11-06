@@ -5,6 +5,16 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.3.1 – 06.11.2026
+
+Bugfix-Update (Seb, 06.11.2026): Anträge leichter finden und öffnen, Bilder an Anträgen, Fehler von Emil beim Entwurf-Testen.
+
+- **Behoben (Antrag #3 von Emil):** Nach „Testen“ auf der Upload-Seite führte der Zurück-Knopf in die Spieleübersicht, und man musste „Spiel hochladen“ neu öffnen. Jetzt öffnet „Testen“ den Entwurf im selben Tab. „← Zurück zum Hochladen“ und der Link im gelben Entwurf-Hinweis führen direkt zum Spiel auf der Upload-Seite (dort hervorgehoben), wo man veröffentlicht.
+- **Neu:** Jeder Antrag hat eine eigene Seite (`#/antrag/<Nummer>`) mit Text, Bildern, Status und Antwortfeld. Ein Klick auf die Meldung in der Glocke öffnet sie direkt, ebenso „Öffnen“ in „Anträge“, „Meine Spiele“ und im Admin-Panel. Sehen dürfen nur Antragsteller, zuständiger Entwickler und Admin.
+- **Neu:** Bilder an Anträgen (bis zu 5, PNG/JPG/WebP): beim Stellen „Bild anfügen“ oder Screenshot mit Strg/⌘+V einfügen, später auch in der Antragsseite. Die Seite verkleinert große Fotos vorher (max. 1600 px). Der Server prüft die Bildart an den Bytes und erlaubt kein SVG. Die Bilder liegen in der Datenbank und werden mitgesichert.
+- **Geändert:** Anträge zu den eigenen Spielen sind leichter zu finden. Unter „Anträge“ stehen sie oben („An dich“), unter „Meine Spiele“ gibt es oben einen Hinweis auf offene Anträge und in der Tabelle die Spalte „Anträge“.
+- **Hinweis:** Meldungen in der Glocke von vor 1.3.1 führen weiter auf die alten Seiten.
+
 ## 1.3.0 – 06.11.2026
 
 - **Neu:** Cloudflare-Abgleich. Das Admin-Panel (Reiter Benutzer) zeigt, wer in den Richtlinien „Kollegen“/„Entwickler“ fehlt oder zu viel ist. Der Server bekommt dafür höchstens einen Nur-Lese-Schlüssel. Geschrieben wird nur vom Mac mit `scripts/cloudflare.py abgleichen`: Schlüssel im Schlüsselbund, Anzeige und Bestätigung, Sicherung vorher, Gegenprobe danach. Siehe `docs/cloudflare-abgleich.md`.

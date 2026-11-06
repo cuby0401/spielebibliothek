@@ -4,6 +4,7 @@ Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Speicher-Dien
 {user}/{game} in der URL ist die Spiel-ID, der Spieler kommt immer aus dem JWT.
 """
 
+import re
 import logging
 import math
 import threading
@@ -20,6 +21,8 @@ from .db import Datenbank, ZuGross
 
 KEY_MUSTER = r"^[A-Za-z0-9_][A-Za-z0-9._:-]{0,99}$"
 BODY_MAX = 300 * 1024
+BILD_BODY_MAX = 3 * 1024 * 1024 + 4096                  # Bild an einem Antrag: max. 2 MB, als Base64 ≈ 2,7 MB
+BILD_PFAD = re.compile(r"^/api/antraege/\d+/bilder$")
 SCORE_ABSTAND = 1.0       # Sekunden zwischen zwei Scores je Spieler und Spiel
 SCORE_MAX = 1e15          # Betrag; schützt nur vor Unsinn, nicht vor Schummeln (Kollegen-Vertrauen)
 
@@ -83,7 +86,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     async def body_grenze(request, weiter):
         # Riesige Anfragen gar nicht erst einlesen (Spielstand max. 256 KB + JSON-Hülle)
         laenge = request.headers.get("content-length")
-        if laenge and laenge.isdigit() and int(laenge) > BODY_MAX:
+        grenze = BILD_BODY_MAX if BILD_PFAD.match(request.url.path) else BODY_MAX   # 1.3.1: ein Bild je Anfrage an einen Antrag
+        if laenge and laenge.isdigit() and int(laenge) > grenze:
             return JSONResponse({"detail": "Anfrage zu groß"}, status_code=413)
         # CSRF: Cloudflare hängt die Anmeldung an jede Anfrage an games – auch an eine, die eine fremde
         # Seite auslöst. Ändernde Anfragen brauchen deshalb diesen Header (fremde Seiten können ihn nicht setzen).

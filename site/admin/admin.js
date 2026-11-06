@@ -299,7 +299,8 @@ async function antraegeSeite(c) {
 		const setzen = (status) => sicher(async () => { await api("PATCH", "/antraege/" + a.id, { status, antwort: antwort.value || null }); meldung(`Antrag ${a.id}: ${status}.`); zeigen(); });
 		return h("div", { class: "karte" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
-				h("span", { class: "leise", text: ` · von ${a.player}` + (a.spiel ? ` · ${a.title || a.spiel}` : "") + ` · ${datumZeit(a.erstellt)}` })),
+				h("span", { class: "leise", text: ` · von ${a.player}` + (a.spiel ? ` · ${a.title || a.spiel}` : "") + ` · ${datumZeit(a.erstellt)}` }),
+				" · ", h("a", { href: "/#/antrag/" + a.id, text: a.bilder ? `Öffnen (${a.bilder} ${a.bilder === 1 ? "Bild" : "Bilder"})` : "Öffnen" })),
 			h("div", { text: a.text }),
 			antwort,
 			h("div", { class: "zeile" }, knopf("Erledigt", () => setzen("erledigt"), ""), knopf("Ablehnen", () => setzen("abgelehnt"), "gefahr"),
@@ -311,7 +312,8 @@ async function antraegeSeite(c) {
 			tabelle(["Spiel", "Entwickler", "Art", "Von", "Status", "Erstellt", "Text"], spielAntraege.map((a) => h("tr", {},
 				h("td", { text: a.title || a.spiel }), h("td", { text: a.zustaendig }), h("td", { text: a.artText }), h("td", { text: a.player }),
 				h("td", {}, h("span", { class: "status " + a.status, text: a.status })), h("td", { text: datumZeit(a.erstellt) }),
-				h("td", { text: a.text.length > 120 ? a.text.slice(0, 120) + " …" : a.text }))))));
+				h("td", {}, h("a", { href: "/#/antrag/" + a.id, text: a.text.length > 120 ? a.text.slice(0, 120) + " …" : a.text }),
+					a.bilder ? h("span", { class: "leise", text: ` · ${a.bilder} 🖼` }) : null))))));
 	}
 }
 
