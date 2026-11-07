@@ -46,7 +46,10 @@ fi
 # ---------- 2. einspielen ----------
 mkdir -p "$ZIEL" && cd "$ZIEL"
 tar -tf "$TAR" | sed 's|^\./||' | grep -v '/$' | grep -v '^examples/' | grep -vx -e '.env' -e 'config/users.yaml' > /tmp/sb-deploy-liste.$$
-tar --no-same-owner -xf "$TAR" -T /tmp/sb-deploy-liste.$$
+# -m: Dateien bekommen die Uhrzeit des Einspielens. Sonst trägt z. B. eine wieder eingespielte ältere Version ein
+# älteres Datum als die zuletzt ausgelieferte, Browser fragen mit If-Modified-Since nach und behalten per 304 die
+# alte index.html, die dann nicht zum neuen app.js passt („Spielen“ tut nichts, 07.11.2026).
+tar --no-same-owner -m -xf "$TAR" -T /tmp/sb-deploy-liste.$$
 # Was nicht mehr im Release ist, entfernen (nur Dateien; .env, config/ und erzeugte Dateien bleiben)
 printf '%s\n' .env config/users.yaml users.yaml site/zentrale.json site/admin/CHANGELOG.md >> /tmp/sb-deploy-liste.$$
 find . -type f ! -path './config/*' | sed 's|^\./||' | grep -vxF -f /tmp/sb-deploy-liste.$$ | while IFS= read -r f; do

@@ -125,7 +125,7 @@ if [ -n "$ZURUECK" ]; then
 		cd $ZIEL
 		tar -tf /tmp/sb-zurueck.tar | sed 's|^\./||' | grep -v '/\$' > .deploy-liste
 		printf '%s\n' .env config/users.yaml >> .deploy-liste
-		tar --no-same-owner -xf /tmp/sb-zurueck.tar
+		tar --no-same-owner -m -xf /tmp/sb-zurueck.tar   # -m: Zeitstempel = jetzt, siehe nas-deploy.sh
 		find . -type f ! -name .deploy-liste ! -path './config/*' ! -name .env | sed 's|^\./||' | grep -vxF -f .deploy-liste | while IFS= read -r f; do
 			echo \"  entfernt: \$f\"; rm -f -- \"\$f\"
 		done

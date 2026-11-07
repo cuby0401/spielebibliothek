@@ -17,6 +17,7 @@ Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 - **Geändert:** Rollen werden im CRM ausdrücklich vergeben. Die Entwickler-Rolle legt das Upload-Konto an bzw. entfernt es. `ADMINS` bleibt als Notfall-Admin.
 - **Geändert:** `config/users.yaml` ist nur noch ein Export aus dem CRM (für den Upload-Dienst und als Rückweg). Beim ersten Start werden alle Einträge übernommen, die Datei vorher gesichert (`data/backup/users-vor-crm-…`).
 - **Behoben:** Der Auftragsdienst spielte nach dem direkten Deploy von 1.3.1 die alte Freigabe 1.3.0 wieder live ein. Er spielt jetzt nie eine ältere oder gleich alte Version ein, zurück geht nur von Hand (`deploy.sh --zurueck`).
+- **Behoben:** Nach dem Zurückspringen auf 1.3.0 und wieder auf 1.3.1 tat „Spielen“ bei Emil nichts. Die wieder eingespielten Dateien trugen ihr altes Datum, das älter war als das der zuvor ausgelieferten. Der Browser bekam deshalb „unverändert“ (304) und behielt die `index.html` von 1.3.0, die nicht zum neuen `app.js` passte. Beim Einspielen und beim Zurückspringen bekommen die Dateien jetzt die aktuelle Uhrzeit (`tar -m` in `scripts/nas-deploy.sh` und `deploy.sh --zurueck`).
 - **Tests:** `tests/test_crm.py` (Übernahme mit gleichen Rechten, Sichtbarkeit der Admin-Felder, Sperre mit Ablauf, Protokoll, Mail ohne Zugangsdaten in Fehlern), Ende-zu-Ende `scripts/e2e-zentrale-1.4-crm.mjs`.
 
 ## 1.3.1 – 06.11.2026
