@@ -290,3 +290,9 @@ main { padding: 1.25rem; max-width: 1200px; margin: 0 auto; }
 .antrag-liste a { text-decoration: none; }
 .antraege-an-mich { border-left: 4px solid #e9b949; }
 .hinweis-antraege { border-left: 4px solid #e9b949; }
+
+/* Zentrale 1.4.0: Hinweis bei einem Fehler der Bibliothek (lib/bridge.js) */
+.zentrale-fehler { position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 80; max-width: 34rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: 8px;
+  background: var(--flaeche); border: 2px solid var(--warn); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.zentrale-fehler p { margin: 0; flex: 1 1 100%; }

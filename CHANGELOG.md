@@ -18,7 +18,10 @@ Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 - **Geändert:** `config/users.yaml` ist nur noch ein Export aus dem CRM (für den Upload-Dienst und als Rückweg). Beim ersten Start werden alle Einträge übernommen, die Datei vorher gesichert (`data/backup/users-vor-crm-…`).
 - **Behoben:** Der Auftragsdienst spielte nach dem direkten Deploy von 1.3.1 die alte Freigabe 1.3.0 wieder live ein. Er spielt jetzt nie eine ältere oder gleich alte Version ein, zurück geht nur von Hand (`deploy.sh --zurueck`).
 - **Behoben:** Nach dem Zurückspringen auf 1.3.0 und wieder auf 1.3.1 tat „Spielen“ bei Emil nichts. Die wieder eingespielten Dateien trugen ihr altes Datum, das älter war als das der zuvor ausgelieferten. Der Browser bekam deshalb „unverändert“ (304) und behielt die `index.html` von 1.3.0, die nicht zum neuen `app.js` passte. Beim Einspielen und beim Zurückspringen bekommen die Dateien jetzt die aktuelle Uhrzeit (`tar -m` in `scripts/nas-deploy.sh` und `deploy.sh --zurueck`).
-- **Tests:** `tests/test_crm.py` (Übernahme mit gleichen Rechten, Sichtbarkeit der Admin-Felder, Sperre mit Ablauf, Protokoll, Mail ohne Zugangsdaten in Fehlern), Ende-zu-Ende `scripts/e2e-zentrale-1.4-crm.mjs`.
+- **Neu:** Fehler der Bibliothek selbst werden gemeldet, nicht mehr nur Fehler in Spielen. Der Spieler sieht „Da ist leider etwas schiefgelaufen … nenne die Fehler-Nr. …“, Admins bekommen eine rote Glocke. Die Fehler stehen ganz oben in der Admin-Übersicht, mit Datei, Zeile, Seite, Version und Stacktrace (`lib/bridge.js`, `POST /api/fehler-zentrale`).
+- **Neu:** Passt eine Seite im Browser nicht zur Version, die live läuft, holt sie sich einmal frisch und lädt neu, höchstens einmal je Live-Stand. Das fängt auch andere Cache-Probleme ab als das vom 07.11.
+- **Behoben:** In der Probe erschienen unter „Anmeldungen“ mehrere Geräte mit derselben IP, obwohl es keine Anmeldung gab. Die Probe hat keine Cloudflare-Anmeldung, gespeichert wurde die interne Docker-Adresse. Solche Einträge heißen jetzt „Probe/Teststand – keine echte Anmeldung“ und zeigen keine IP.
+- **Tests:** `tests/test_crm.py` (Übernahme mit gleichen Rechten, Sichtbarkeit der Admin-Felder, Sperre mit Ablauf, Protokoll, Mail ohne Zugangsdaten in Fehlern), `test_fehler_der_bibliothek`, Ende-zu-Ende `scripts/e2e-zentrale-1.4-crm.mjs`.
 
 ## 1.3.1 – 06.11.2026
 

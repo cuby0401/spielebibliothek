@@ -132,6 +132,10 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         ip = h.get("cf-connecting-ip") or (request.client.host if request.client else None)
         # Ort: Land kommt von Cloudflare immer, Stadt/Region nur mit der Managed Transform „Add visitor location headers“
         ort = ", ".join(x for x in (h.get("cf-ipcity"), h.get("cf-region"), h.get("cf-ipcountry")) if x and x != "XX") or None
+        if not sitzung:
+            # Probe/Teststand (DEV_USER): keine Cloudflare-Anmeldung – die IP wäre nur die interne Docker-Adresse,
+            # und jeder Browser (auch Testläufe) erschiene als eigenes Gerät mit derselben IP (07.11.2026)
+            ip, ort = None, "Probe/Teststand – keine echte Anmeldung"
         db.anmeldung(player, sitzung, geraet, ip, ort)
 
     @app.get("/api/vorschau/{user}/{ordner}")

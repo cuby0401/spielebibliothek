@@ -281,6 +281,25 @@ def test_fehlerbericht_ratelimit_und_kuerzen(client):
     assert max(len(f["meldung"]) for f in client.get("/api/entwickler/fehler", headers=client.als()).json()) <= 300
 
 
+def test_fehler_der_bibliothek(client):
+    """Zentrale 1.4.0: Fehler der Bibliotheksseite selbst – Nummer für den Spieler, sichtbar und löschbar nur für Admins."""
+    h = client.als(PAUL)
+    bericht = {"meldung": "TypeError: Cannot set properties of null (setting 'href')", "quelle": "/app.js", "zeile": 480,
+               "spalte": 20, "stack": "at zeigeSpiel (app.js:480:20)", "seite": "#/spiel/seb/zaehler", "version": "1.4.0 abc1234"}
+    nr = client.post("/api/fehler-zentrale", json=bericht, headers=h).json()["nr"]
+    assert isinstance(nr, int)
+    assert client.post("/api/fehler-zentrale", json=bericht, headers=h).json()["nr"] == nr      # gleicher Fehler → gleiche Nummer
+    alle = client.get("/api/entwickler/fehler?alle=true", headers=client.als()).json()
+    f = next(x for x in alle if x["id"] == nr)
+    assert f["zentrale"] is True and f["anzahl"] == 2 and f["title"] == "Bibliothek (Zentrale)"
+    assert f["stack"].startswith("Seite: #/spiel/seb/zaehler · Version: 1.4.0 abc1234")
+    # Admin bekommt eine wichtige Meldung, Entwickler sehen den Bericht nicht und dürfen ihn nicht löschen
+    assert any("Fehler in der Bibliothek" in m["text"] and m["wichtig"] for m in client.get("/api/meldungen", headers=client.als()).json()["liste"])
+    assert all(x["game"] != "zentrale" for x in client.get("/api/entwickler/fehler", headers=h).json())
+    assert client.delete(f"/api/entwickler/fehler/{nr}", headers=h).status_code == 404
+    assert client.delete(f"/api/entwickler/fehler/{nr}", headers=client.als()).status_code == 204
+
+
 # ---------- Daumen hoch und „gesehen“ (05.11.2026) ----------
 
 def test_daumen(client):

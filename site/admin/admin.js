@@ -24,6 +24,7 @@ const knopf = (text, onclick, art = "leise") => h("button", { type: "button", cl
 async function uebersicht(c) {
 	const d = await api("GET", "/uebersicht");
 	const kz = (wert, text) => h("div", { class: "kennzahl" }, h("div", { class: "wert", text: String(wert) }), h("div", { class: "text", text }));
+	await zentraleFehlerZeigen(c);
 	c.append(h("div", { class: "kacheln-klein" },
 		kz(d.spieler, "Personen mit Zugang"),
 		kz(d.spiele, "Spiele" + (d.testspiele ? ` (+${d.testspiele} Testspiele)` : "") + (d.offline ? ` · ${d.offline} offline` : "")),
@@ -63,6 +64,21 @@ async function uebersicht(c) {
 			: h("tr", {}, h("td", { text: datumZeit(u.zeit) }), h("td", { text: u.player }), h("td", { text: u.aktion + (u.dateien ? ` (${u.dateien} Dateien)` : "") }), h("td", { text: u.ordner || "" })))));
 	c.append(h("h2", { text: "Speicher je Entwickler" }), tabelle(["Entwickler", "Live-Spiele", "Kontingent (inkl. Entwürfe und Versionen)"],
 		Object.entries(d.speicher).map(([n, b]) => h("tr", {}, h("td", { text: n }), h("td", { text: groesse(b) }), h("td", { text: groesse(d.kontingent) })))));
+}
+
+// Fehler der Bibliothek selbst (Zentrale 1.4.0) – ganz oben, mit Fundort und Stacktrace. Leer: nur eine grüne Zeile.
+async function zentraleFehlerZeigen(c) {
+	let liste = [];
+	try { liste = (await Bridge.json("GET", "/api/entwickler/fehler?alle=true")).filter((f) => f.zentrale); } catch { return; }
+	if (!liste.length) return c.append(h("p", { class: "leise", text: "✓ Keine Fehler in der Bibliothek selbst gemeldet." }));
+	c.append(h("h2", { text: `⚠ Fehler in der Bibliothek (${liste.length})` }),
+		h("p", { class: "leise", text: "Abstürze der Bibliotheksseite bei Spielern – der Spieler sah dazu „Fehler-Nr. …“. Gleiche Fehler sind zusammengefasst. „Erledigt“ entfernt den Eintrag, tritt er wieder auf, erscheint er neu." }),
+		tabelle(["Nr.", "Fehler", "Fundort", "Anzahl", "Zuletzt", "Browser", ""], liste.map((f) => h("tr", {},
+			h("td", { text: String(f.id) }),
+			h("td", {}, h("code", { text: f.meldung }), f.stack ? h("details", {}, h("summary", { text: "Seite, Version, Stacktrace" }), h("pre", { class: "changelog", text: f.stack })) : null),
+			h("td", {}, h("code", { text: (f.quelle || "inline") + (f.zeile ? `:${f.zeile}` + (f.spalte ? `:${f.spalte}` : "") : "") })),
+			h("td", { text: String(f.anzahl) }), h("td", { text: datumZeit(f.letztes) }), h("td", { text: f.browser || "" }),
+			h("td", {}, knopf("Erledigt", async () => { await Bridge.json("DELETE", "/api/entwickler/fehler/" + f.id); zeigen(); }))))));
 }
 
 // Version der Zentrale (E39): site/zentrale.json und CHANGELOG.md schreibt scripts/deploy.sh
@@ -159,7 +175,7 @@ async function spieleSeite(c) {
 	});
 	c.append(h("p", { class: "leise", text: "„Ausblenden“ versteckt ein Spiel in der Übersicht für alle außer dir (die Dateien bleiben unter play erreichbar). „Empfehlen“ heftet es mit Marke nach den Favoriten oben an. „Testspiel“ nimmt es für alle aus der Übersicht – auch für dich; öffnen über „Öffnen“ hier. Für Tutorials und Testwerkzeuge wie Spike, Böse oder die Bestenlisten-Vorlage." }),
 		tabelle(["Spiel", "Spieler", "Daumen", "Spielzeit", "Zuletzt", "Bestenliste", "Fehler", "Sichtbarkeit", ""], zeilen));
-	const fehler = await Bridge.json("GET", "/api/entwickler/fehler?alle=true");
+	const fehler = (await Bridge.json("GET", "/api/entwickler/fehler?alle=true")).filter((f) => !f.zentrale);   // Bibliothek: siehe Übersicht
 	c.append(h("h2", { text: "Fehlerberichte aller Spiele" }),
 		fehler.length ? tabelle(["Spiel", "Fehler", "Ort", "Anzahl", "Zuletzt", "Browser", ""], fehler.map((f) => h("tr", {},
 			h("td", {}, f.title, f.entwurf ? h("span", { class: "leise", text: " (Entwurf)" }) : null),

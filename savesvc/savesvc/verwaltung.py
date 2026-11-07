@@ -323,6 +323,43 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             db.melden(user, f"Neuer Fehler in „{titel_von(sid)}“: {meldung[:120]}" + (f" (Zeile {zahl('zeile')})" if zahl("zeile") else ""),
                       f"#/meine-spiele?{sid}", wichtig=True)
 
+    # ---------- Fehler der Bibliothek selbst (Zentrale 1.4.0) ----------
+    # Bisher wurden nur Fehler in Spielen gemeldet. Ein Absturz der Bibliotheksseite (z. B. „Spielen“ tut nichts bei
+    # Emil, 07.11.2026) blieb unsichtbar. Gespeichert wie Spielfehler unter der Kennung „zentrale“ (ohne „/“, kann also
+    # kein Spiel sein und erscheint nie bei einem Entwickler), sichtbar nur für Admins.
+    ZENTRALE = "zentrale"
+
+    @app.post("/api/fehler-zentrale")
+    def zentrale_fehler_melden(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
+        import time as _t
+        jetzt_m = _t.monotonic()
+        liste = [x for x in fehler_takt.get((player, ZENTRALE), []) if jetzt_m - x < 60]
+        if len(liste) >= 20:
+            fehler_takt[(player, ZENTRALE)] = liste
+            return {"nr": None}
+        fehler_takt[(player, ZENTRALE)] = liste + [jetzt_m]
+        def text(k, n):
+            x = body.get(k)
+            return x[:n] if isinstance(x, str) else ""
+        def zahl(k):
+            x = body.get(k)
+            return int(x) if isinstance(x, (int, float)) and not isinstance(x, bool) and 0 <= x < 10_000_000 else 0
+        meldung = text("meldung", 300).strip() or "(ohne Meldung)"
+        quelle = text("quelle", 200)
+        # Seite und Version gehören zum Fundort – vor den Stacktrace, damit der Bericht für sich allein reicht
+        kopf = f"Seite: {text('seite', 200) or '–'} · Version: {text('version', 60) or '–'}"
+        stack = kopf + ("\n" + text("stack", 1500) if text("stack", 1500) else "")
+        neu = db.fehler_melden(ZENTRALE, meldung, quelle, zahl("zeile"), zahl("spalte"), stack,
+                               browser_von(request.headers.get("user-agent", "")))
+        nr = db.fehler_nummer(ZENTRALE, meldung, quelle, zahl("zeile"))
+        if neu:
+            link = "/admin/#uebersicht"
+            for a in rollen.admins(e):
+                if not db.wichtig_kuerzlich(a, link):
+                    db.melden(a, f"Fehler in der Bibliothek (Nr. {nr}): {meldung[:120]}" + (f" ({quelle}:{zahl('zeile')})" if quelle else ""),
+                              link, wichtig=True)
+        return {"nr": nr}
+
     @app.get("/api/entwickler/fehler")
     def fehler_ansehen(request: Request, player: str = Depends(entwickler), alle: bool = Query(False)):
         if alle and rollen.rolle(e, request, player)["admin"]:
@@ -332,12 +369,15 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             for name in eigene_spiele(player):
                 ids += [f"{player}/{name}", f"{player}/{name}{versionen.ENTWURF}"]
             liste = db.fehler_liste(ids)
-        return [{**f, "entwurf": f["game"].endswith(versionen.ENTWURF), "title": titel_von(f["game"].removesuffix(versionen.ENTWURF))} for f in liste]
+        return [{**f, "entwurf": f["game"].endswith(versionen.ENTWURF), "zentrale": f["game"] == ZENTRALE,
+                 "title": "Bibliothek (Zentrale)" if f["game"] == ZENTRALE else titel_von(f["game"].removesuffix(versionen.ENTWURF))}
+                for f in liste]
 
     @app.delete("/api/entwickler/fehler/{fehler_id}", status_code=204)
     def fehler_erledigt(request: Request, player: str = Depends(entwickler), fehler_id: int = P(...)):
         f = db.fehler_eintrag(fehler_id)
-        if not f or (f["game"].split("/")[0] != player and not rollen.rolle(e, request, player)["admin"]):
+        eigen = f is not None and f["game"] != ZENTRALE and f["game"].split("/")[0] == player
+        if not f or (not eigen and not rollen.rolle(e, request, player)["admin"]):
             raise HTTPException(404, "Fehlerbericht nicht gefunden")
         db.fehler_loeschen(fehler_id)
 

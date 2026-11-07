@@ -735,6 +735,13 @@ class Datenbank:
                       (game, game, self.FEHLER_MAX_JE_SPIEL))
         return neu
 
+    def fehler_nummer(self, game: str, meldung: str, quelle: str, zeile: int) -> int | None:
+        """Nummer eines Fehlerberichts – die Bibliothek zeigt sie dem Spieler, damit er sie Seb nennen kann."""
+        with self.verbindung() as v:
+            z = v.execute("SELECT id FROM fehler WHERE game=? AND meldung=? AND quelle=? AND zeile=?",
+                          (game, meldung, quelle, zeile)).fetchone()
+        return z["id"] if z else None
+
     def fehler_liste(self, spiele: list[str] | None = None) -> list[dict]:
         with self.verbindung() as v:
             if spiele is None:
