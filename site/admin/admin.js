@@ -24,12 +24,13 @@ const knopf = (text, onclick, art = "leise") => h("button", { type: "button", cl
 async function uebersicht(c) {
 	const d = await api("GET", "/uebersicht");
 	const kz = (wert, text) => h("div", { class: "kennzahl" }, h("div", { class: "wert", text: String(wert) }), h("div", { class: "text", text }));
+	notausZeigen(c);
 	await zentraleFehlerZeigen(c);
 	c.append(h("div", { class: "kacheln-klein" },
 		kz(d.spieler, "Personen mit Zugang"),
 		kz(d.spiele, "Spiele" + (d.testspiele ? ` (+${d.testspiele} Testspiele)` : "") + (d.offline ? ` · ${d.offline} offline` : "")),
 		kz(d.zaehler.saves, "Spielstände"),
-		kz(d.zaehler.scores, "Bestenlisten-Einträge"), kz(d.offeneAntraege, "offene Anträge"),
+		kz(d.zaehler.scores, "Bestenlisten-Einträge"), kz(d.offeneAntraege, "offene Anfragen"),
 		kz(groesse(d.datenbank), "Datenbank"),
 		d.platte && d.platte.gesamt ? kz(groesse(d.platte.frei), "frei auf der NAS" + (d.platte.knapp ? " ⚠" : "")) : null, kz(d.sicherung ? datumZeit(d.sicherung) : "–", "letzte DB-Kopie fürs Backup")));
 	if (d.platte && d.platte.knapp) c.append(h("p", { class: "meldung fehler", text: `⚠ Speicher auf der NAS wird knapp: nur noch ${groesse(d.platte.frei)} von ${groesse(d.platte.gesamt)} frei. Alte Versionen löschen oder Kontingente (UPLOAD_KONTINGENT_MB) senken.` }));
@@ -40,7 +41,7 @@ async function uebersicht(c) {
 			text: !w.aktiv ? "Wächter ist aus (WAECHTER=0)."
 				: !w.letzterLauf ? "Wächter startet – erster Lauf etwa eine Minute nach dem Start."
 				: (w.probleme.length ? "⚠ " + w.probleme.join(" · ") : "✓ Alles in Ordnung") + ` · zuletzt geprüft ${datumZeit(w.letzterLauf)}` }),
-		h("p", { class: "leise", text: w.homeAssistant ? "Home Assistant bekommt Lebenszeichen, Probleme und neue Anträge (HA_WEBHOOK_URL gesetzt)."
+		h("p", { class: "leise", text: w.homeAssistant ? "Home Assistant bekommt Lebenszeichen, Probleme und neue Anfragen (HA_WEBHOOK_URL gesetzt)."
 			: "Home Assistant ist nicht verbunden – HA_WEBHOOK_URL in der .env setzen, Anleitung: docs/home-assistant.md im Repo." }));
 	await zentraleZeigen(c);
 	await probeZeigen(c);
@@ -55,7 +56,7 @@ async function uebersicht(c) {
 		location.href = "/#/";
 	};
 	c.append(h("h2", { text: "Bibliothek als Rolle ansehen" }),
-		h("p", { class: "leise", text: "Zeigt die Bibliothek in diesem Tab so, wie Kollegen mit dieser Rolle sie sehen – mit einem eigenen Konto, das bei jedem Start geleert wird. Bestenliste und Anträge sind dabei gesperrt. Beenden über das lila Band oben in der Bibliothek." }),
+		h("p", { class: "leise", text: "Zeigt die Bibliothek in diesem Tab so, wie Kollegen mit dieser Rolle sie sehen – mit einem eigenen Konto, das bei jedem Start geleert wird. Bestenliste und Anfragen sind dabei gesperrt. Beenden über das lila Band oben in der Bibliothek." }),
 		h("div", { class: "zeile" }, knopf("Ansicht als Spieler", () => ansichtStarten("spieler")), knopf("Ansicht als Entwickler", () => ansichtStarten("entwickler"))));
 	c.append(h("h2", { text: "Letzte Aktivität" }), tabelle(["Spieler", "Spiel", "Zeit"],
 		d.aktivitaet.map((a) => h("tr", {}, h("td", { text: a.player }), h("td", { text: a.title }), h("td", { text: datumZeit(a.zeit) })))));
@@ -64,6 +65,32 @@ async function uebersicht(c) {
 			: h("tr", {}, h("td", { text: datumZeit(u.zeit) }), h("td", { text: u.player }), h("td", { text: u.aktion + (u.dateien ? ` (${u.dateien} Dateien)` : "") }), h("td", { text: u.ordner || "" })))));
 	c.append(h("h2", { text: "Speicher je Entwickler" }), tabelle(["Entwickler", "Live-Spiele", "Kontingent (inkl. Entwürfe und Versionen)"],
 		Object.entries(d.speicher).map(([n, b]) => h("tr", {}, h("td", { text: n }), h("td", { text: groesse(b) }), h("td", { text: groesse(d.kontingent) })))));
+}
+
+// Not-Aus (Zentrale 1.4.0, E72): trennt die Bibliothek vom Internet. Aufheben geht nur am Mac (scripts/deploy.sh --notaus-aus).
+function notausZeigen(c) {
+	const ausloesen = async () => {
+		const grund = prompt("NOT-AUS: Die Bibliothek wird sofort gesperrt (keine Daten mehr), der Tunnel geht innerhalb einer Minute aus.\n" +
+			"Wieder einschalten geht NUR am Mac mit scripts/deploy.sh --notaus-aus.\n\nGrund (optional, steht im Sicherheitsprotokoll):", "");
+		if (grund === null) return;
+		const best = prompt("Zur Bestätigung NOT-AUS eintippen:");
+		if (best !== "NOT-AUS") return meldung("Nicht ausgelöst.");
+		const d = await api("POST", "/notaus", { bestaetigung: "NOT-AUS", grund });
+		c.replaceChildren(h("div", { class: "notaus-an" },
+			h("strong", { text: "Not-Aus ist AN" }), h("p", { text: d.hinweis }),
+			h("p", { class: "leise", text: `Ausgelöst ${datumZeit(d.zeit)} von ${d.von}${d.grund ? " – " + d.grund : ""}. Diese Seite funktioniert jetzt nicht mehr.` })));
+		meldung("");
+	};
+	const box = h("details", { class: "notaus" },
+		h("summary", { text: "Not-Aus" }),
+		h("p", { class: "leise", text: "Bei Verdacht auf ein Datenleck oder einen Angriff: sperrt sofort alle Daten (Bibliothek und Upload) und trennt die Webseite innerhalb einer Minute vom Internet. Andere Dienste auf der NAS laufen weiter. Wieder einschalten nur am Mac: scripts/deploy.sh --notaus-aus." }),
+		h("div", { class: "zeile" }, knopf("Not-Aus auslösen …", ausloesen, "gefahr"), knopf("Sicherheitsprotokoll", async () => {
+			const liste = await api("GET", "/sicherheit");
+			box.append(liste.length ? tabelle(["Zeit", "Ereignis", "Wer", "Text"], liste.map((x) => h("tr", {},
+				h("td", { text: datumZeit(x.zeit) }), h("td", { text: x.art }), h("td", { text: x.wer || "" }), h("td", { text: x.text || "" }))))
+				: h("p", { class: "leise", text: "Noch keine Einträge (aufbewahrt wird ein Jahr)." }));
+		})));
+	c.append(box);
 }
 
 // Fehler der Bibliothek selbst (Zentrale 1.4.0) – ganz oben, mit Fundort und Stacktrace. Leer: nur eine grüne Zeile.
@@ -443,17 +470,17 @@ async function spielstandDetail(c, s, filter) {
 			h("pre", { text: JSON.stringify(v.data, null, 1) }))) : [h("p", { class: "leise", text: "Kein Verlauf." })]));
 }
 
-// ---------- Anträge ----------
+// ---------- Anfragen ----------
 async function antraegeSeite(c) {
 	const alle = await api("GET", "/antraege");
-	// 1.3.0: Hier nur, was der Admin erledigt (Bibliothek). Anträge zu Spielen bearbeitet deren Entwickler – nur zur Info, ohne Zahl.
+	// 1.3.0: Hier nur, was der Admin erledigt (Bibliothek). Anfragen zu Spielen bearbeitet deren Entwickler – nur zur Info, ohne Zahl.
 	const liste = alle.filter((a) => a.zustaendig === "admin"), spielAntraege = alle.filter((a) => a.zustaendig !== "admin");
-	c.append(h("h2", { text: "Anträge an die Bibliothek" }));
-	if (!liste.length) c.append(h("p", { class: "leise", text: "Keine Anträge." }));
+	c.append(h("h2", { text: "Anfragen an die Bibliothek" }));
+	if (!liste.length) c.append(h("p", { class: "leise", text: "Keine Anfragen." }));
 	c.append(...liste.map((a) => {
 		const antwort = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Antwort an " + a.player });
 		antwort.value = a.antwort || "";
-		const setzen = (status) => sicher(async () => { await api("PATCH", "/antraege/" + a.id, { status, antwort: antwort.value || null }); meldung(`Antrag ${a.id}: ${status}.`); zeigen(); });
+		const setzen = (status) => sicher(async () => { await api("PATCH", "/antraege/" + a.id, { status, antwort: antwort.value || null }); meldung(`Anfrage ${a.id}: ${status}.`); zeigen(); });
 		return h("div", { class: "karte" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
 				h("span", { class: "leise", text: ` · von ${a.player}` + (a.spiel ? ` · ${a.title || a.spiel}` : "") + ` · ${datumZeit(a.erstellt)}` }),
@@ -465,7 +492,7 @@ async function antraegeSeite(c) {
 	}));
 	if (spielAntraege.length) {
 		const offen = spielAntraege.filter((a) => a.status === "offen").length;
-		c.append(h("details", { class: "karte" }, h("summary", { text: `Anträge zu Spielen – bearbeitet der jeweilige Entwickler (${offen} offen, ${spielAntraege.length - offen} geschlossen, nur zur Info)` }),
+		c.append(h("details", { class: "karte" }, h("summary", { text: `Anfragen zu Spielen – bearbeitet der jeweilige Entwickler (${offen} offen, ${spielAntraege.length - offen} geschlossen, nur zur Info)` }),
 			tabelle(["Spiel", "Entwickler", "Art", "Von", "Status", "Erstellt", "Text"], spielAntraege.map((a) => h("tr", {},
 				h("td", { text: a.title || a.spiel }), h("td", { text: a.zustaendig }), h("td", { text: a.artText }), h("td", { text: a.player }),
 				h("td", {}, h("span", { class: "status " + a.status, text: a.status })), h("td", { text: datumZeit(a.erstellt) }),

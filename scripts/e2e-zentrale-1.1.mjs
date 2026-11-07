@@ -77,7 +77,7 @@ const dialoge = [];
 
   // Bibliothek: Menü, Fußzeile, offline nehmen
   await gehe(G + "/", 3000);
-  ok(await eval_(`![...document.querySelectorAll("#menue a")].some(a=>a.textContent.includes("Handbuch"))`), "Kontextmenü ohne Handbuch");
+  ok(await eval_(`![...document.querySelectorAll(".kopf nav a")].some(a=>a.textContent.includes("Handbuch"))`), "Kopfzeile ohne Handbuch");
   ok(await eval_(`[...document.querySelectorAll(".fuss a")].map(a=>a.textContent).join("|")`) === "Hilfe|Entwickler-Handbuch|Fehler melden / Idee", "Fußzeile: Hilfe · Handbuch · Fehler melden");
   await gehe(G + "/#/meine-spiele", 3000);
   await bis(`[...document.querySelectorAll("button")].some(b=>b.textContent==="Offline nehmen")`);

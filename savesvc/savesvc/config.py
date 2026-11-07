@@ -18,7 +18,7 @@ class Einstellungen:
     admins: frozenset = frozenset({"seb"})   # dürfen /admin
     intern_token: str = ""                  # für den Upload-Dienst (Spiele löschen, Upload-Konten)
     upload_url: str = "http://upload:8000"
-    ha_webhook: str = ""                    # Home-Assistant-Webhook für Wächter und Anträge (leer = aus)
+    ha_webhook: str = ""                    # Home-Assistant-Webhook für Wächter und Anfragen (leer = aus)
     waechter: bool = False                  # Gesundheitsprüfung alle 5 Minuten (im Betrieb an, in Tests aus)
     probe: bool = False                     # Probe-Zentrale (Kopie zum Testen vor dem Live-Gang, E56)
     zentrale_commit: str = ""

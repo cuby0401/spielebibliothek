@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS scores (
     score REAL NOT NULL, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS scores_liste ON scores (game, season, player, score);
--- Phase 10: Einstellungen je Spieler, Einstellungen je Spiel, Anträge
+-- Phase 10: Einstellungen je Spieler, Einstellungen je Spiel, Anfragen
 CREATE TABLE IF NOT EXISTS einstellungen (player TEXT PRIMARY KEY, daten TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS spiel_einstellungen (
     game TEXT PRIMARY KEY, versteckt INTEGER NOT NULL DEFAULT 0, hervorgehoben INTEGER NOT NULL DEFAULT 0,
@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS fehler (
     zeile INTEGER NOT NULL, spalte INTEGER NOT NULL DEFAULT 0, stack TEXT, browser TEXT,
     anzahl INTEGER NOT NULL DEFAULT 1, erstes TEXT NOT NULL, letztes TEXT NOT NULL,
     UNIQUE (game, meldung, quelle, zeile));
+-- Sicherheitsprotokoll (Zentrale 1.4.0): Not-Aus ein/aus, später weitere Ereignisse. Ein Jahr aufbewahrt.
+CREATE TABLE IF NOT EXISTS sicherheit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, zeit TEXT NOT NULL, art TEXT NOT NULL, wer TEXT, text TEXT);
 CREATE TABLE IF NOT EXISTS antraege (
     id INTEGER PRIMARY KEY AUTOINCREMENT, player TEXT NOT NULL, art TEXT NOT NULL, spiel TEXT, text TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'offen', antwort TEXT, erstellt TEXT NOT NULL, geaendert TEXT NOT NULL);
@@ -82,7 +85,7 @@ CREATE TABLE IF NOT EXISTS anmeldungen (
 -- Daumen hoch je Spieler und Spiel (Idee „Bewertung“, 05.11.2026)
 CREATE TABLE IF NOT EXISTS daumen (
     player TEXT NOT NULL, game TEXT NOT NULL, zeit TEXT NOT NULL, PRIMARY KEY (player, game));
--- Zentrale 1.3.1: Bilder (Screenshots) an Anträgen – in der Datenbank, damit sie mit gesichert werden
+-- Zentrale 1.3.1: Bilder (Screenshots) an Anfragen – in der Datenbank, damit sie mit gesichert werden
 CREATE TABLE IF NOT EXISTS antrag_bilder (
     id INTEGER PRIMARY KEY AUTOINCREMENT, antrag_id INTEGER NOT NULL, art TEXT NOT NULL, daten BLOB NOT NULL,
     von TEXT NOT NULL, erstellt TEXT NOT NULL);
@@ -124,7 +127,7 @@ class Datenbank:
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline_grund TEXT")
                 v.execute("ALTER TABLE spiel_einstellungen ADD COLUMN offline_seit TEXT")
             if "beantwortet_von" not in {z["name"] for z in v.execute("PRAGMA table_info(antraege)")}:
-                v.execute("ALTER TABLE antraege ADD COLUMN beantwortet_von TEXT")   # 1.3.0: Entwickler beantworten Spiel-Anträge
+                v.execute("ALTER TABLE antraege ADD COLUMN beantwortet_von TEXT")   # 1.3.0: Entwickler beantworten Spiel-Anfragen
 
     @contextmanager
     def verbindung(self):
@@ -331,7 +334,7 @@ class Datenbank:
     # --- Meldungen / Glocke (Zentrale 1.2.0) ---
 
     def melden(self, an: str, text: str, link: str | None = None, wichtig: bool = False) -> None:
-        """an = Spielername oder "*" (alle). wichtig = rote, wackelnde Glocke und Einblendung (Fehler, Anträge)."""
+        """an = Spielername oder "*" (alle). wichtig = rote, wackelnde Glocke und Einblendung (Fehler, Anfragen)."""
         with self.verbindung() as v:
             v.execute("INSERT INTO meldungen (an, text, link, zeit, wichtig) VALUES (?,?,?,?,?)", (an, text[:300], link, jetzt(), int(wichtig)))
             v.execute("DELETE FROM meldungen WHERE id NOT IN (SELECT id FROM meldungen ORDER BY id DESC LIMIT 5000)")
@@ -714,6 +717,20 @@ class Datenbank:
         with self.verbindung() as v:
             return v.execute("DELETE FROM scores WHERE id=?", (score_id,)).rowcount > 0
 
+    # --- Sicherheitsprotokoll (Zentrale 1.4.0) ---
+
+    SICHERHEIT_TAGE = 365
+
+    def sicherheit_eintragen(self, art: str, wer: str | None, text: str) -> None:
+        grenze = (datetime.now(timezone.utc) - timedelta(days=self.SICHERHEIT_TAGE)).isoformat(timespec="seconds")
+        with self.verbindung() as v:
+            v.execute("INSERT INTO sicherheit (zeit, art, wer, text) VALUES (?,?,?,?)", (jetzt(), art[:40], (wer or "")[:60], text[:1000]))
+            v.execute("DELETE FROM sicherheit WHERE zeit < ?", (grenze,))
+
+    def sicherheit_liste(self, anzahl: int = 200) -> list[dict]:
+        with self.verbindung() as v:
+            return [dict(z) for z in v.execute("SELECT * FROM sicherheit ORDER BY id DESC LIMIT ?", (anzahl,))]
+
     # --- Fehlerberichte (gebündelt, ohne Spielerdaten) ---
 
     FEHLER_MAX_JE_SPIEL = 200
@@ -784,7 +801,7 @@ class Datenbank:
                 "SELECT player, ?, key, data, save_version, ? FROM saves WHERE player=? AND game=?",
                 (nach, jetzt(), player, von)).rowcount
 
-    # --- Anträge ---
+    # --- Anfragen ---
 
     def antrag_anlegen(self, player: str, art: str, spiel: str | None, text: str) -> int:
         with self.verbindung() as v:
@@ -799,7 +816,7 @@ class Datenbank:
                 "SELECT * FROM antraege ORDER BY CASE status WHEN 'offen' THEN 0 ELSE 1 END, id DESC")]
 
     def antrag_bild_anlegen(self, antrag_id: int, art: str, daten: bytes, von: str, maximal: int) -> int | None:
-        """None = schon `maximal` Bilder an diesem Antrag."""
+        """None = schon `maximal` Bilder an dieser Anfrage."""
         with self.verbindung() as v:
             if v.execute("SELECT COUNT(*) FROM antrag_bilder WHERE antrag_id=?", (antrag_id,)).fetchone()[0] >= maximal:
                 return None

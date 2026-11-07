@@ -1,6 +1,6 @@
-// Seiten aus dem Benutzermenü (Phase 10): Einstellungen, Meine Spielstände, Meine Spiele, Anträge.
+// Seiten aus dem Benutzermenü (Phase 10): Einstellungen, Meine Spielstände, Meine Spiele, Anfragen.
 // Nutzt aus app.js: seiten, einstellungen, einstellungenSpeichern, spiele, ich, meldung, Bridge.
-// Sicherheit: Inhalte nur per textContent (Titel, Antragstexte usw. sind fremde Eingaben).
+// Sicherheit: Inhalte nur per textContent (Titel, Anfragetexte usw. sind fremde Eingaben).
 "use strict";
 
 // Auf der Admin-Seite gibt es kein app.js – dann werden die Seiten einfach nicht registriert
@@ -104,14 +104,14 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 	const [liste, fehler, antraege] = await Promise.all([Bridge.json("GET", "/api/entwickler/spiele"), Bridge.json("GET", "/api/entwickler/fehler"),
 		Bridge.json("GET", "/api/entwickler/antraege").catch(() => [])]);
 	if (!liste.length) return c.append(h("p", { text: "Du hast noch keine Spiele hochgeladen." }));
-	// 1.3.1: offene Anträge gleich oben sichtbar – ein Klick springt zu den Anträgen des Spiels
+	// 1.3.1: offene Anfragen gleich oben sichtbar – ein Klick springt zu den Anfragen des Spiels
 	const offeneAntraege = antraege.filter((a) => a.status === "offen" && a.player !== ich.player);
 	const zuAntraegen = (spiel) => (e) => { e.preventDefault(); (document.getElementById("antraege-" + spiel) || document.getElementById("antraege"))?.scrollIntoView({ behavior: "smooth" }); };
-	if (offeneAntraege.length) c.append(h("p", { class: "karte hinweis-antraege" }, `📬 ${offeneAntraege.length} ${offeneAntraege.length === 1 ? "offener Antrag" : "offene Anträge"} zu deinen Spielen – `,
+	if (offeneAntraege.length) c.append(h("p", { class: "karte hinweis-antraege" }, `📬 ${offeneAntraege.length} ${offeneAntraege.length === 1 ? "offene Anfrage" : "offene Anfragen"} zu deinen Spielen – `,
 		h("a", { href: "#/meine-spiele", text: "ansehen", onclick: zuAntraegen("") })));
 	const fehlerText = (f) => !f || !f.arten ? "–" : `${f.arten24h ? f.arten24h + " neu (24 h) · " : ""}${f.anzahl}× gesamt`;
 	c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Daumen", "Spielzeit", "Zuletzt gespielt", "Bestenliste", "Fehler", "Anträge", ""].map((t) => h("th", { text: t })))),
+		h("thead", {}, h("tr", {}, ...["Spiel", "Spieler", "Daumen", "Spielzeit", "Zuletzt gespielt", "Bestenliste", "Fehler", "Anfragen", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((s) => {
 			const [user, ordner] = s.id.split("/");
 			return h("tr", {},
@@ -172,7 +172,7 @@ SEITEN_REG["meine-spiele"] = async (c) => {
 		} })))));
 };
 
-// ---------- Bilder an Anträgen (Zentrale 1.3.1) ----------
+// ---------- Bilder an Anfragen (Zentrale 1.3.1) ----------
 // Screenshots werden im Browser verkleinert (längste Seite 1600 px, WebP bzw. JPEG) – so passen auch Handy-Fotos unter 2 MB.
 const BILD_SEITE = 1600, BILD_MAX = 2 * 1024 * 1024;
 async function bildVorbereiten(datei) {
@@ -218,10 +218,10 @@ function bildAuswahl(max, einfuegenIn) {
 const bildText = (n) => n ? ` · ${n} ${n === 1 ? "Bild" : "Bilder"}` : "";
 const oeffnen = (a) => h("a", { href: "#/antrag/" + a.id, class: "knopf klein leise", text: "Öffnen" + bildText(a.bilder) });
 
-// Anträge zu den eigenen Spielen (1.3.0): pro Spiel, offen zuerst, geschlossene eingeklappt. Nur der Entwickler (und der Antragsteller) sieht sie.
+// Anfragen zu den eigenen Spielen (1.3.0): pro Spiel, offen zuerst, geschlossene eingeklappt. Nur der Entwickler (und der Absender) sieht sie.
 function antraegeProSpiel(c, antraege) {
-	c.append(h("h2", { id: "antraege", text: "Anträge zu deinen Spielen" }));
-	if (!antraege.length) return c.append(h("p", { class: "leise", text: "Keine Anträge – Spieler können unter Menü → Anträge Fehler und Wünsche zu deinen Spielen schicken." }));
+	c.append(h("h2", { id: "antraege", text: "Anfragen zu deinen Spielen" }));
+	if (!antraege.length) return c.append(h("p", { class: "leise", text: "Keine Anfragen – Spieler können unter Konto → Anfragen Fehler und Wünsche zu deinen Spielen schicken." }));
 	const proSpiel = new Map();
 	for (const a of antraege) { if (!proSpiel.has(a.spiel)) proSpiel.set(a.spiel, []); proSpiel.get(a.spiel).push(a); }
 	const karte = (a) => {
@@ -230,7 +230,7 @@ function antraegeProSpiel(c, antraege) {
 		const setzen = async (status) => {
 			try {
 				await Bridge.json("PATCH", "/api/entwickler/antraege/" + a.id, { status, antwort: antwort.value || null });
-				meldung(`Antrag von ${a.player}: ${status}.`);
+				meldung(`Anfrage von ${a.player}: ${status}.`);
 				c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
 			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
 		};
@@ -249,7 +249,7 @@ function antraegeProSpiel(c, antraege) {
 	}
 }
 
-// ---------- Anträge (Entwickler) ----------
+// ---------- Anfragen (Entwickler) ----------
 SEITEN_REG["antraege"] = async (c) => {
 	const [arten, meine, anMich] = await Promise.all([Bridge.json("GET", "/api/antraege/arten"), Bridge.json("GET", "/api/antraege"),
 		ich.uploader ? Bridge.json("GET", "/api/entwickler/antraege").catch(() => []) : Promise.resolve([])]);
@@ -267,33 +267,33 @@ SEITEN_REG["antraege"] = async (c) => {
 			const r = await Bridge.json("POST", "/api/antraege", { art: art.value, spiel: spiel.value || null, text: text.value });
 			let fehlt = 0;   // Bilder einzeln hinterher (je Anfrage ein Bild)
 			for (const bild of auswahl.bilder()) await Bridge.json("POST", `/api/antraege/${r.id}/bilder`, { bild }).catch((f) => { if (f instanceof Bridge.SitzungAbgelaufen) throw f; fehlt++; });
-			if (fehlt) alert(`${fehlt} Bild(er) konnten nicht angefügt werden. Du kannst sie im Antrag (Öffnen) noch einmal anfügen.`);
+			if (fehlt) alert(`${fehlt} Bild(er) konnten nicht angefügt werden. Du kannst sie in der Anfrage (Öffnen) noch einmal anfügen.`);
 			meldung(r.an && r.an !== "admin"
-				? `Antrag verschickt – er geht an ${r.an === ich.player ? "dich als Entwickler (unter „Meine Spiele“)" : r.an + ", den Entwickler des Spiels"}. Antwort und Status erscheinen hier.`
-				: "Antrag verschickt – Seb bekommt ihn. Antwort und Status erscheinen hier.");
+				? `Anfrage verschickt – er geht an ${r.an === ich.player ? "dich als Entwickler (unter „Meine Spiele“)" : r.an + ", den Entwickler des Spiels"}. Antwort und Status erscheinen hier.`
+				: "Anfrage verschickt – Seb bekommt ihn. Antwort und Status erscheinen hier.");
 			c.replaceChildren(); SEITEN_REG["antraege"](c);
 		} catch (f) { senden.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
 	} },
 		h("label", {}, "Art", art), h("label", {}, "Spiel", spiel), h("label", {}, "Beschreibung", text), auswahl.element,
-		h("div", {}, h("button", { type: "submit", class: "knopf", text: "Antrag senden" })));
-	c.append(h("h1", { text: "Anträge" }),
-		h("p", { class: "leise", text: "Fehler, Wünsche und Sonstiges zu einem bestimmten Spiel gehen direkt an dessen Entwickler – nur er und du sehen den Antrag. "
+		h("div", {}, h("button", { type: "submit", class: "knopf", text: "Anfrage senden" })));
+	c.append(h("h1", { text: "Anfragen" }),
+		h("p", { class: "leise", text: "Fehler, Wünsche und Sonstiges zu einem bestimmten Spiel gehen direkt an dessen Entwickler – nur er und du sehen die Anfrage. "
 			+ "Alles andere bekommt Seb: Fehler in der Bibliothek, Spielstand wiederherstellen" + (ich.uploader || ich.admin ? ", Bestenliste zurücksetzen, Spiel umbenennen." : ".") }),
 		formular);
-	// 1.3.1: Anträge zu den eigenen Spielen auch hier – offene oben, ein Klick öffnet den Antrag
+	// 1.3.1: Anfragen zu den eigenen Spielen auch hier – offene oben, ein Klick öffnet die Anfrage
 	const fremde = anMich.filter((a) => a.player !== ich.player);
 	if (fremde.length) {
 		const offen = fremde.filter((a) => a.status === "offen");
 		formular.before(h("div", { class: "karte antraege-an-mich" },
-			h("h2", { text: `An dich – Anträge zu deinen Spielen (${offen.length} offen)` }),
+			h("h2", { text: `An dich – Anfragen zu deinen Spielen (${offen.length} offen)` }),
 			offen.length ? h("ul", { class: "antrag-liste" }, offen.map((a) => h("li", {},
 				h("a", { href: "#/antrag/" + a.id }, h("strong", { text: a.title || a.spiel }), ` · ${a.artText} von ${a.player} · ${datumZeit(a.erstellt)}${bildText(a.bilder)}`),
 				h("div", { class: "leise", text: a.text.length > 140 ? a.text.slice(0, 140) + " …" : a.text }))))
 				: h("p", { class: "leise", text: "Alles erledigt. 🎉" }),
-			h("p", {}, h("a", { href: "#/meine-spiele", text: `Alle ${fremde.length} Anträge pro Spiel → Meine Spiele` }))));
+			h("p", {}, h("a", { href: "#/meine-spiele", text: `Alle ${fremde.length} Anfragen pro Spiel → Meine Spiele` }))));
 	}
-	c.append(h("h2", { text: "Meine Anträge" }));
-	if (!meine.length) return c.append(h("p", { class: "leise", text: "Noch keine Anträge." }));
+	c.append(h("h2", { text: "Meine Anfragen" }));
+	if (!meine.length) return c.append(h("p", { class: "leise", text: "Noch keine Anfragen." }));
 	c.append(...meine.map((a) => h("div", { class: "karte" },
 		h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ",
 			h("strong", { text: arten[a.art] || a.art }), a.spiel ? h("span", { class: "leise", text: " · " + titelVon(a.spiel) }) : null,
@@ -303,13 +303,13 @@ SEITEN_REG["antraege"] = async (c) => {
 		a.antwort ? h("div", { class: "antwort" }, h("strong", { text: `Antwort von ${a.beantwortet_von || "Seb"}: ` }), a.antwort) : null)));
 };
 
-// ---------- Ein Antrag (Zentrale 1.3.1): #/antrag/<id> – aus der Glocke, „Anträge“ und „Meine Spiele“ ----------
+// ---------- Eine Anfrage (Zentrale 1.3.1): #/antrag/<id> – aus der Glocke, „Anfragen“ und „Meine Spiele“ ----------
 SEITEN_REG["antrag"] = async (c) => {
 	const id = antragNr;
 	const a = await Bridge.json("GET", "/api/antraege/" + id);
 	const neu = () => zeigeSeite("antrag");   // ganz neu aufbauen – mit Zurück-Pfeil
 	const an = a.zustaendig === "admin" ? "Seb (Bibliothek)" : a.zustaendig === ich.player ? "dich (Entwickler)" : a.zustaendig + " (Entwickler)";
-	c.append(h("h1", { text: `Antrag #${a.id}` }),
+	c.append(h("h1", { text: `Anfrage #${a.id}` }),
 		h("div", { class: "karte antrag-ticket" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
 				a.spiel ? h("span", {}, " · ", h("a", { href: "#/spiel/" + a.spiel, text: a.title || a.spiel })) : null),
@@ -345,7 +345,7 @@ SEITEN_REG["antrag"] = async (c) => {
 		const setzen = async (status) => {
 			try {
 				await Bridge.json("PATCH", "/api/antraege/" + a.id, { status, antwort: antwort.value || null });
-				meldung(`Antrag #${a.id}: ${status}.` + (a.player !== ich.player && status !== "offen" ? ` ${a.player} bekommt eine Nachricht.` : ""));
+				meldung(`Anfrage #${a.id}: ${status}.` + (a.player !== ich.player && status !== "offen" ? ` ${a.player} bekommt eine Nachricht.` : ""));
 				neu();
 			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
 		};
@@ -359,12 +359,28 @@ SEITEN_REG["antrag"] = async (c) => {
 // ---------- Profil (Zentrale 1.2.0): Spielzeit, Erfolge, Bestplätze ----------
 SEITEN_REG["profil"] = async (c) => {
 	const d = await Bridge.json("GET", "/api/profil/" + encodeURIComponent(profilName));
-	c.append(h("h1", { text: d.ich ? "Mein Profil" : "Profil von " + d.name }),
-		h("div", { class: "profil-zahlen" },
-			h("div", {}, h("b", { text: dauer(d.sekunden) }), "Spielzeit"),
-			h("div", {}, h("b", { text: String(d.spiele.length) }), "Spiele"),
-			h("div", {}, h("b", { text: String(d.erfolge) }), "Erfolge")));
-	c.append(h("h2", { text: "Spiele" }));
+	// Kopf (Zentrale 1.4.0): Bild, Name, Rollen, dabei seit – Spielzeit, Spiele, Erfolge klein in der Ecke
+	const rollen = (d.rollen || []).filter((r) => r !== "spieler" || d.rollen.length === 1);
+	c.append(h("h1", { text: d.ich ? "Mein Profil" : "Profil von " + (d.anzeigename || d.name) }),
+		h("div", { class: "profil-kopf karte" },
+			avatarFuellen(h("span", { class: "avatar gross", "aria-hidden": "true" }), d.name, d.anzeigename),
+			h("div", { class: "profil-name" },
+				h("strong", { text: d.anzeigename || d.name }),
+				h("div", { class: "leise", text: "@" + d.name + (d.dabeiSeit ? " · dabei seit " + new Date(d.dabeiSeit).toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "") }),
+				rollen.length ? h("div", { class: "rollen" }, ...rollen.map((r) => h("span", { class: "rolle " + r, text: ROLLEN_NAMEN[r] || r }))) : null),
+			h("div", { class: "profil-zahlen" },
+				h("div", {}, h("b", { text: dauer(d.sekunden) }), "Spielzeit"),
+				h("div", {}, h("b", { text: String(d.spiele.length) }), "Spiele"),
+				h("div", {}, h("b", { text: String(d.erfolge) }), "Erfolge"))));
+	// Nur im eigenen Profil: Meine Angaben (privat)
+	if (d.ich) {
+		const angaben = h("section", { class: "profil-abschnitt", id: "angaben" }, h("h2", { text: "Meine Angaben" }));
+		const gInhalt = h("div");
+		angaben.append(gInhalt);
+		c.append(angaben);
+		await angabenAbschnitt(gInhalt);
+	}
+	c.append(h("h2", { text: d.ich ? "Meine Spiele mit Plätzen und Erfolgen" : "Spiele" }));
 	if (!d.spiele.length) c.append(h("p", { class: "leise", text: "Noch nichts gespielt." }));
 	else c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
 		h("thead", {}, h("tr", {}, ...["Spiel", "Spielzeit", "Platz (aktuelle Season)", "Erfolge"].map((t) => h("th", { text: t })))),
@@ -374,15 +390,20 @@ SEITEN_REG["profil"] = async (c) => {
 			h("td", { text: s.platz ? s.platz + "." : "–" }),
 			h("td", {}, s.erfolgeGesamt ? `${s.erfolge.length}/${s.erfolgeGesamt}` : "–",
 				s.erfolge.length ? h("div", { class: "leise", text: s.erfolge.map((e) => "🏆 " + e.titel).join(" · ") }) : null)))))));
-	// Nur im eigenen Profil: Spielstände und Anmeldungen (privat)
-	if (!d.ich) return;
-	const angaben = h("section", { class: "profil-abschnitt", id: "angaben" }, h("h2", { text: "Meine Angaben" }));
-	const spielstaende = h("section", { class: "profil-abschnitt", id: "spielstaende" }, h("h2", { text: "Spielstände" }));
-	const anmeldungen = h("section", { class: "profil-abschnitt", id: "anmeldungen" }, h("h2", { text: "Anmeldungen" }));
-	c.append(angaben, spielstaende, anmeldungen);
-	const gInhalt = h("div"), sInhalt = h("div"), aInhalt = h("div");
-	angaben.append(gInhalt); spielstaende.append(sInhalt); anmeldungen.append(aInhalt);
-	await Promise.all([angabenAbschnitt(gInhalt), spielstaendeAbschnitt(sInhalt), anmeldungenAbschnitt(aInhalt)]);
+};
+
+// Konto-Bereich (Zentrale 1.4.0): Spielstände und Anmeldungen als eigene Seiten statt Abschnitte im Profil
+SEITEN_REG["spielstaende"] = async (c) => {
+	c.append(h("h1", { text: "Meine Spielstände" }));
+	const inhalt = h("div", { id: "spielstaende" });
+	c.append(inhalt);
+	await spielstaendeAbschnitt(inhalt);
+};
+SEITEN_REG["sicherheit"] = async (c) => {
+	c.append(h("h1", { text: "Sicherheit" }), h("h2", { text: "Anmeldungen" }));
+	const inhalt = h("div", { id: "anmeldungen" });
+	c.append(inhalt);
+	await anmeldungenAbschnitt(inhalt);
 };
 
 // ---------- Meine Angaben (CRM, Zentrale 1.4.0): sieht und ändert nur die Person selbst (und der Admin) ----------

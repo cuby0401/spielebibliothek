@@ -5,6 +5,7 @@ Einrichten (einmalig, vom Mac):  sh scripts/auftragsdienst-einrichten.sh
 Log auf der NAS:                 /tmp/sb-auftragsdienst.log
 
 Was er tut – und NUR das:
+  0. Not-Aus (1.4.0): Liegt config/notaus.json im Live-Ordner, stoppt er den Tunnel (jede Minute als Erstes) und spielt nichts ein.
   1. Lebenszeichen an den Speicher-Dienst (Admin-Panel, Wächter merkt einen Ausfall).
   2. Live-Deploy nach Freigabe: Ist in der Probe genau der dort abgelegte Release-Stand (release.tar/release.json)
      freigegeben (data/freigabe.json) und noch nicht live, spielt er ihn mit scripts/nas-deploy.sh ein – aus dem Tar selbst,
@@ -35,6 +36,7 @@ QUELLE = Path(os.environ.get("SB_QUELLE", "/volume1/docker/spielebibliothek-quel
 PROBE = Path(os.environ.get("SB_PROBE", "/volume1/docker/spielebibliothek-probe"))
 LIVE_C = os.environ.get("SB_LIVE_C", "spielebibliothek-savesvc")
 PROBE_C = os.environ.get("SB_PROBE_C", "sbprobe-savesvc")
+TUNNEL_C = os.environ.get("SB_TUNNEL_C", "spielebibliothek-cloudflared")
 SPERRE = Path(os.environ.get("SB_SPERRE", "/tmp/sb-auftragsdienst.lock"))
 ARTEN = {"unit-tests", "e2e-tests"}
 ZIELE = {"live", "probe"}
@@ -102,6 +104,21 @@ def entpacken(tar: Path, ziel: Path) -> None:
         raise RuntimeError("Entpacken fehlgeschlagen: " + ausgabe[-300:])
 
 
+# ---------- 0. Not-Aus (Zentrale 1.4.0, E72) ----------
+
+def notaus_aktiv() -> bool:
+    return (LIVE / "config/notaus.json").exists()
+
+
+def notaus() -> None:
+    """Ist der Not-Aus an, den Tunnel stoppen – die Bibliothek ist dann von außen nicht mehr erreichbar.
+    Läuft bei jedem Aufruf als Erstes, auch wenn noch lange Tests laufen (vor der Sperre)."""
+    if not notaus_aktiv() or not lauft(TUNNEL_C):
+        return
+    r = subprocess.run(["docker", "stop", TUNNEL_C], capture_output=True, text=True, timeout=60)
+    log(f"NOT-AUS: Tunnel {TUNNEL_C} gestoppt" if r.returncode == 0 else f"NOT-AUS: Tunnel stoppen fehlgeschlagen: {r.stderr.strip()[-300:]}")
+
+
 # ---------- 2. Live-Deploy nach Freigabe ----------
 
 def nummer(v: str) -> tuple[int, ...]:
@@ -109,6 +126,8 @@ def nummer(v: str) -> tuple[int, ...]:
 
 
 def deploy_nach_freigabe() -> None:
+    if notaus_aktiv():
+        return                                                     # ein Deploy würde den Tunnel wieder starten
     freigabe, release = lesen(PROBE / "data/freigabe.json"), lesen(PROBE / "release.json")
     version, commit = str(release.get("version", "")), str(release.get("commit", ""))
     if not (VERSION.match(version) and COMMIT.match(commit)) or freigabe.get("commit") != commit:
@@ -207,6 +226,10 @@ def auftraege() -> None:
 
 
 def main() -> int:
+    try:
+        notaus()
+    except Exception as f:   # noqa: BLE001
+        log(f"notaus: {f}")
     with open(SPERRE, "w") as sperre:
         try:
             fcntl.flock(sperre, fcntl.LOCK_EX | fcntl.LOCK_NB)

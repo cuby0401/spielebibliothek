@@ -89,7 +89,22 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await eval_(`document.querySelector('#angaben input[type="checkbox"]').disabled`), "Datenschutzhinweis bestätigt");
   ok(await eval_(`fetch("/api/mein/konto").then(r=>r.text()).then(t=>!t.includes("Notiz") && !t.includes("protokoll"))`), "Mein Konto ohne Admin-Felder");
 
+  ok(await eval_(`document.querySelector(".profil-kopf strong").textContent==="Seb E2E"`), "Profilkopf zeigt den Anzeigenamen");
+
+  // 8) Fehler der Bibliothek (1.4.0): Bericht mit Nummer, ganz oben in der Admin-Übersicht
+  const nr = await eval_(`fetch("/api/fehler-zentrale",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},
+    body:JSON.stringify({meldung:"TypeError: E2E-Test",quelle:"/app.js",zeile:42,seite:"#/e2e",version:"e2e"})}).then(r=>r.json()).then(d=>d.nr)`);
+  ok(Number.isInteger(nr), "Fehler der Bibliothek bekommt eine Nummer: " + nr);
+  await gehe(G + "/admin/", 3500);
+  ok(await eval_(`document.body.textContent.includes("Fehler in der Bibliothek") && document.body.textContent.includes("TypeError: E2E-Test")`), "Admin-Übersicht zeigt den Fehler oben");
+
+  // 9) Not-Aus (1.4.0) – als Letztes, danach antwortet der Teststand absichtlich nicht mehr
+  ok(await eval_(`!!document.querySelector("details.notaus summary")`), "Not-Aus-Feld in der Übersicht");
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
+  const na = await eval_(`fetch("/api/admin/notaus",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({bestaetigung:"NOT-AUS",grund:"E2E"})}).then(r=>r.status)`);
+  ok(na === 200, "Not-Aus ausgelöst");
+  ok(await eval_(`fetch("/api/me").then(r=>r.status)`) === 503, "Danach: Speicher-Dienst antwortet 503");
+  ok(await eval_(`fetch("/api/games").then(r=>r.status)`) === 503, "Danach: keine Spielliste mehr");
   console.log(ergebnis.join("\n"));
   chrome.kill(); process.exit();
 })().catch((e) => { console.log(ergebnis.join("\n")); console.error("ABBRUCH:", e.message); chrome.kill(); process.exit(1); });

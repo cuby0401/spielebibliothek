@@ -1,4 +1,4 @@
-"""Phase 10: Benutzermenü, Entwickler-Bereich, Anträge und Admin-Panel (Speicher-Dienst-Seite).
+"""Phase 10: Benutzermenü, Entwickler-Bereich, Anfragen und Admin-Panel (Speicher-Dienst-Seite).
 
 Alles, was in spiele/ schreibt oder Upload-Konten betrifft, erledigt der Upload-Dienst – der
 Speicher-Dienst ruft ihn über die interne Schnittstelle /intern (geheimes Token, von außen nicht erreichbar).
@@ -35,10 +35,10 @@ ARTEN = {
 }
 NUR_ENTWICKLER = {"bestenliste", "spiel"}   # betreffen eigene Spiele
 # Zentrale 1.3.0: Diese Arten gehen mit einem gewählten Spiel an dessen Entwickler – nicht an den Admin.
-# Alles andere (Spielstand, Bestenliste, Spiel löschen/umbenennen, Anträge ohne Spiel) kann nur der Admin erledigen.
+# Alles andere (Spielstand, Bestenliste, Spiel löschen/umbenennen, Anfragen ohne Spiel) kann nur der Admin erledigen.
 SPIEL_ARTEN = {"fehler", "wunsch", "sonstiges"}
 STATUS = ("offen", "erledigt", "abgelehnt")
-BILDER_MAX = 5                    # Bilder je Antrag (1.3.1) – PNG/JPG/WebP, je höchstens 2 MB (die Seite verkleinert vorher)
+BILDER_MAX = 5                    # Bilder je Anfrage (1.3.1) – PNG/JPG/WebP, je höchstens 2 MB (die Seite verkleinert vorher)
 
 
 def bild_aus_daten_url(wert) -> tuple[str, bytes]:
@@ -391,7 +391,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         log.info("%s: neue Season %d für %s", player, neu, sid)
         return {"season": neu}
 
-    # ---------- Anträge ----------
+    # ---------- Anfragen ----------
 
     def arten_fuer(request: Request, player: str) -> dict:
         ist_entw = rollen.rolle(e, request, player)["entwickler"]
@@ -404,7 +404,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.post("/api/antraege", status_code=201)
     def antrag_stellen(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
         if rollen.simuliert(e, request, player):
-            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Anträge verschickt")
+            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Anfragen verschickt")
         art, text, spiel = body.get("art"), body.get("text"), body.get("spiel") or None
         if art not in arten_fuer(request, player):
             raise HTTPException(422, "unbekannte oder nicht erlaubte Art")
@@ -414,23 +414,23 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             raise HTTPException(422, "spiel ungültig")
         # Bilder kommen danach einzeln über POST /api/antraege/{id}/bilder (Grenze je Anfrage, 1.3.1)
         aid = db.antrag_anlegen(player, art, spiel, text.strip())
-        log.info("neuer Antrag %d von %s (%s)", aid, player, art)
+        log.info("neue Anfrage %d von %s (%s)", aid, player, art)
         kurz = " ".join(text.split())[:100]
         besitzer = zustaendig({"art": art, "spiel": spiel})
         if besitzer:
-            # Spiel-Antrag (1.3.0): nur der Entwickler bekommt ihn – der Admin nicht (keine Glocke, keine Zahl, kein Push)
+            # Spiel-Anfrage (1.3.0): nur der Entwickler bekommt ihn – der Admin nicht (keine Glocke, keine Zahl, kein Push)
             if besitzer != player:
-                db.melden(besitzer, f"Antrag zu „{titel_von(spiel)}“ von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}",
+                db.melden(besitzer, f"Anfrage zu „{titel_von(spiel)}“ von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}",
                           wichtig=(art == "fehler"))
             return {"id": aid, "an": besitzer}
         for a in sorted(rollen.admins(e)):
-            db.melden(a, f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}", wichtig=True)
+            db.melden(a, f"Neue Anfrage von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}", wichtig=True)
         from . import waechter
-        waechter.ha_senden(e, "antrag", f"Neuer Antrag von {player} ({ARTEN[art]}): {kurz}")
+        waechter.ha_senden(e, "antrag", f"Neue Anfrage von {player} ({ARTEN[art]}): {kurz}")
         return {"id": aid, "an": "admin"}
 
     def zustaendig(a: dict) -> str | None:
-        """Entwickler, der einen Antrag bearbeitet – None = Admin."""
+        """Entwickler, der eine Anfrage bearbeitet – None = Admin."""
         spiel = a.get("spiel") or ""
         if a.get("art") not in SPIEL_ARTEN or "/" not in spiel:
             return None
@@ -450,17 +450,17 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         zahlen = db.antrag_bild_zahlen()
         return [mit_infos(a, zahlen) for a in antraege]
 
-    # ---------- Ein Antrag als „Ticket“ (1.3.1): aus der Glocke, aus „Meine Spiele“ und aus „Anträge“ ----------
+    # ---------- Eine Anfrage als „Ticket“ (1.3.1): aus der Glocke, aus „Meine Spiele“ und aus „Anfragen“ ----------
     def sicht(request: Request, player: str, antrag_id: int) -> tuple[dict, bool]:
-        """(Antrag, darf antworten). Sehen dürfen: Antragsteller, zuständiger Entwickler, Admin. Sonst 404."""
+        """(Anfrage, darf antworten). Sehen dürfen: Absender, zuständiger Entwickler, Admin. Sonst 404."""
         a = db.antrag(antrag_id)
         if not a:
-            raise HTTPException(404, "Antrag nicht gefunden")
+            raise HTTPException(404, "Anfrage nicht gefunden")
         r = rollen.rolle(e, request, player)
         z = zustaendig(a)
         darf_antworten = not r["ansicht"] and (z == player or (z is None and r["admin"]))
         if not (a["player"] == rollen.daten_id(e, request, player) or darf_antworten or r["admin"]):
-            raise HTTPException(404, "Antrag nicht gefunden")
+            raise HTTPException(404, "Anfrage nicht gefunden")
         return a, darf_antworten
 
     @app.get("/api/antraege/{antrag_id}")
@@ -475,14 +475,14 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def antrag_bild_dazu(request: Request, player: str = Depends(spieler), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):
         a, darf_antworten = sicht(request, player, antrag_id)
         if rollen.simuliert(e, request, player) or not (a["player"] == player or darf_antworten):
-            raise HTTPException(403, "Nur Antragsteller und Bearbeiter können Bilder anfügen")
+            raise HTTPException(403, "Nur Absender und Bearbeiter können Bilder anfügen")
         try:
             bart, daten = bild_aus_daten_url(body.get("bild"))
         except steckbrief.UngueltigesBild as f:
             raise HTTPException(422, str(f)) from None
         bid = db.antrag_bild_anlegen(antrag_id, bart, daten, player, BILDER_MAX)
         if bid is None:
-            raise HTTPException(409, f"Schon {BILDER_MAX} Bilder an diesem Antrag")
+            raise HTTPException(409, f"Schon {BILDER_MAX} Bilder an dieser Anfrage")
         return {"id": bid}
 
     @app.get("/api/antraege/{antrag_id}/bilder/{bild_id}")
@@ -509,14 +509,14 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def antrag_antworten(request: Request, player: str = Depends(spieler), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):
         a, darf_antworten = sicht(request, player, antrag_id)
         if not darf_antworten:
-            raise HTTPException(403, "Diesen Antrag bearbeitet " + (zustaendig(a) or "Seb"))
+            raise HTTPException(403, "Diese Anfrage bearbeitet " + (zustaendig(a) or "Seb"))
         return antworten(a, body, player)
 
     @app.get("/api/antraege")
     def meine_antraege(player: str = Depends(ich_daten)):
         return liste_mit_infos(db.antraege(player))
 
-    # Spiel-Anträge für den Entwickler (1.3.0): pro Spiel, offen und geschlossen
+    # Spiel-Anfragen für den Entwickler (1.3.0): pro Spiel, offen und geschlossen
     @app.get("/api/entwickler/antraege")
     def entwickler_antraege(request: Request, player: str = Depends(entwickler)):
         if rollen.simuliert(e, request, player):
@@ -527,10 +527,10 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def entwickler_antwort(request: Request, player: str = Depends(entwickler), antrag_id: int = P(...),
                            body: dict[str, Any] = Body(...)):
         if rollen.simuliert(e, request, player):
-            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Anträge beantwortet")
+            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler werden keine Anfragen beantwortet")
         a = db.antrag(antrag_id)
         if not a or zustaendig(a) != player:
-            raise HTTPException(404, "Antrag nicht gefunden")
+            raise HTTPException(404, "Anfrage nicht gefunden")
         return antworten(a, body, player)
 
     def antworten(a: dict, body: dict, von: str) -> dict:
@@ -540,9 +540,9 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         if antwort is not None and (not isinstance(antwort, str) or len(antwort) > 4000):
             raise HTTPException(422, "antwort zu lang")
         db.antrag_bearbeiten(a["id"], status, antwort, von)
-        if status != "offen" and a["player"] != von:   # Glocke: Antragsteller erfährt die Antwort
+        if status != "offen" and a["player"] != von:   # Glocke: Absender erfährt die Antwort
             zu = f" zu „{titel_von(a['spiel'])}“" if a.get("spiel") else ""
-            db.melden(a["player"], f"Dein Antrag{zu} wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'} ({von})"
+            db.melden(a["player"], f"Deine Anfrage{zu} wurde {'erledigt' if status == 'erledigt' else 'abgelehnt'} ({von})"
                                    + (f": {antwort[:120]}" if antwort else ""), f"/#/antrag/{a['id']}")
         return {"ok": True}
 
@@ -645,6 +645,24 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             return int(os.environ.get("UPLOAD_KONTINGENT_MB", "1024"))
         except ValueError:
             return 1024
+
+    # ---------- Not-Aus und Sicherheitsprotokoll (Zentrale 1.4.0, E72) ----------
+    @app.post("/api/admin/notaus")
+    def notaus_ausloesen(player: str = Depends(admin), body: dict[str, Any] = Body(...)):
+        from . import notaus
+        from .waechter import ha_senden
+        if body.get("bestaetigung") != "NOT-AUS":
+            raise HTTPException(422, "Zur Bestätigung „NOT-AUS“ eintippen")
+        grund = body.get("grund") if isinstance(body.get("grund"), str) else ""
+        d = notaus.einschalten(e.users_file.parent, db, player, grund)
+        log.warning("NOT-AUS ausgelöst von %s: %s", player, d["grund"])
+        ha_senden(e, "notaus", f"Not-Aus der Spielebibliothek ausgelöst von {player}" + (f": {d['grund']}" if d["grund"] else ""))
+        return {**d, "hinweis": "Ab sofort sind alle Daten gesperrt. Der Tunnel geht innerhalb einer Minute aus. "
+                                "Wieder einschalten nur am Mac: scripts/deploy.sh --notaus-aus"}
+
+    @app.get("/api/admin/sicherheit")
+    def sicherheit_ansehen(_: str = Depends(admin)):
+        return db.sicherheit_liste()
 
     @app.get("/api/admin/uebersicht")
     def uebersicht(_: str = Depends(admin)):
@@ -789,7 +807,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def admin_spielstand_loeschen(_: str = Depends(admin), player: str = Query(...), game: str = Query(...), key: str = Query(...)):
         db.loeschen(player, game, key)
 
-    # Anträge
+    # Anfragen
     @app.get("/api/admin/antraege")
     def alle_antraege(_: str = Depends(admin)):
         # „zustaendig“: admin = Bibliothek (zählt, mit Glocke) – sonst der Entwickler (nur zur Info)
@@ -799,5 +817,5 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     def antrag_beantworten(admin_name: str = Depends(admin), antrag_id: int = P(...), body: dict[str, Any] = Body(...)):
         a = db.antrag(antrag_id)
         if not a:
-            raise HTTPException(404, "Antrag nicht gefunden")
+            raise HTTPException(404, "Anfrage nicht gefunden")
         return antworten(a, body, admin_name)

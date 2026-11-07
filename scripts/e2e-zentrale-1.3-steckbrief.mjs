@@ -1,5 +1,5 @@
 // Ende-zu-Ende-Test für Zentrale 1.3.0: Beschreibung und Vorschaubild auf der Upload-Seite (Steckbrief, E61),
-// „noch nie angemeldet“ und Cloudflare-Abgleich im Admin-Panel, Anträge an Entwickler, Simulation endet im Admin-Panel,
+// „noch nie angemeldet“ und Cloudflare-Abgleich im Admin-Panel, Anfragen an Entwickler, Simulation endet im Admin-Panel,
 // Reiter „Aufgaben“. Aufbau wie e2e-zentrale-1.3.mjs.
 // Aufruf (macht scripts/e2e-alle.sh): node scripts/e2e-zentrale-1.3-steckbrief.mjs <ordner> <upload-passwort>
 import { spawn } from "node:child_process";
@@ -106,17 +106,17 @@ async function bildWaehlen(datei) {
   ok(await eval_(`document.body.textContent.includes("Cloudflare-Abgleich nicht eingerichtet")`), "Admin: Hinweis „Cloudflare-Abgleich nicht eingerichtet“");
   ok(await eval_(`document.body.textContent.includes("scripts/cloudflare.py abgleichen")`), "Admin: Hinweis auf scripts/cloudflare.py beim Anlegen");
 
-  // 6) Anträge: Antrag zu pauls Spiel geht an paul – im Admin-Panel ohne Zahl, nur eingeklappt zur Info
+  // 6) Anfragen: Anfrage zu pauls Spiel geht an paul – im Admin-Panel ohne Zahl, nur eingeklappt zur Info
   await gehe(G + "/", 3000);
   const an = await eval_(`fetch("/api/antraege",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},
     body:JSON.stringify({art:"fehler",spiel:"paul/raetsel",text:"E2E: Knopf reagiert nicht"})}).then(r=>r.json()).then(d=>d.an)`);
-  ok(an === "paul", "Antrag zu pauls Spiel geht an paul");
+  ok(an === "paul", "Anfrage zu pauls Spiel geht an paul");
   await gehe(G + "/#/antraege", 3000);
-  ok(await eval_(`document.body.textContent.includes("geht an paul (Entwickler)")`), "Antragsteller sieht: geht an paul");
+  ok(await eval_(`document.body.textContent.includes("geht an paul (Entwickler)")`), "Absender sieht: geht an paul");
   await gehe(G + "/admin/#antraege", 3500);
-  ok(await eval_(`document.getElementById("offen-zahl").hidden`), "Admin-Panel: keine Zahl für Spiel-Anträge");
-  ok(await eval_(`[...document.querySelectorAll("details summary")].some(s=>s.textContent.includes("Anträge zu Spielen") && s.textContent.includes("1 offen"))`),
-    "Admin-Panel: Spiel-Antrag nur eingeklappt zur Info");
+  ok(await eval_(`document.getElementById("offen-zahl").hidden`), "Admin-Panel: keine Zahl für Spiel-Anfragen");
+  ok(await eval_(`[...document.querySelectorAll("details summary")].some(s=>s.textContent.includes("Anfragen zu Spielen") && s.textContent.includes("1 offen"))`),
+    "Admin-Panel: Spiel-Anfrage nur eingeklappt zur Info");
 
   // 7) Simulation: Beenden führt zurück ins Admin-Panel
   await gehe(G + "/admin/#uebersicht", 3500);

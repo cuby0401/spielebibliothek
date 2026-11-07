@@ -1,4 +1,4 @@
-"""Zentrale 1.3.1: Ein Antrag als „Ticket“ (aus der Glocke öffnen) und Bilder an Anträgen."""
+"""Zentrale 1.3.1: Eine Anfrage als „Ticket“ (aus der Glocke öffnen) und Bilder an Anfragen."""
 import base64
 
 SEB, PAUL, MIA = "seb@example.com", "paul@example.com", "mia@example.com"
@@ -16,9 +16,9 @@ def test_ticket_sichtbarkeit_und_link_in_der_glocke(client, umgebung):
     assert r.status_code == 201
     aid = r.json()["id"]
     assert client.post(f"/api/antraege/{aid}/bilder", json={"bild": url(PNG)}, headers=client.als(MIA)).status_code == 201
-    # Glocke beim Entwickler verlinkt direkt auf den Antrag
+    # Glocke beim Entwickler verlinkt direkt auf die Anfrage
     assert client.get("/api/meldungen", headers=client.als(PAUL)).json()["liste"][0]["link"] == f"/#/antrag/{aid}"
-    # Antragsteller, Entwickler und Admin sehen ihn – andere nicht
+    # Absender, Entwickler und Admin sehen ihn – andere nicht
     for wer, antworten in ((MIA, False), (PAUL, True), (SEB, False)):
         t = client.get(f"/api/antraege/{aid}", headers=client.als(wer))
         assert t.status_code == 200 and t.json()["darfAntworten"] is antworten, wer
@@ -31,7 +31,7 @@ def test_ticket_sichtbarkeit_und_link_in_der_glocke(client, umgebung):
     b = client.get(f"/api/antraege/{aid}/bilder/{t['bilder'][0]['id']}", headers=client.als(PAUL))
     assert b.status_code == 200 and b.content == PNG and b.headers["content-type"] == "image/png"
     assert b.headers["x-content-type-options"] == "nosniff" and "sandbox" in b.headers["content-security-policy"]
-    # Antworten über das Ticket: nur der Zuständige (Admin bei Spiel-Anträgen nicht)
+    # Antworten über das Ticket: nur der Zuständige (Admin bei Spiel-Anfragen nicht)
     assert client.patch(f"/api/antraege/{aid}", json={"status": "erledigt"}, headers=client.als(MIA)).status_code == 403
     assert client.patch(f"/api/antraege/{aid}", json={"status": "erledigt"}, headers=client.als(SEB)).status_code == 403
     assert client.patch(f"/api/antraege/{aid}", json={"status": "erledigt", "antwort": "Behoben"}, headers=client.als(PAUL)).status_code == 200
@@ -64,7 +64,7 @@ def test_bilder_pruefen(client, umgebung):
     assert client.post("/api/antraege", json={"art": "fehler", "text": "x" * 400000}, headers=h).status_code == 413
     for _ in range(4):
         assert client.post(f"/api/antraege/{aid}/bilder", json={"bild": url(PNG)}, headers=h).status_code == 201
-    # nachträglich: Antragsteller ja (bis 5), Fremde nein
+    # nachträglich: Absender ja (bis 5), Fremde nein
     assert client.post(f"/api/antraege/{aid}/bilder", json={"bild": url(b"\xff\xd8\xff" + b"\x00" * 10, "jpeg")}, headers=h).status_code == 201
     assert client.post(f"/api/antraege/{aid}/bilder", json={"bild": url(PNG)}, headers=h).status_code == 409
     assert client.post(f"/api/antraege/{aid}/bilder", json={"bild": url(PNG)}, headers=client.als(PAUL)).status_code == 404
@@ -77,6 +77,6 @@ def test_bilder_pruefen(client, umgebung):
 
 
 def test_simulation_sieht_echte_antraege_nicht(client):
-    aid = client.post("/api/antraege", json={"art": "fehler", "text": "echter Antrag"}, headers=client.als()).json()["id"]
+    aid = client.post("/api/antraege", json={"art": "fehler", "text": "echte Anfrage"}, headers=client.als()).json()["id"]
     sim = {**client.als(), "X-Ansicht": "spieler"}
     assert client.get(f"/api/antraege/{aid}", headers=sim).status_code == 404

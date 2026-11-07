@@ -45,7 +45,7 @@ def test_glocke_ueberholt_und_antrag(client, ohne_takt):
     assert client.get("/api/meldungen", headers=p).json()["ungelesen"] == 0
     client.post("/api/score/seb/zaehler", json={"score": 15}, headers=p)          # verbessert, aber nicht vorbei
     assert client.get("/api/meldungen", headers=s).json()["ungelesen"] == 0
-    # Antrag beantwortet → Meldung an den Antragsteller
+    # Anfrage beantwortet → Meldung an den Absender
     aid = client.post("/api/antraege", json={"art": "fehler", "text": "Geht nicht"}, headers=p).json()["id"]
     client.patch(f"/api/admin/antraege/{aid}", json={"status": "erledigt", "antwort": "Behoben"}, headers=s)
     assert "Behoben" in client.get("/api/meldungen", headers=p).json()["liste"][0]["text"]
@@ -103,7 +103,7 @@ def test_admin_platte(client, upload):
     assert d["platte"]["gesamt"] > 0 and d["kontingent"] == 1024 * 1024 * 1024
 
 
-# ---------- Glocke: Favoriten, Fehler, Anträge (wichtig) ----------
+# ---------- Glocke: Favoriten, Fehler, Anfragen (wichtig) ----------
 
 def test_updates_nur_an_favoriten(iclient):
     c = iclient
@@ -124,12 +124,12 @@ def test_neuer_fehler_meldet_sich_beim_entwickler(client):
 
 
 def test_spiel_antrag_geht_nur_an_entwickler(client):
-    """1.3.0: Antrag zu einem Spiel → nur dessen Entwickler. Der Admin bekommt keine Glocke und keine Zahl."""
+    """1.3.0: Anfrage zu einem Spiel → nur dessen Entwickler. Der Admin bekommt keine Glocke und keine Zahl."""
     r = client.post("/api/antraege", json={"art": "fehler", "spiel": "paul/snake", "text": "Stürzt ab"}, headers=client.als())
     assert r.json()["an"] == "paul"
     assert client.get("/api/meldungen", headers=client.als()).json()["liste"] == []                   # seb (Admin): nichts
     pm = client.get("/api/meldungen", headers=client.als(PAUL)).json()
-    assert pm["wichtigUngelesen"] == 1 and "Antrag zu" in pm["liste"][0]["text"]
+    assert pm["wichtigUngelesen"] == 1 and "Anfrage zu" in pm["liste"][0]["text"]
     assert client.get("/api/admin/uebersicht", headers=client.als()).json()["offeneAntraege"] == 0
     # Paul sieht und beantwortet ihn – seb bekommt die Antwort in die Glocke
     liste = client.get("/api/entwickler/antraege", headers=client.als(PAUL)).json()
@@ -150,10 +150,10 @@ def test_admin_antraege_und_fremde_spiel_antraege(client):
     assert client.post("/api/antraege", json={"art": "wunsch", "text": "Dunkles Design"}, headers=client.als(PAUL)).json()["an"] == "admin"
     assert client.get("/api/admin/uebersicht", headers=client.als()).json()["offeneAntraege"] == 2
     assert client.get("/api/meldungen", headers=client.als()).json()["wichtigUngelesen"] == 2
-    # Spiel-Antrag zu seb/zaehler: seb ist hier Entwickler → bekommt ihn als Entwickler, aber er zählt nicht im Admin-Panel
+    # Spiel-Anfrage zu seb/zaehler: seb ist hier Entwickler → bekommt ihn als Entwickler, aber er zählt nicht im Admin-Panel
     aid = client.post("/api/antraege", json={"art": "wunsch", "spiel": "seb/zaehler", "text": "Mehr Zahlen"}, headers=client.als(PAUL)).json()["id"]
     assert client.get("/api/admin/uebersicht", headers=client.als()).json()["offeneAntraege"] == 2
-    # paul darf fremde Spiel-Anträge nicht beantworten
+    # paul darf fremde Spiel-Anfragen nicht beantworten
     assert client.patch(f"/api/entwickler/antraege/{aid}", json={"status": "erledigt"}, headers=client.als(PAUL)).status_code == 404
     assert client.patch(f"/api/entwickler/antraege/{aid}", json={"status": "erledigt"}, headers=client.als()).status_code == 200
 

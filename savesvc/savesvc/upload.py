@@ -234,6 +234,9 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
 
     @app.middleware("http")
     async def schutz(request: Request, weiter):
+        from . import notaus   # Not-Aus (1.4.0): dieselbe Datei wie im Speicher-Dienst, hier nur lesbar eingebunden
+        if notaus.aktiv(e.users_file.parent):
+            return JSONResponse({"detail": notaus.MELDUNG}, status_code=503, headers={"Retry-After": "3600"})
         laenge = request.headers.get("content-length")
         if laenge and laenge.isdigit() and int(laenge) > UPLOAD_MAX:
             return JSONResponse({"detail": "Datei zu groß (max. 100 MB)"}, status_code=413)
@@ -383,7 +386,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
                     punkte.append({"stufe": "warnung", "text": f"Umwandlung auf saveVersion {sv_neu} noch nicht getestet. Im Entwurf "
                                                                "ein Spiel laden, zu dem du einen alten Spielstand hast."})
             if t["fehler"]:
-                punkte.append({"stufe": "warnung", "text": f"{t['fehler']} JavaScript-Fehler beim Testen des Entwurfs – siehe Menü → Meine Spiele → Fehlerberichte."})
+                punkte.append({"stufe": "warnung", "text": f"{t['fehler']} JavaScript-Fehler beim Testen des Entwurfs – siehe Konto → Meine Spiele → Fehlerberichte."})
         version = (release.ordner_version(live) or {}).get("version") if live.is_dir() else None
         return {"ordner": ordner, "version": version, "erstveroeffentlichung": not live.is_dir(),
                 "vorschlaege": release.vorschlaege(version), "arten": release.ARTEN,

@@ -93,12 +93,12 @@ const dialoge = [];
   await gehe(G + "/#/spielstaende", 2500);
   // (Spalte „Deine Spielzeit“ erscheint nur, wenn es Spielstände gibt)
 
-  // 4b) Wichtige Meldung (Antrag an die Bibliothek → Admin): rote, wackelnde Glocke + Einblendung.
-  //     Seit 1.3.0 ohne Spiel – Anträge zu einem Spiel gehen an dessen Entwickler (E64), geprüft in e2e-zentrale-1.3-steckbrief.mjs
+  // 4b) Wichtige Meldung (Anfrage an die Bibliothek → Admin): rote, wackelnde Glocke + Einblendung.
+  //     Seit 1.3.0 ohne Spiel – Anfragen zu einem Spiel gehen an dessen Entwickler (E64), geprüft in e2e-zentrale-1.3-steckbrief.mjs
   await eval_(`fetch("/api/antraege",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({art:"fehler",text:"Bibliothek stürzt beim Start ab"})}).then(r=>r.status)`);
   await gehe(G + "/", 3500);
   ok(await eval_(`document.getElementById("glocke-knopf").classList.contains("alarm")`), "Glocke rot/wackelnd bei wichtiger Meldung");
-  ok(await eval_(`!document.getElementById("alarm").hidden && document.getElementById("alarm").textContent.includes("Neuer Antrag")`), "Einblendung „Wichtige Meldung“");
+  ok(await eval_(`!document.getElementById("alarm").hidden && document.getElementById("alarm").textContent.includes("Neue Anfrage")`), "Einblendung „Wichtige Meldung“");
   await eval_(`document.querySelector("#alarm button").click(); document.getElementById("glocke-knopf").click(); true`);
   ok(await bis(`!document.getElementById("glocke-knopf").classList.contains("alarm")`), "Nach dem Öffnen nicht mehr rot");
   await gehe(G + "/", 3000);

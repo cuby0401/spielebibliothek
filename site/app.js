@@ -19,7 +19,7 @@ let letzteRoute = "#/";   // wohin der Zurück-Pfeil einer Unterseite führt
 let suche = "", tagFilter = null;   // Suche und Kategorien in der Übersicht (Zentrale 1.2.0)
 let profilName = null;              // für #/profil/<name>
 let antragNr = null;                // für #/antrag/<id> (Zentrale 1.3.1)
-let antragZurueck = "#/";           // Zurück-Pfeil im Antrag: dorthin, wo man herkam (Anträge, Meine Spiele, Spiel)
+let antragZurueck = "#/";           // Zurück-Pfeil in der Anfrage: dorthin, wo man herkam (Anfragen, Meine Spiele, Spiel)
 let bisherigeRoute = "";
 const idPfad = (id) => id.split("/").map(encodeURIComponent).join("/");
 
@@ -440,14 +440,18 @@ async function zeigeSeite(name) {
 	zurueck.setAttribute("aria-label", zurueck.title);
 	el("seite").replaceChildren();
 	meldung("");
-	try { await seiten[name](el("seite")); }
+	// Konto-Seiten mit Leiste – fremde Profile nicht (die gehören nicht zum eigenen Konto)
+	const eigenesProfil = profilName === ich.player || profilName === `${ich.player}~${ich.ansicht}`;
+	const konto = KONTO_SEITEN.some((s) => s.name === name) && (name !== "profil" || eigenesProfil);
+	const ziel = konto ? kontoRahmen(name) : el("seite");
+	try { await seiten[name](ziel); }
 	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message); }
 	// Pfeil unauffällig links neben die Überschrift der Unterseite
-	const titel = el("seite").querySelector("h1");
+	const titel = ziel.querySelector("h1");
 	const kopf = document.createElement("div");
 	kopf.className = "seitenkopf";
 	if (titel) { titel.replaceWith(kopf); kopf.append(zurueck, titel); }
-	else { kopf.append(zurueck); el("seite").prepend(kopf); }
+	else { kopf.append(zurueck); ziel.prepend(kopf); }
 }
 
 // Upload-Seite (für „Zurück zum Hochladen“ im Entwurf, 1.3.1) – Adresse aus dem Link in der Taskleiste
@@ -462,7 +466,7 @@ async function zeigeSpiel(id, entwurfSpiel, eigenerOrdner = null) {
 	el("entwurf-hinweis").hidden = !entwurfSpiel && !spiel.offline;
 	if (!entwurfSpiel && spiel.offline) {
 		el("entwurf-hinweis").textContent = "Offline – andere Spieler sehen dieses Spiel gerade nicht." + (spiel.offlineGrund ? " Grund: " + spiel.offlineGrund : "") +
-			" Wieder online stellen: Menü → Meine Spiele.";
+			" Wieder online stellen: Konto → Meine Spiele.";
 	}
 	if (entwurfSpiel) {
 		el("entwurf-hinweis").textContent = "Entwurf – nur du siehst ihn. " +
@@ -524,14 +528,13 @@ async function zeigeEntwurf(user, ordner) {
 }
 
 function route() {
-	el("menue").hidden = true;
 	const vorher = bisherigeRoute;
 	bisherigeRoute = location.hash;
 	const ent = location.hash.match(/^#\/entwurf\/([a-z0-9][a-z0-9_-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*)$/);
 	if (ent) { letzteRoute = location.hash; return zeigeEntwurf(ent[1], ent[2]); }
 	const m = location.hash.match(/^#\/spiel\/(.+)$/);
 	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1]); }
-	if (/^#\/(spielstaende|anmeldungen)$/.test(location.hash)) { location.replace("#/profil"); return; }
+	if (location.hash === "#/anmeldungen") { location.replace("#/sicherheit"); return; }   // alte Links (vor 1.4.0)
 	const pr = location.hash.match(/^#\/profil(?:\/([a-z0-9][a-z0-9_~-]*))?$/);
 	if (pr) { profilName = pr[1] ? decodeURIComponent(pr[1]) : (ich.ansicht ? `${ich.player}~${ich.ansicht}` : ich.player); return zeigeSeite("profil"); }
 	const an = location.hash.match(/^#\/antrag\/(\d{1,9})$/);
@@ -546,18 +549,57 @@ function route() {
 	zeigeUebersicht();
 }
 
-// Kontextmenü (Menü unter dem Benutzernamen in der Taskleiste)
+// Initialen-Bild (Zentrale 1.4.0): feste Farbe je Benutzername, bis es hochladbare Profilbilder gibt
+function avatarFuellen(ziel, name, anzeigename) {
+	const text = String(anzeigename || name || "?").trim();
+	const teile = text.split(/[\s._-]+/).filter(Boolean);
+	ziel.textContent = ((teile[0] || "?")[0] + (teile.length > 1 ? teile[1][0] : (teile[0] || "")[1] || "")).toUpperCase();
+	let n = 0;
+	for (const z of String(name || text)) n = (n * 31 + z.charCodeAt(0)) >>> 0;
+	ziel.style.setProperty("--avatar-farbe", `hsl(${n % 360} 55% 42%)`);
+	return ziel;
+}
+
+// Konto-Bereich (Zentrale 1.4.0): diese Seiten bekommen die Leiste links (Handy: oben)
+const KONTO_SEITEN = [
+	{ name: "profil", text: "Profil" },
+	{ name: "meine-spiele", text: "Meine Spiele", rolle: "entwickler" },
+	{ name: "spielstaende", text: "Meine Spielstände" },
+	{ name: "antraege", text: "Anfragen" },
+	{ name: "einstellungen", text: "Einstellungen" },
+	{ name: "sicherheit", text: "Sicherheit" },
+];
+function kontoRahmen(aktiv) {
+	const leiste = document.createElement("nav");
+	leiste.className = "konto-leiste";
+	leiste.setAttribute("aria-label", "Konto");
+	const darf = { entwickler: ich.uploader || ich.admin };
+	for (const s of KONTO_SEITEN) {
+		if (s.rolle && !darf[s.rolle]) continue;
+		const a = document.createElement("a");
+		a.href = "#/" + s.name; a.textContent = s.text;
+		if (s.name === aktiv) { a.className = "aktiv"; a.setAttribute("aria-current", "page"); }
+		leiste.append(a);
+	}
+	const unten = document.createElement("div");
+	unten.className = "konto-leiste-unten";
+	if (ich.admin) unten.append(Object.assign(document.createElement("a"), { href: "/admin/", textContent: "Admin-Panel" }));
+	unten.append(Object.assign(document.createElement("a"), { href: "/cdn-cgi/access/logout", textContent: "Abmelden" }));
+	leiste.append(unten);
+	const inhalt = document.createElement("div");
+	inhalt.className = "konto-inhalt";
+	const rahmen = document.createElement("div");
+	rahmen.className = "konto";
+	rahmen.append(leiste, inhalt);
+	el("seite").append(rahmen);
+	return inhalt;
+}
 function menueEinrichten() {
-	const knopf = el("menue-knopf"), menue = el("menue");
+	// Zentrale 1.4.0: kein Aufklappmenü mehr – der Name führt ins Konto (Profil), Admins haben zusätzlich „Admin“ oben
+	const knopf = el("menue-knopf");
 	knopf.hidden = false;
-	knopf.onclick = (e) => { e.stopPropagation(); menue.hidden = !menue.hidden; knopf.setAttribute("aria-expanded", String(!menue.hidden)); };
-	document.addEventListener("click", (e) => { if (!menue.contains(e.target)) { menue.hidden = true; knopf.setAttribute("aria-expanded", "false"); } });
-	document.addEventListener("keydown", (e) => { if (e.key === "Escape") menue.hidden = true; });
-	const darf = {
-		admin: ich.admin,
-		entwickler: ich.uploader || ich.admin,
-	};
-	for (const a of menue.querySelectorAll("[data-rolle]")) a.hidden = !darf[a.dataset.rolle];
+	avatarFuellen(el("avatar"), ich.player);
+	el("admin-link").hidden = !ich.admin;
 	// Band oben, solange eine Rolle simuliert wird (gestartet im Admin-Panel → Übersicht)
 	if (ich.ansicht) {
 		el("ansicht-text").textContent = `Du siehst die Bibliothek als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"} – so wie Kollegen mit dieser Rolle. Spielstände und Favoriten bleiben deine.`;
@@ -587,7 +629,7 @@ async function glockeLaden() {
 	el("glocke").hidden = false;
 	el("glocke-zahl").textContent = String(glockeDaten.ungelesen);
 	el("glocke-zahl").hidden = !glockeDaten.ungelesen;
-	// Wichtig (Fehler in deinen Spielen, Anträge): rote, wackelnde Glocke + einmalige Einblendung
+	// Wichtig (Fehler in deinen Spielen, Anfragen): rote, wackelnde Glocke + einmalige Einblendung
 	el("glocke-knopf").classList.toggle("alarm", !!glockeDaten.wichtigUngelesen);
 	const wichtige = glockeDaten.liste.filter((m) => m.neu && m.wichtig);
 	let gezeigt = 0;

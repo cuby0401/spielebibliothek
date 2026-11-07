@@ -5,7 +5,7 @@ Home Assistant bekommt über einen Webhook (HA_WEBHOOK_URL in der .env):
                                                                      oder die NAS weg (HA-Timer läuft ab → Push)
     {"art": "problem", "text": "..."}                                sobald ein neues Problem auftaucht
     {"art": "wieder_ok", "text": "..."}                              wenn alles wieder läuft
-    {"art": "antrag", "text": "..."}                                 bei jedem neuen Antrag (aus verwaltung.py)
+    {"art": "antrag", "text": "..."}                                 bei jeder neuen Anfrage (aus verwaltung.py)
 Die passende Automation steht in docs/home-assistant.md.
 
 Geprüft wird: Datenbank (lesen und schreiben, seit 1.3.0), Upload-Dienst (inkl. Schreiben), Caddy (intern), Erreichbarkeit von außen über Cloudflare, freier Speicher,
@@ -47,6 +47,11 @@ def ha_senden(e, art: str, text: str = "", **extra) -> None:
 
 
 def pruefen(e, db, upload) -> list[str]:
+    # Not-Aus (1.4.0): Dienste und Tunnel sind absichtlich aus – nur das melden, nicht jede Folge davon einzeln
+    from . import notaus
+    na = notaus.aktiv(e.users_file.parent) if getattr(e, "users_file", None) else None
+    if na:
+        return [f"Not-Aus aktiv seit {na.get('zeit') or '?'} (von {na.get('von') or '?'}) – wieder einschalten am Mac: scripts/deploy.sh --notaus-aus"]
     probleme = []
     try:
         db.zaehlen()

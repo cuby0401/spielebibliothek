@@ -185,7 +185,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
         <tr><td>Umwandlung beim Testen fehlgeschlagen</td><td>✗</td><td><code>migration</code>-Schritt reparieren (Fehlertext steht dabei)</td></tr>
         <tr><td><code>saveVersion</code> gestiegen</td><td>ℹ / ⚠</td><td>Entwurf mit altem Spielstand testen, bis „Umwandlung … getestet ✓“ erscheint</td></tr>
         <tr><td>Entwurf noch nicht getestet</td><td>⚠</td><td>„Testen“ klicken und kurz spielen</td></tr>
-        <tr><td>JavaScript-Fehler beim Testen</td><td>⚠</td><td>Menü → Meine Spiele → Fehlerberichte</td></tr>
+        <tr><td>JavaScript-Fehler beim Testen</td><td>⚠</td><td>Konto → Meine Spiele → Fehlerberichte</td></tr>
         <tr><td><code>gamesave.js</code> nicht eingebunden</td><td>⚠</td><td>Erste Zeile im <code>&lt;head&gt;</code>: <code>&lt;script src="/lib/gamesave.js"&gt;&lt;/script&gt;</code></td></tr>
         <tr><td>Absolute Pfade <code>/…</code></td><td>⚠</td><td>Relativ schreiben (sonst weiße Fläche)</td></tr>
         <tr><td>Dateien von fremden Servern (CDN)</td><td>⚠</td><td>Als Datei mitliefern</td></tr>
@@ -225,7 +225,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     <ul>
       <li><strong>Formate:</strong> <code>zahl</code> (1.234), <code>dezimal</code> (12,50), <code>zeit</code> (Millisekunden → 1:23,4), <code>text</code> (max. 40 Zeichen, rangiert nicht).</li>
       <li>Ohne <code>spalten</code> reicht <code>submitScore(1250)</code>. Nur eingetragene Spalten werden angenommen.</li>
-      <li><strong>Neue Season:</strong> wenn ein Update das Spiel deutlich leichter oder schwerer macht – im Update-Fenster ankreuzen oder Menü → Meine Spiele → „Neue Season“.
+      <li><strong>Neue Season:</strong> wenn ein Update das Spiel deutlich leichter oder schwerer macht – im Update-Fenster ankreuzen oder Konto → Meine Spiele → „Neue Season“.
         Alte Seasons bleiben abrufbar.</li>
     </ul>
 
@@ -288,10 +288,10 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       Bestenliste nur mit Einträgen aus dieser Woche. Für dich ändert sich nichts – <code>submitScore</code> funktioniert wie immer.</p>
     <h3>Spielzeit und Speicher</h3>
     <ul>
-      <li>Die Bibliothek misst, wie lange gespielt wird (nur bei sichtbarem Tab). Unter Menü → Meine Spiele siehst du die Spielzeit aller Spieler zusammen.</li>
+      <li>Die Bibliothek misst, wie lange gespielt wird (nur bei sichtbarem Tab). Unter Konto → Meine Spiele siehst du die Spielzeit aller Spieler zusammen.</li>
       <li><strong>Glocke:</strong> Ein neuer JavaScript-Fehler in deinem veröffentlichten Spiel oder eine Fehlermeldung eines Spielers macht deine Glocke
         <strong>rot</strong> – mit einer Einblendung beim nächsten Besuch. Wer dein Spiel als Favorit hat, bekommt deine Updates in die Glocke.
-        Hast du gerade viele Fehler: Menü → Meine Spiele → „Offline nehmen“.</li>
+        Hast du gerade viele Fehler: Konto → Meine Spiele → „Offline nehmen“.</li>
       <li>Jeder Entwickler hat <strong>1 GB Speicher</strong> für Spiele, Entwürfe und aufgehobene Versionen. Die Upload-Seite zeigt den Stand gesamt und je Spiel
         (live, Entwurf, ältere Versionen) – ältere Versionen sind meist der größte Brocken.
         Ist er voll, wird der Upload abgelehnt – alte Spiele löschen oder Seb um mehr Platz bitten.</li>
@@ -299,7 +299,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
 
     <h2 id="selbst">10. Was du selbst einstellen kannst – und was nicht</h2>
     <div class="tabelle-rahmen"><table class="tabelle">
-      <thead><tr><th>Selbst</th><th>Nur über Antrag an Seb (Menü → Anträge)</th></tr></thead>
+      <thead><tr><th>Selbst</th><th>Nur über Anfrage an Seb (Konto → Anfragen)</th></tr></thead>
       <tbody><tr>
         <td><ul>
           <li>Titel, Beschreibung, Vorschaubild (<a href="#steckbrief">Upload-Seite</a>, gilt sofort)</li>
@@ -317,17 +317,17 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       </tr></tbody>
     </table></div>
 
-    <h3 id="antraege">Anträge zu deinen Spielen</h3>
+    <h3 id="antraege">Anfragen zu deinen Spielen</h3>
     <p>Fehler, Wünsche und Sonstiges, die Spieler zu einem deiner Spiele schicken, landen bei <strong>dir</strong> – nicht bei Seb.
-      Du bekommst eine Meldung in der Glocke (bei Fehlern rot) – <strong>ein Klick darauf öffnet den Antrag</strong> mit Text, Bildern und Antwortfeld.
-      Alle offenen Anträge stehen außerdem oben unter Menü → <strong>Anträge</strong> („An dich“) und unter Menü → Meine Spiele
-      (Spalte „Anträge“ und „Anträge zu deinen Spielen“, pro Spiel getrennt nach offen und geschlossen).
+      Du bekommst eine Meldung in der Glocke (bei Fehlern rot) – <strong>ein Klick darauf öffnet die Anfrage</strong> mit Text, Bildern und Antwortfeld.
+      Alle offenen Anfragen stehen außerdem oben unter Konto → <strong>Anfragen</strong> („An dich“) und unter Konto → Meine Spiele
+      (Spalte „Anfragen“ und „Anfragen zu deinen Spielen“, pro Spiel getrennt nach offen und geschlossen).
       Mit „Erledigt“ oder „Ablehnen“ und einer kurzen Antwort schließt du sie – der Spieler bekommt deine Antwort in seine Glocke.
-      Du kannst auch selbst Bilder anfügen, z. B. einen Screenshot nach dem Fix. Nur du, der Antragsteller und Seb sehen den Antrag.</p>
+      Du kannst auch selbst Bilder anfügen, z. B. einen Screenshot nach dem Fix. Nur du, der Absender und Seb sehen die Anfrage.</p>
 
     <h2 id="werkzeuge">11. Fehler suchen</h2>
     <h3>Fehlerberichte</h3>
-    <p>JavaScript-Fehler beim Spielen werden automatisch gemeldet – zusammengefasst, ohne Spielernamen. Menü → Meine Spiele → „Fehlerberichte“
+    <p>JavaScript-Fehler beim Spielen werden automatisch gemeldet – zusammengefasst, ohne Spielernamen. Konto → Meine Spiele → „Fehlerberichte“
       mit Datei, Zeile und Stacktrace. Fehler aus dem Entwurf sind gekennzeichnet und erscheinen in der Prüfung.</p>
     <h3>Entwicklerwerkzeuge des Browsers</h3>
     <ol>
@@ -360,11 +360,11 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       <dt>Mein Update ist kaputt.</dt>
       <dd>Upload-Seite → „Ältere Versionen“ → „Zurücksetzen“, siehe <a href="#rollback">Zurücksetzen</a>.</dd>
       <dt>Spielstände sind nach einem Update weg oder kaputt.</dt>
-      <dd>Anderer Ordnername? <code>saveVersion</code> vergessen? Sonst Antrag an Seb – die Stände vor jeder Umwandlung sind dauerhaft aufgehoben.</dd>
+      <dd>Anderer Ordnername? <code>saveVersion</code> vergessen? Sonst Anfrage an Seb – die Stände vor jeder Umwandlung sind dauerhaft aufgehoben.</dd>
       <dt>Mein Bestenlisten-Eintrag wird abgelehnt.</dt>
       <dd>Steht jeder Schlüssel aus <code>submitScore({...})</code> in <code>leaderboard.spalten</code>? Die Fehlermeldung nennt den Grund.</dd>
       <dt>Mein Spiel hat plötzlich viele Fehler – was tun?</dt>
-      <dd>Menü → Meine Spiele → <strong>„Offline nehmen“</strong> (optional mit Grund). Andere sehen das Spiel dann nicht mehr, Spielstände und
+      <dd>Konto → Meine Spiele → <strong>„Offline nehmen“</strong> (optional mit Grund). Andere sehen das Spiel dann nicht mehr, Spielstände und
         Bestenliste bleiben. Danach in Ruhe reparieren oder auf eine ältere Version <a href="#rollback">zurücksetzen</a> und wieder „online stellen“.</dd>
       <dt>Wie ändere ich den Text unter meinem Spiel oder das Bild?</dt>
       <dd>Upload-Seite → bei deinem Spiel „Beschreibung und Vorschaubild“, siehe <a href="#steckbrief">Beschreibung und Vorschaubild</a>. Gilt sofort, ohne Update.</dd>

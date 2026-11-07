@@ -79,3 +79,27 @@ docker exec borgmatic borgmatic extract --archive latest \
 
 Getestet am 05.11.2026: ein Spiel (bit-genau), alles (identisch, DB `integrity_check: ok`), einzelner Spielstand per CLI.
 
+
+## Not-Aus (Zentrale 1.4.0)
+
+Bei Verdacht auf ein Datenleck oder einen Angriff. Wirkt nur auf die Spielebibliothek, alle anderen Dienste der NAS laufen weiter.
+
+**Auslösen** – eins von beiden:
+- Admin-Panel → Übersicht → ganz oben „Not-Aus“ aufklappen → „Not-Aus auslösen …“, Grund angeben, `NOT-AUS` eintippen.
+- Am Mac: `scripts/deploy.sh --notaus` (falls das Admin-Panel nicht mehr erreichbar ist).
+
+**Was passiert:**
+1. Sofort: `config/notaus.json` wird angelegt. Speicher-Dienst und Upload-Dienst antworten auf **jede** Anfrage mit 503 – keine Daten mehr.
+2. Innerhalb einer Minute: Der Auftragsdienst stoppt den Tunnel (`spielebibliothek-cloudflared`). Die Seite ist von außen weg.
+   Er prüft das jede Minute als Erstes, auch während lange Tests laufen.
+3. Solange die Datei da ist, spielen Auftragsdienst, `nas-deploy.sh` und `deploy.sh --zurueck` nichts ein (das würde den Tunnel wieder starten).
+4. Home Assistant bekommt eine Meldung (wenn `HA_WEBHOOK_URL` gesetzt ist). Der Wächter meldet nur noch „Not-Aus aktiv“.
+
+**Aufheben – nur am Mac** (bewusst nicht im Admin-Panel, damit ein gekapertes Admin-Konto es nicht rückgängig machen kann):
+```
+scripts/deploy.sh --notaus-status   # Zustand
+scripts/deploy.sh --notaus-aus      # fragt nach, entfernt die Datei, startet den Tunnel
+```
+Mit `--probe` wirken alle drei auf die Probe-Zentrale (zum Ausprobieren, dort gibt es keinen Tunnel).
+
+Ein- und Ausschalten stehen im **Sicherheitsprotokoll** (Admin-Panel → Not-Aus → „Sicherheitsprotokoll“, Tabelle `sicherheit`, ein Jahr aufbewahrt).

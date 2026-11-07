@@ -440,3 +440,12 @@ def test_intern_gesund_mit_token(umgebung, rsa_schluessel, tmp_path, monkeypatch
     c = TestClient(app)
     assert c.get("/intern/gesund", headers={"X-Intern-Token": "t" * 32}).json() == {"ok": True}
     assert c.get("/intern/gesund", headers={"X-Intern-Token": "falsch"}).status_code == 403
+
+
+def test_notaus_sperrt_upload(uclient, umgebung):
+    """Not-Aus (1.4.0): Der Upload-Dienst liest dieselbe Datei wie der Speicher-Dienst und antwortet sofort nur noch 503."""
+    (umgebung.users.parent / "notaus.json").write_text('{"zeit": "2026-11-07T18:00:00+00:00", "von": "seb", "grund": "Test"}')
+    assert uclient.get("/api/upload/status", headers=uclient.als()).status_code == 503
+    assert anmelden(uclient).status_code == 503
+    (umgebung.users.parent / "notaus.json").unlink()
+    assert uclient.get("/api/upload/status", headers=uclient.als()).status_code != 503

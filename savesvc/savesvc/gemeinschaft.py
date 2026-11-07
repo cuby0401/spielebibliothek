@@ -132,8 +132,13 @@ def registrieren(app: FastAPI, e, db, spieler, spiel, ich_daten, benutzerliste, 
                            "platz": platz, "erfolgeGesamt": len(definiert),
                            "erfolge": [{**definiert[x["erfolg"]], "zeit": x["zeit"]} for x in erf.get(sid, []) if x["erfolg"] in definiert]})
         spiele.sort(key=lambda x: -x["sekunden"])
+        # Profilkopf (Zentrale 1.4.0): nur, was ohnehin öffentlich ist – Anzeigename, Rollen, dabei seit. Kein Klarname, kein Geburtstag.
+        person = rollen.QUELLE.person(name) if rollen.QUELLE is not None else None
+        kopf = {"anzeigename": person.get("anzeigename") or None,
+                "rollen": [r for r in ("admin", "entwickler", "tester", "spieler") if r in (person.get("rollen") or [])],
+                "dabeiSeit": person.get("angelegt")} if person else {"anzeigename": None, "rollen": [], "dabeiSeit": None}
         return {"name": name, "sekunden": sum(x["sekunden"] for x in spiele), "spiele": spiele,
-                "erfolge": sum(len(x["erfolge"]) for x in spiele), "ich": name == rollen.daten_id(e, request, player)}
+                "erfolge": sum(len(x["erfolge"]) for x in spiele), "ich": name == rollen.daten_id(e, request, player), **kopf}
 
     # ---------- Spiel der Woche ----------
 

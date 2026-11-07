@@ -14,14 +14,14 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from . import games, rollen, steckbrief, versionen
+from . import games, notaus, rollen, steckbrief, versionen
 from .auth import Benutzerliste, Pruefer
 from .config import Einstellungen, laden
 from .db import Datenbank, ZuGross
 
 KEY_MUSTER = r"^[A-Za-z0-9_][A-Za-z0-9._:-]{0,99}$"
 BODY_MAX = 300 * 1024
-BILD_BODY_MAX = 3 * 1024 * 1024 + 4096                  # Bild an einem Antrag: max. 2 MB, als Base64 ≈ 2,7 MB
+BILD_BODY_MAX = 3 * 1024 * 1024 + 4096                  # Bild an einer Anfrage: max. 2 MB, als Base64 ≈ 2,7 MB
 BILD_PFAD = re.compile(r"^/api/antraege/\d+/bilder$")
 SCORE_ABSTAND = 1.0       # Sekunden zwischen zwei Scores je Spieler und Spiel
 SCORE_MAX = 1e15          # Betrag; schützt nur vor Unsinn, nicht vor Schummeln (Kollegen-Vertrauen)
@@ -93,9 +93,12 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
 
     @app.middleware("http")
     async def body_grenze(request, weiter):
+        # Not-Aus (1.4.0): ab der ersten Sekunde keine Antwort mehr mit Daten – auch nicht intern
+        if notaus.aktiv(e.users_file.parent):
+            return JSONResponse({"detail": notaus.MELDUNG}, status_code=503, headers={"Retry-After": "3600"})
         # Riesige Anfragen gar nicht erst einlesen (Spielstand max. 256 KB + JSON-Hülle)
         laenge = request.headers.get("content-length")
-        grenze = BILD_BODY_MAX if BILD_PFAD.match(request.url.path) else BODY_MAX   # 1.3.1: ein Bild je Anfrage an einen Antrag
+        grenze = BILD_BODY_MAX if BILD_PFAD.match(request.url.path) else BODY_MAX   # 1.3.1: ein Bild je Anfrage an eine Anfrage
         if laenge and laenge.isdigit() and int(laenge) > grenze:
             return JSONResponse({"detail": "Anfrage zu groß"}, status_code=413)
         # CSRF: Cloudflare hängt die Anmeldung an jede Anfrage an games – auch an eine, die eine fremde

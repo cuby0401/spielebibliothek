@@ -34,7 +34,7 @@ def test_handeintrag_in_users_yaml_wird_uebernommen(client, umgebung):
 
 def test_admin_felder_nie_bei_der_person_selbst(client, upload):  # noqa: F811
     client.post("/api/admin/personen/paul/notizen", json={"text": "GEHEIME NOTIZ"}, headers=client.als())
-    client.post("/api/admin/personen/paul/verwarnen", json={"grund": "Zu viele Anträge"}, headers=client.als())
+    client.post("/api/admin/personen/paul/verwarnen", json={"grund": "Zu viele Anfragen"}, headers=client.als())
     konto = client.get("/api/mein/konto", headers=client.als(PAUL))
     assert konto.status_code == 200 and konto.json()["status"] == "verwarnt"
     assert "GEHEIME" not in konto.text and not any(k in konto.json() for k in ("notizen", "zeitleiste", "protokoll", "sperrgrund"))
@@ -44,7 +44,7 @@ def test_admin_felder_nie_bei_der_person_selbst(client, upload):  # noqa: F811
     assert client.post("/api/admin/personen/seb/notizen", json={"text": "x"}, headers=client.als(PAUL)).status_code == 403
     # Verwarnung kommt rot in die Glocke, mit Grund
     m = client.get("/api/meldungen", headers=client.als(PAUL)).json()
-    assert m["wichtigUngelesen"] == 1 and "Zu viele Anträge" in m["liste"][0]["text"]
+    assert m["wichtigUngelesen"] == 1 and "Zu viele Anfragen" in m["liste"][0]["text"]
     # Simulation: keine echten CRM-Daten
     sim = {**client.als(), "X-Ansicht": "entwickler"}
     assert client.get("/api/mein/konto", headers=sim).json() == {"name": "seb~entwickler", "simuliert": True}
@@ -70,7 +70,7 @@ def test_rollen_und_upload_konto(client, upload):  # noqa: F811
     assert r.json()["dazu"] == ["entwickler"] and r.json()["passwort"] == "X" * 20
     # Admin kann sich die Admin-Rolle nicht selbst nehmen; Notfall-Admin bleibt immer Admin
     assert client.put("/api/admin/personen/seb/rollen", json={"rollen": ["spieler"]}, headers=client.als()).status_code == 409
-    # CRM-Admin: wirkt sofort, auch für Anträge an „admin“
+    # CRM-Admin: wirkt sofort, auch für Anfragen an „admin“
     client.put("/api/admin/personen/paul/rollen", json={"rollen": ["entwickler", "admin"]}, headers=client.als())
     assert client.get("/api/me", headers=client.als(PAUL)).json()["admin"] is True
     client.post("/api/antraege", json={"art": "wunsch", "text": "Dunkles Design"}, headers=client.als())

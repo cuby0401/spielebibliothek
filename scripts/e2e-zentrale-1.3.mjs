@@ -51,10 +51,10 @@ const dialoge = [];
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
 
-  // 1) Menü und Symbole
+  // 1) Konto (1.4.0): Name führt direkt ins Profil, kein Aufklappmenü; Admin-Link oben; Symbole
   await gehe(G + "/", 3500);
-  const menue = await eval_(`[...document.querySelectorAll("#menue a")].map(a=>a.textContent).join("|")`);
-  ok(!menue.includes("Spielstände") && !menue.includes("Anmeldungen") && menue.includes("Mein Profil"), "Kontextmenü: nur noch „Mein Profil“: " + menue);
+  ok(await eval_(`!document.getElementById("menue") && document.getElementById("menue-knopf").getAttribute("href")==="#/profil"`), "Name führt direkt ins Profil (kein Kontextmenü)");
+  ok(await eval_(`/^[A-Z]{1,2}$/.test(document.getElementById("avatar").textContent) && !document.getElementById("admin-link").hidden`), "Initialen-Bild und Admin-Link für Admins");
   ok(await eval_(`!!document.querySelector("#glocke-knopf svg.ikon") && !/🔔/.test(document.getElementById("glocke-knopf").textContent)`), "Glocke als SVG, ohne Emoji");
   ok(await eval_(`!!document.querySelector(".kachel .daumen svg.ikon") && ![...document.querySelectorAll(".daumen")].some(d=>/👍/.test(d.textContent))`), "Daumen als SVG, ohne Emoji");
 
@@ -63,13 +63,21 @@ const dialoge = [];
   await eval_(`fetch("/api/spielzeit/seb/spike",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({sekunden:60})}).then(r=>r.status)`);
   await eval_(`fetch("/api/admin/spiele/seb/spike",{method:"PATCH",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({testspiel:true})}).then(r=>r.status)`);
   await gehe(G + "/#/profil", 3500);
+  const leiste = await eval_(`[...document.querySelectorAll(".konto-leiste a")].map(a=>a.textContent).join("|")`);
+  ok(leiste === "Profil|Meine Spiele|Meine Spielstände|Anfragen|Einstellungen|Sicherheit|Admin-Panel|Abmelden", "Konto-Leiste (1.4.0): " + leiste);
+  ok(await eval_(`document.querySelector(".konto-leiste a.aktiv").textContent==="Profil" && !!document.querySelector(".profil-kopf .avatar.gross")`), "Profil aktiv, Kopf mit Bild");
   const h2 = await eval_(`[...document.querySelectorAll("#seite h2")].map(h=>h.textContent).join("|")`);
-  ok(h2 === "Spiele|Meine Angaben|Spielstände|Anmeldungen", "Profil: Spiele, Meine Angaben (1.4.0), Spielstände, Anmeldungen: " + h2);
-  ok(await eval_(`document.querySelector("#spielstaende").textContent.includes("Zähler")`), "Profil: Spielstand von Zähler");
+  ok(h2 === "Meine Angaben|Meine Spiele mit Plätzen und Erfolgen", "Profil: Meine Angaben, Spiele: " + h2);
   ok(await eval_(`!document.querySelector("#seite table").textContent.includes("Sandbox-Spike")`), "Profil: Testspiel Spike zählt nicht");
-  ok(await eval_(`document.querySelector("#anmeldungen").textContent.includes("dieses Gerät")`), "Profil: Anmeldung dieses Geräts");
-  await gehe(G + "/#/spielstaende", 2500);
-  ok(await eval_(`location.hash`) === "#/profil", "Alte Adresse #/spielstaende → Profil");
+  await gehe(G + "/#/spielstaende", 3000);
+  ok(await eval_(`document.querySelector("#spielstaende").textContent.includes("Zähler") && document.querySelector(".konto-leiste a.aktiv").textContent==="Meine Spielstände"`), "Meine Spielstände: Zähler");
+  await gehe(G + "/#/sicherheit", 3000);
+  ok(await eval_(`document.querySelector("#anmeldungen").textContent.includes("dieses Gerät")`), "Sicherheit: Anmeldung dieses Geräts");
+  ok(await eval_(`document.querySelector("#anmeldungen").textContent.includes("Probe/Teststand – keine echte Anmeldung")`), "Teststand: Anmeldung als „keine echte Anmeldung“ markiert, ohne Docker-IP");
+  await gehe(G + "/#/anmeldungen", 2500);
+  ok(await eval_(`location.hash`) === "#/sicherheit", "Alte Adresse #/anmeldungen → Sicherheit");
+  await gehe(G + "/#/profil/paul", 3000);
+  ok(await eval_(`!document.querySelector(".konto-leiste") && document.querySelector("#seite h1").textContent.startsWith("Profil von")`), "Fremdes Profil ohne Konto-Leiste");
 
   // 3) Glocke: archivieren, Archiv, löschen
   await eval_(`fetch("/api/admin/spiel-der-woche/paul/raetsel",{method:"PUT",headers:{"X-Bibliothek":"1"}}).then(r=>r.status)`);

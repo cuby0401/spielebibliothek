@@ -17,20 +17,11 @@
         <div id="glocke-liste" class="menue-liste glocke-liste" hidden></div>
       </div>
       <a class="knopf leise" href="/hilfe/">Hilfe</a>
-      <div class="menue">
-        <button id="menue-knopf" class="knopf leise benutzer-knopf" type="button" aria-haspopup="true" aria-expanded="false" hidden>
-          <span id="benutzer"></span> ▾
-        </button>
-        <!-- Kontextmenü -->
-        <div id="menue" class="menue-liste" hidden>
-          <a href="#/profil">Mein Profil</a>
-          <a href="#/einstellungen">Einstellungen</a>
-          <a href="#/meine-spiele" data-rolle="entwickler" hidden>Meine Spiele</a>
-          <a href="#/antraege">Anträge</a>
-          <a href="/admin/" data-rolle="admin" hidden>Admin-Panel</a>
-          <hr>
-          <a href="/cdn-cgi/access/logout">Abmelden</a>
-        </div>
+      <a class="knopf leise" id="admin-link" href="/admin/" hidden>Admin</a>
+      <!-- Konto (Zentrale 1.4.0): Klick auf den Namen öffnet das eigene Profil, die Bereiche stehen dort in der Leiste -->
+      <a id="menue-knopf" class="benutzer-knopf" href="#/profil" title="Mein Konto" hidden>
+        <span id="avatar" class="avatar" aria-hidden="true"></span><span id="benutzer"></span>
+      </a>
       </div>
     </nav>
   </header>

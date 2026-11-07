@@ -86,7 +86,7 @@ def test_entwickler_season(client, umgebung):
 
 def test_antraege(client, umgebung):
     (umgebung.users).write_text("seb@example.com: seb\npaul@example.com: paul\nmia@example.com: mia\n")
-    # Spieler dürfen Anträge stellen (z. B. Fehler melden), aber nicht die Entwickler-Arten
+    # Spieler dürfen Anfragen stellen (z. B. Fehler melden), aber nicht die Entwickler-Arten
     assert client.post("/api/antraege", json={"art": "fehler", "text": "Spiel friert ein"}, headers=client.als("mia@example.com")).status_code == 201
     assert client.post("/api/antraege", json={"art": "bestenliste", "text": "Bitte leeren"}, headers=client.als("mia@example.com")).status_code == 422
     assert "bestenliste" not in client.get("/api/antraege/arten", headers=client.als("mia@example.com")).json()
@@ -115,9 +115,9 @@ def test_person_einladen_sperren_archivieren(client, umgebung, upload):
     assert liste["emil"]["uploadKonto"] is True and "admin" in liste["seb"]["rollen"] and liste["seb"]["notfallAdmin"] is True
     # Sperren wirkt sofort, auch beim Upload-Export; Admin nicht sperrbar
     assert client.post("/api/admin/personen/seb/sperren", json={"grund": "Test"}, headers=client.als()).status_code == 409
-    assert client.post("/api/admin/personen/emil/sperren", json={"grund": "Spam im Antrag"}, headers=client.als()).status_code == 200
+    assert client.post("/api/admin/personen/emil/sperren", json={"grund": "Spam in der Anfrage"}, headers=client.als()).status_code == 200
     r = client.get("/api/me", headers=client.als("emil@example.com"))
-    assert r.status_code == 403 and "Konto gesperrt: Spam im Antrag" in r.json()["detail"]
+    assert r.status_code == 403 and "Konto gesperrt: Spam in der Anfrage" in r.json()["detail"]
     assert "emil" not in umgebung.users.read_text()
     assert client.post("/api/admin/personen/emil/entsperren", headers=client.als()).status_code == 200
     assert client.get("/api/me", headers=client.als("emil@example.com")).status_code == 200
@@ -210,7 +210,7 @@ def test_simulation_hat_eigenes_leeres_konto(client, monkeypatch):
     # in der Simulation speichern geht – getrennt vom echten Stand
     client.put("/api/save/seb/zaehler/stand", json={"data": {"zahl": 1}}, headers=sim)
     assert client.get("/api/save/seb/zaehler/stand", headers=echt).json()["data"] == {"zahl": 42}
-    # Bestenliste und Anträge werden in der Simulation nicht gespeichert
+    # Bestenliste und Anfragen werden in der Simulation nicht gespeichert
     assert client.post("/api/score/seb/zaehler", json={"score": 5}, headers=sim).status_code == 409
     assert client.post("/api/antraege", json={"art": "fehler", "text": "Test aus der Simulation"}, headers=sim).status_code == 409
     assert client.get("/api/antraege", headers=sim).json() == []
@@ -463,3 +463,37 @@ def test_simulation_startet_leer(client):
     assert client.post("/api/admin/ansicht/admin/zuruecksetzen", headers=echt).status_code == 422
     assert client.post("/api/admin/ansicht/spieler/zuruecksetzen", headers=client.als(PAUL)).status_code == 403
     assert client.post("/api/admin/ansicht/spieler/zuruecksetzen", headers=sim).status_code == 403   # aus der Simulation heraus nicht
+
+
+# ---------- Not-Aus (Zentrale 1.4.0, E72) ----------
+
+def test_notaus(client, umgebung):
+    from savesvc import notaus
+    from savesvc.db import Datenbank
+    p = client.als(PAUL)
+    assert client.post("/api/admin/notaus", json={"bestaetigung": "NOT-AUS"}, headers=p).status_code == 403          # nur Admins
+    assert client.post("/api/admin/notaus", json={"bestaetigung": "ja"}, headers=client.als()).status_code == 422     # Bestätigung nötig
+    assert client.post("/api/admin/notaus", json={"bestaetigung": "NOT-AUS"},
+                       headers={**client.als(), "X-Ansicht": "spieler"}).status_code == 403                          # nicht in „Ansicht als …“
+    assert client.get("/api/me", headers=p).status_code == 200
+    r = client.post("/api/admin/notaus", json={"bestaetigung": "NOT-AUS", "grund": "Verdacht auf Datenleck"}, headers=client.als())
+    assert r.status_code == 200 and "deploy.sh --notaus-aus" in r.json()["hinweis"]
+    # ab sofort: keine Antwort mit Daten mehr – für niemanden, auch nicht für Admins oder intern
+    for pfad in ("/api/me", "/api/games", "/api/admin/uebersicht", "/api/admin/sicherheit", "/intern/gesund"):
+        assert client.get(pfad, headers=client.als()).status_code == 503, pfad
+    assert client.post("/api/admin/notaus", json={"bestaetigung": "NOT-AUS"}, headers=client.als()).status_code == 503
+    # Ausschalten nur von außen (CLI vom Mac), danach geht alles wieder; beides steht im Sicherheitsprotokoll
+    db = Datenbank(umgebung.db)
+    assert notaus.ausschalten(umgebung.users.parent, db, "mac") is True
+    assert client.get("/api/me", headers=p).status_code == 200
+    liste = client.get("/api/admin/sicherheit", headers=client.als()).json()
+    assert [x["art"] for x in liste[:2]] == ["notaus-aus", "notaus-ein"]
+    assert liste[1]["wer"] == "seb" and liste[1]["text"] == "Verdacht auf Datenleck"
+    assert client.get("/api/admin/sicherheit", headers=p).status_code == 403
+
+
+def test_notaus_unlesbare_datei_gilt_als_an(tmp_path):
+    from savesvc import notaus
+    (tmp_path / "notaus.json").write_text("kaputt")
+    assert notaus.aktiv(tmp_path) is not None
+    assert notaus.aktiv(tmp_path / "gibtsnicht") is None

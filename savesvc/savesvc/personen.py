@@ -82,7 +82,7 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         z = [{"zeit": x["zeit"], "art": x["art"], "text": x["text"], "von": x["von"]} for x in crm.ereignisse(name)]
         z += [{"zeit": a["letzte"], "art": "anmeldung", "text": f"Angemeldet: {a['geraet']}" + (f" · {a['ort']}" if a.get("ort") else ""), "von": None}
               for a in db.anmeldungen(name, 30)]
-        z += [{"zeit": a["erstellt"], "art": "antrag", "text": f"Antrag #{a['id']} ({a['art']}): {a['text'][:80]}", "von": None}
+        z += [{"zeit": a["erstellt"], "art": "antrag", "text": f"Anfrage #{a['id']} ({a['art']}): {a['text'][:80]}", "von": None}
               for a in db.antraege(name)[:30]]
         try:
             z += [{"zeit": x.get("zeit"), "art": "upload", "text": f"{x.get('aktion', '')} {x.get('ordner') or ''}".strip(), "von": None}

@@ -13,6 +13,9 @@ Für den Auftragsdienst (scripts/auftragsdienst.py, 1.3.0) – nur per docker ex
   python -m savesvc lebenszeichen <version>       „Auftragsdienst läuft“ fürs Admin-Panel und den Wächter
   python -m savesvc live-status                   (Probe) Stand des Live-Deploys nach der Freigabe von stdin (JSON)
 
+Not-Aus (Zentrale 1.4.0) – vom Mac über scripts/deploy.sh --notaus / --notaus-aus:
+  python -m savesvc notaus ein|aus|status [--von NAME] [--grund TEXT]
+
 Im Upload-Container (spielebibliothek-upload):
   python -m savesvc entwickler anlegen <name>     Upload-Konto + Spielordner; Passwort wird EINMAL angezeigt
   python -m savesvc entwickler passwort <name>    neues Passwort
@@ -50,7 +53,24 @@ def main(argv=None) -> int:
     lz = sub.add_parser("lebenszeichen", help="für den Auftragsdienst")
     lz.add_argument("version")
     sub.add_parser("live-status", help="für den Auftragsdienst (Probe)")
+    na = sub.add_parser("notaus", help="Not-Aus ein/aus/status (vom Mac über scripts/deploy.sh --notaus / --notaus-aus)")
+    na.add_argument("aktion", choices=["ein", "aus", "status"])
+    na.add_argument("--von", default="mac")
+    na.add_argument("--grund", default="")
     a = p.parse_args(argv)
+    if a.befehl == "notaus":
+        from . import notaus
+        e = laden()
+        db = Datenbank(e.db_path)
+        if a.aktion == "ein":
+            d = notaus.einschalten(e.users_file.parent, db, a.von, a.grund)
+            print(f"Not-Aus AN seit {d['zeit']}")
+        elif a.aktion == "aus":
+            print("Not-Aus aus" if notaus.ausschalten(e.users_file.parent, db, a.von) else "Not-Aus war nicht an")
+        else:
+            d = notaus.aktiv(e.users_file.parent)
+            print(f"AN seit {d.get('zeit')} von {d.get('von')}: {d.get('grund')}" if d else "aus")
+        return 0
     if a.befehl in ("auftraege-holen", "auftrag-fertig", "lebenszeichen", "live-status"):
         return auftragsdienst(a, sys.stdin)
 

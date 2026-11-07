@@ -13,6 +13,9 @@
 #   scripts/deploy.sh --ohne-tests       Tests überspringen (nur im Notfall)
 #   scripts/deploy.sh --zurueck 1.1.0    auf eine früher deployte Version zurück (aus dem Release-Archiv)
 #   scripts/deploy.sh --versionen        aufgehobene Versionen auf der NAS anzeigen
+#   scripts/deploy.sh --notaus           NOT-AUS vom Mac: alle Daten sofort gesperrt, Tunnel aus (auch im Admin-Panel auslösbar)
+#   scripts/deploy.sh --notaus-aus       Not-Aus aufheben – geht NUR hier, nicht im Admin-Panel (mit --probe: in der Probe)
+#   scripts/deploy.sh --notaus-status    Zustand anzeigen
 #
 # Schutz vor „Peng, alles kaputt“:
 #   0. Live nur nach Test in der Probe-Zentrale und „Für Live freigeben“ im Admin-Panel der Probe.
@@ -43,6 +46,7 @@ BEHALTEN=""
 PROBE_DIR=/volume1/docker/spielebibliothek-probe
 PROBE_URL=http://<NAS_GH>:18188
 ZURUECK=""
+NOTAUS=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--examples) BEISPIELE=1 ;;
@@ -54,6 +58,9 @@ while [ $# -gt 0 ]; do
 		--daten-behalten) BEHALTEN="--daten-behalten" ;;
 		--zurueck) shift; ZURUECK="${1:-}"; [ -n "$ZURUECK" ] || { echo "--zurueck braucht eine Version, z. B. 1.1.0" >&2; exit 2; } ;;
 		--versionen) ssh "$NAS" "ls -1t $RELEASES 2>/dev/null | sed 's/\.tar\$//' || echo '(noch keine)'"; exit 0 ;;
+		--notaus) NOTAUS=ein ;;
+		--notaus-aus) NOTAUS=aus ;;
+		--notaus-status) NOTAUS=status ;;
 		*) echo "Unbekannte Option: $1" >&2; exit 2 ;;
 	esac
 	shift
@@ -61,6 +68,22 @@ done
 
 cd "$(dirname "$0")/.."
 export COPYFILE_DISABLE=1 # keine ._-Dateien von macOS
+
+# ---------- Not-Aus (Zentrale 1.4.0, E72) ----------
+# Ein: sperrt sofort alle Daten und stoppt den Tunnel. Aus: NUR hier vom Mac – nicht aus dem Admin-Panel.
+# Mit --probe wirkt es auf die Probe-Zentrale (zum Ausprobieren; die hat keinen Tunnel).
+if [ -n "$NOTAUS" ]; then
+	if [ "$PROBE" = 1 ]; then C=sbprobe-savesvc; T=""; else C=spielebibliothek-savesvc; T=spielebibliothek-cloudflared; fi
+	case "$NOTAUS" in
+		ein) ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -m savesvc notaus ein --von mac --grund 'am Mac ausgelöst (deploy.sh --notaus)' ${T:+&& docker stop $T >/dev/null && echo 'Tunnel gestoppt'}" ;;
+		aus)
+			printf 'Not-Aus wirklich aufheben? Vorher sicherstellen, dass das Leck geschlossen ist. [ja/nein] '
+			read -r ANTWORT; [ "$ANTWORT" = ja ] || { echo "Abgebrochen – Not-Aus bleibt an."; exit 1; }
+			ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -m savesvc notaus aus --von mac ${T:+&& docker start $T >/dev/null && echo 'Tunnel läuft wieder'}" ;;
+		status) ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -m savesvc notaus status; ${T:+docker inspect -f 'Tunnel läuft: {{.State.Running}}' $T}" ;;
+	esac
+	exit $?
+fi
 
 # Git-Tags für Versionen nachholen, die der Auftragsdienst nach einer Freigabe live eingespielt hat (1.3.0)
 tag_nachholen() {
@@ -115,6 +138,8 @@ STARTBEFEHL="cd $ZIEL && docker compose up -d --build --remove-orphans && docker
 
 # ---------- Zurück auf eine frühere Version ----------
 if [ -n "$ZURUECK" ]; then
+	# Not-Aus (1.4.0): das Zurückspringen startet alle Container neu, auch den Tunnel
+	if ssh -o LogLevel=ERROR "$NAS" "test -f $ZIEL/config/notaus.json"; then echo "Not-Aus ist aktiv – erst scripts/deploy.sh --notaus-aus" >&2; exit 3; fi
 	echo "→ Zentrale zurück auf $ZURUECK"
 	ssh "$NAS" "
 		set -e

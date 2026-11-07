@@ -38,7 +38,7 @@ def rolle(e, request: Request, player: str) -> dict:
 
 
 def daten_id(e, request: Request, player: str) -> str:
-    """Unter welchem Namen Spielstände, Einstellungen und Anträge liegen. In der Simulation eine eigene,
+    """Unter welchem Namen Spielstände, Einstellungen und Anfragen liegen. In der Simulation eine eigene,
     leere Identität (z. B. „seb~spieler“) – wie ein neuer Kollege; Sebs echte Daten bleiben unberührt."""
     a = rolle(e, request, player)["ansicht"]
     return f"{player}~{a}" if a else player

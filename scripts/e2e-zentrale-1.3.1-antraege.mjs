@@ -1,5 +1,5 @@
-// Ende-zu-Ende-Test für Zentrale 1.3.1: Entwurf testen → „Zurück zum Hochladen“ (Antrag von Emil),
-// Antrag mit Bild, Glocke öffnet den Antrag, Antworten im Antrag. Aufbau wie e2e-zentrale-1.3-steckbrief.mjs.
+// Ende-zu-Ende-Test für Zentrale 1.3.1: Entwurf testen → „Zurück zum Hochladen“ (Anfrage von Emil),
+// Anfrage mit Bild, Glocke öffnet die Anfrage, Antworten in der Anfrage. Aufbau wie e2e-zentrale-1.3-steckbrief.mjs.
 // Aufruf (macht scripts/e2e-alle.sh): node scripts/e2e-zentrale-1.3.1-antraege.mjs <ordner> <upload-passwort>
 import { writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -70,33 +70,33 @@ writeFileSync(`${DIR}/screenshot.png`, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQA
   ok(await bis(`document.getElementById("spiel-e2e")?.classList.contains("hervorgehoben")`), "Upload-Seite: Spiel e2e wird hervorgehoben");
   ok(await eval_(`[...document.querySelectorAll("#spiel-e2e button")].some(b=>b.textContent==="Veröffentlichen …")`), "… mit „Veröffentlichen …“ direkt dabei");
 
-  // 3) Antrag mit Bild über das Formular
+  // 3) Anfrage mit Bild über das Formular
   await gehe(G + "/#/antraege", 3000);
   await eval_(`document.querySelector("form.karte textarea").value="E2E: Zurück-Knopf im Entwurf"; true`);
   await datei('form.karte input[type="file"]', "screenshot.png");
   ok(await bis(`(()=>{const i=document.querySelector("form.karte .antrag-bilder img"); return i && i.complete && i.naturalWidth===4})()`), "Bild-Vorschau im Formular (verkleinert/umgewandelt)");
   await eval_(`document.querySelector("form.karte").requestSubmit(); true`);
-  ok(await bis(`document.body.textContent.includes("Antrag verschickt")`), "Antrag mit Bild verschickt");
-  ok(await bis(`[...document.querySelectorAll("a")].some(a=>a.textContent==="Öffnen · 1 Bild")`), "„Meine Anträge“: „Öffnen · 1 Bild“");
+  ok(await bis(`document.body.textContent.includes("Anfrage verschickt")`), "Anfrage mit Bild verschickt");
+  ok(await bis(`[...document.querySelectorAll("a")].some(a=>a.textContent==="Öffnen · 1 Bild")`), "„Meine Anfragen“: „Öffnen · 1 Bild“");
 
-  // 4) Glocke: Meldung führt direkt in den Antrag
+  // 4) Glocke: Meldung führt direkt in die Anfrage
   await gehe(G + "/", 3500);
   await eval_(`document.getElementById("glocke-knopf").click(); true`);
-  ok(await bis(`[...document.querySelectorAll("#glocke-liste a")].some(a=>/\\/#\\/antrag\\/\\d+$/.test(a.href))`), "Glocke: Meldung verlinkt auf den Antrag");
+  ok(await bis(`[...document.querySelectorAll("#glocke-liste a")].some(a=>/\\/#\\/antrag\\/\\d+$/.test(a.href))`), "Glocke: Meldung verlinkt auf die Anfrage");
   await eval_(`[...document.querySelectorAll("#glocke-liste a")].find(a=>/\\/#\\/antrag\\/\\d+$/.test(a.href)).click(); true`);
-  ok(await bis(`/^Antrag #\\d+$/.test(document.querySelector("#seite h1")?.textContent || "")`), "Antrag öffnet sich als eigene Seite");
-  ok(await eval_(`document.querySelector(".antrag-ticket .antrag-text").textContent`) === "E2E: Zurück-Knopf im Entwurf", "Antragstext steht im Ticket");
-  ok(await bis(`(()=>{const i=document.querySelector("#seite .antrag-bilder img"); return i && i.complete && i.naturalWidth===4})()`), "Bild wird im Antrag angezeigt");
+  ok(await bis(`/^Anfrage #\\d+$/.test(document.querySelector("#seite h1")?.textContent || "")`), "Anfrage öffnet sich als eigene Seite");
+  ok(await eval_(`document.querySelector(".antrag-ticket .antrag-text").textContent`) === "E2E: Zurück-Knopf im Entwurf", "Anfragetext steht im Ticket");
+  ok(await bis(`(()=>{const i=document.querySelector("#seite .antrag-bilder img"); return i && i.complete && i.naturalWidth===4})()`), "Bild wird in der Anfrage angezeigt");
   const art = await eval_(`fetch(document.querySelector("#seite .antrag-bilder img").src).then(r=>r.headers.get("content-type")+"|"+r.headers.get("x-content-type-options"))`);
   ok(/^image\/(webp|jpeg)\|nosniff$/.test(art), "Bild mit richtigem Typ und nosniff: " + art);
 
-  // 5) Antworten im Ticket (Admin-Antrag → seb darf antworten)
+  // 5) Antworten im Ticket (Admin-Anfrage → seb darf antworten)
   await eval_(`document.querySelector("#seite textarea").value="E2E erledigt"; [...document.querySelectorAll("#seite button")].find(b=>b.textContent==="Erledigt").click(); true`);
-  ok(await bis(`document.querySelector("#seite .status")?.textContent==="erledigt"`), "Antrag im Ticket erledigt");
+  ok(await bis(`document.querySelector("#seite .status")?.textContent==="erledigt"`), "Anfrage im Ticket erledigt");
   ok(await eval_(`document.querySelector("#seite .antwort")?.textContent.includes("E2E erledigt")`), "Antwort steht im Ticket");
   ok(await eval_(`document.querySelector(".zurueck-pfeil").getAttribute("href")`) === "#/", "Zurück-Pfeil führt dorthin, wo man herkam (Übersicht)");
 
-  // 6) Admin-Panel: „Öffnen“ beim Antrag
+  // 6) Admin-Panel: „Öffnen“ bei der Anfrage
   await gehe(G + "/admin/#antraege", 3500);
   ok(await bis(`[...document.querySelectorAll("a")].some(a=>/^Öffnen \\(1 Bild\\)$/.test(a.textContent) && a.getAttribute("href").startsWith("/#/antrag/"))`), "Admin-Panel: „Öffnen (1 Bild)“");
 

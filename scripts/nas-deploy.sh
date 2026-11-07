@@ -25,6 +25,8 @@ echo "$COMMIT" | grep -Eq '^[0-9a-f]{7,40}$' || { echo "Commit ungültig: $COMMI
 [ -f "$TAR" ] || { echo "Release fehlt: $TAR" >&2; exit 2; }
 tar -tf "$TAR" | grep -qx 'VERSION' || { echo "Release ohne VERSION – kein vollständiger Stand" >&2; exit 2; }
 [ "$(tar -xOf "$TAR" VERSION | tr -d ' \n')" = "$VERSION_ZENTRALE" ] || { echo "VERSION im Release passt nicht zu $VERSION_ZENTRALE" >&2; exit 2; }
+# Not-Aus (1.4.0): ein Deploy würde den Tunnel wieder starten – erst am Mac scripts/deploy.sh --notaus-aus
+[ ! -f "$ZIEL/config/notaus.json" ] || { echo "Not-Aus ist aktiv – kein Deploy. Erst: scripts/deploy.sh --notaus-aus" >&2; exit 3; }
 
 # ---------- 1. vorher sichern ----------
 mkdir -p "$RELEASES"
