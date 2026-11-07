@@ -4,7 +4,11 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 SKRIPT = Path(__file__).resolve().parents[2] / "scripts" / "auftragsdienst.py"
+# Beim Deploy testet die NAS nur savesvc/ (ohne scripts/) – dort laufen diese Tests nicht, am Mac und im Teststand schon
+pytestmark = pytest.mark.skipif(not SKRIPT.is_file(), reason="scripts/auftragsdienst.py nicht im Testumfang")
 
 
 def laden(tmp_path, monkeypatch):
