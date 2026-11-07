@@ -103,3 +103,18 @@ scripts/deploy.sh --notaus-aus      # fragt nach, entfernt die Datei, startet de
 Mit `--probe` wirken alle drei auf die Probe-Zentrale (zum Ausprobieren, dort gibt es keinen Tunnel).
 
 Ein- und Ausschalten stehen im **Sicherheitsprotokoll** (Admin-Panel → Not-Aus → „Sicherheitsprotokoll“, Tabelle `sicherheit`, ein Jahr aufbewahrt).
+
+## Testserver und Tester-Panel (Zentrale 1.4.0)
+
+Die Probe-Zentrale ist zugleich der Testserver für die Tester:
+
+- **Adressen:** `https://test.cuby0401.uk` (Bibliothek), `test-play` (Spiele), `test-upload` (Upload). Tunnel-Routen auf
+  `http://192.168.178.100:18188/18189/18190`, geschützt durch die Access-Anwendung **„Spielebibliothek Test“**
+  (AUD `04f54bd3…`, Richtlinie „Tester“: Seb + Tester). Wer dort rein darf, regelt allein diese Richtlinie.
+- **Anmeldung:** echt, per E-Mail-Code – kein `DEV_USER` mehr. Die Ports hängen nur an der LAN-Adresse der NAS.
+  **Nie Tunnel-Routen auf einen Dienst mit `DEV_USER` anlegen** (07.11.2026 war die Probe so für wenige Minuten offen).
+- **Testplan:** `tests/manuell/<Version>.json` im Repo (Format in `savesvc/savesvc/tester.py`). Kommt mit `scripts/deploy.sh --probe` mit.
+- **Ergebnisse:** `/volume1/docker/spielebibliothek-tests/ergebnisse.db` (überlebt Neubauten), im Admin-Panel der Probe bei der Freigabe.
+- **Tester benachrichtigen:** `deploy.sh --probe` schickt allen mit der CRM-Rolle „Tester“ eine Glocke (ab 1.4.0 live).
+- **Neuen Tester aufnehmen:** E-Mail in die Richtlinie „Tester“ der Access-Anwendung, Rolle „Tester“ im CRM (für Link und Glocke).
+

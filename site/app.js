@@ -560,6 +560,8 @@ function avatarFuellen(ziel, name, anzeigename) {
 	return ziel;
 }
 
+const TESTSERVER = "https://test.cuby0401.uk";   // Probe = Testserver (1.4.0, E76)
+
 // Konto-Bereich (Zentrale 1.4.0): diese Seiten bekommen die Leiste links (Handy: oben)
 const KONTO_SEITEN = [
 	{ name: "profil", text: "Profil" },
@@ -584,6 +586,9 @@ function kontoRahmen(aktiv) {
 	const unten = document.createElement("div");
 	unten.className = "konto-leiste-unten";
 	if (ich.admin) unten.append(Object.assign(document.createElement("a"), { href: "/admin/", textContent: "Admin-Panel" }));
+	// Tester-Panel (1.4.0, E76): auf dem Testserver für alle (den Zugang regelt Cloudflare Access), live für die Rolle Tester
+	if (ich.probe) unten.append(Object.assign(document.createElement("a"), { href: "/tester/", textContent: "Tester-Panel" }));
+	else if (ich.tester) unten.append(Object.assign(document.createElement("a"), { href: TESTSERVER + "/tester/", target: "_blank", rel: "noopener", textContent: "Tester-Panel ↗" }));
 	unten.append(Object.assign(document.createElement("a"), { href: "/cdn-cgi/access/logout", textContent: "Abmelden" }));
 	leiste.append(unten);
 	const inhalt = document.createElement("div");

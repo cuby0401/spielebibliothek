@@ -120,18 +120,30 @@ async function zentraleZeigen(c) {
 }
 
 // Probe-Zentrale (E56): Kopie zum Testen; „Für Live freigeben“ erlaubt scripts/deploy.sh genau diesen Commit
-const PROBE_URL = "http://<NAS_GH>:18188";
+const PROBE_URL = "https://test.cuby0401.uk";   // seit 1.4.0 zugleich der Testserver für die Tester (E76)
 async function probeZeigen(c) {
 	const p = await api("GET", "/probe").catch(() => null);
 	if (!p) return;
 	c.append(h("h2", { text: p.probe ? "🧪 Diese Seite ist die Probe-Zentrale" : "Probe-Zentrale" }));
 	if (!p.probe) {
-		return c.append(h("p", {}, "Neue Versionen der Zentrale laufen zuerst in der Probe – einer Kopie mit den echten Spielen und Daten, nur für dich über Tailscale: ",
-			h("a", { href: PROBE_URL, target: "_blank", rel: "noopener", text: PROBE_URL.replace("http://", "") }),
+		return c.append(h("p", {}, "Neue Versionen der Zentrale laufen zuerst in der Probe – einer Kopie mit den echten Spielen und Daten. Sie ist zugleich der Testserver für die Tester (Anmeldung über die Access-Anwendung „Spielebibliothek Test“): ",
+			h("a", { href: PROBE_URL, target: "_blank", rel: "noopener", text: PROBE_URL.replace("https://", "") }),
+			" · ", h("a", { href: PROBE_URL + "/tester/", target: "_blank", rel: "noopener", text: "Tester-Panel" }),
 			". Aufsetzen: scripts/deploy.sh --probe. Live geht eine Version erst, wenn du sie dort freigegeben hast."));
 	}
 	const f = p.freigabe;
-	c.append(h("p", {}, `Version ${p.version || "?"} · Commit ${p.commit || "?"}` + (p.kopieVon ? ` · Daten kopiert ${datumZeit(p.kopieVon)}` : "")),
+	// Tester-Ergebnisse (1.4.0, E76) – stehen direkt bei der Freigabe
+	const tp = await Bridge.json("GET", "/api/tester/plan").catch(() => null);
+	const z = tp && tp.zusammenfassung;
+	const fehlschlaege = tp ? tp.ergebnisse.filter((x) => !x.ok) : [];
+	const testBox = !tp ? h("p", { class: "leise", text: "Für diese Version gibt es keinen Testplan (tests/manuell/<Version>.json im Repo)." })
+		: h("div", { class: z.fehlgeschlagen ? "hinweis-box" : "karte" },
+			h("strong", { text: `Tests der Tester: ${z.bestanden} von ${z.gesamt} bestanden` + (z.fehlgeschlagen ? `, ${z.fehlgeschlagen} fehlgeschlagen` : "") + (z.offen ? `, ${z.offen} offen` : "") }),
+			fehlschlaege.length ? h("ul", {}, fehlschlaege.map((x) => h("li", {},
+				h("a", { href: "/tester/#test-" + x.test, text: (tp.tests.find((t) => t.id === x.test) || {}).titel || x.test }),
+				` – ${x.player}, ${datumZeit(x.zeit)}: ${x.text}`))) : null,
+			h("a", { href: "/tester/", text: "Zum Tester-Panel →" }));
+	c.append(h("p", {}, `Version ${p.version || "?"} · Commit ${p.commit || "?"}` + (p.kopieVon ? ` · Daten kopiert ${datumZeit(p.kopieVon)}` : "")), testBox,
 		h("p", { class: f && f.commit === p.commit ? "hinweis-box" : "leise" },
 			f && f.commit === p.commit ? `✓ Freigegeben am ${datumZeit(f.zeit)}${f.notiz ? " – " + f.notiz : ""}.` : "Noch nicht freigegeben."),
 		// Live-Deploy nach der Freigabe (1.3.0): meldet der Auftragsdienst
@@ -140,7 +152,9 @@ async function probeZeigen(c) {
 			f && f.commit === p.commit
 				? knopf("Freigabe zurücknehmen", async () => { await api("DELETE", "/probe/freigeben"); meldung("Freigabe zurückgenommen."); zeigen(); }, "gefahr")
 				: knopf("Getestet – für Live freigeben", async () => {
-					const notiz = prompt("Für Live freigeben? Was hast du getestet? (optional, steht in der Freigabe)", "");
+					// Fehlgeschlagene oder offene Tests: nur deutlich warnen, nicht sperren (manchmal ist ein Fehler bekannt und unwichtig)
+					if (z && (z.fehlgeschlagen || z.offen) && !confirm(`Achtung: ${z.fehlgeschlagen} Test(s) fehlgeschlagen, ${z.offen} noch offen.\nTrotzdem für Live freigeben?`)) return;
+					const notiz = prompt("Für Live freigeben? Was hast du getestet? (optional, steht in der Freigabe)", z ? `Tester: ${z.bestanden}/${z.gesamt} bestanden` : "");
 					if (notiz === null) return;
 					await api("POST", "/probe/freigeben", { notiz });
 					meldung("Freigegeben – der Auftragsdienst spielt diese Version innerhalb einer Minute live ein.");

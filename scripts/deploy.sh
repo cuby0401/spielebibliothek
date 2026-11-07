@@ -44,7 +44,7 @@ PROBE=0
 OHNE_PROBE=0
 BEHALTEN=""
 PROBE_DIR=/volume1/docker/spielebibliothek-probe
-PROBE_URL=http://<NAS_GH>:18188
+PROBE_URL=https://test.cuby0401.uk
 ZURUECK=""
 NOTAUS=""
 while [ $# -gt 0 ]; do
@@ -231,7 +231,13 @@ if [ "$PROBE" = 1 ]; then
 		mv /tmp/sb-probe.tar $PROBE_DIR/release.tar && chmod 644 $PROBE_DIR/release.tar
 		printf '{\"version\": \"%s\", \"commit\": \"%s\"}\n' '$VERSION_ZENTRALE' '$COMMIT' > $PROBE_DIR/release.json
 		rm -rf /tmp/sb-probe-repo"
-	echo "✓ Probe läuft: $PROBE_URL  (nur über Tailscale; angemeldet als seb, Upload mit deinem normalen Upload-Passwort)"
+	echo "✓ Probe läuft: $PROBE_URL  (zugleich Testserver; Anmeldung per E-Mail-Code über die Access-Anwendung „Spielebibliothek Test“, Upload: https://test-upload.cuby0401.uk mit deinem normalen Upload-Passwort)"
+	echo "  Tester-Panel: $PROBE_URL/tester/  (Testplan: tests/manuell/$VERSION_ZENTRALE.json)"
+	# Tester (1.4.0): Glocke auf der Live-Seite für alle mit der Rolle Tester – erst ab 1.4.0 live möglich, vorher still übersprungen
+	if [ -f "tests/manuell/$VERSION_ZENTRALE.json" ]; then
+		ANZAHL=$(grep -c '"id":' "tests/manuell/$VERSION_ZENTRALE.json" || true)
+		ssh -o LogLevel=ERROR "$NAS" "docker exec spielebibliothek-savesvc python -m savesvc tester-melden $VERSION_ZENTRALE $ANZAHL 2>/dev/null" | sed 's/^/  /' || true
+	fi
 	echo "  Testen, dann dort Admin-Panel → „Für Live freigeben“ – der Auftragsdienst spielt dann innerhalb einer Minute live ein."
 	echo "  (Ohne eingerichteten Auftragsdienst danach: scripts/deploy.sh)"
 	exit 0

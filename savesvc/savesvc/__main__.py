@@ -57,7 +57,23 @@ def main(argv=None) -> int:
     na.add_argument("aktion", choices=["ein", "aus", "status"])
     na.add_argument("--von", default="mac")
     na.add_argument("--grund", default="")
+    tm = sub.add_parser("tester-melden", help="Glocke für alle mit der Rolle Tester: neue Tests warten (deploy.sh --probe)")
+    tm.add_argument("version"); tm.add_argument("anzahl", type=int)
     a = p.parse_args(argv)
+    if a.befehl == "tester-melden":
+        import re as _re
+        from .crm import Crm
+        e = laden()
+        if not _re.match(r"^\d+\.\d+\.\d+$", a.version):
+            print("Version wie 1.4.0", file=sys.stderr)
+            return 2
+        db = Datenbank(e.db_path)
+        tester = [x["name"] for x in Crm(db, e.admins).personen()
+                  if "tester" in (x.get("rollen") or []) and x.get("status") in ("aktiv", "verwarnt", "eingeladen")]
+        for name in tester:
+            db.melden(name, f"Neue Tests für Version {a.version} ({a.anzahl}) warten im Tester-Panel", "https://test.cuby0401.uk/tester/")
+        print(f"{len(tester)} Tester benachrichtigt")
+        return 0
     if a.befehl == "notaus":
         from . import notaus
         e = laden()

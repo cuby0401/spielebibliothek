@@ -161,6 +161,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         anmeldung_merken(request, player)
         crm.angemeldet(player)          # eingeladen → aktiv bei der ersten Anmeldung (CRM)
         return {"player": player, "uploader": r["uploader"], "admin": r["admin"], "probe": e.probe,
+                # Tester (1.4.0): Link „Tester-Panel“ in der Konto-Leiste; der Testserver selbst prüft über Cloudflare Access
+                "tester": not r["ansicht"] and "tester" in rollen.crm_rollen(player),
                 "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"],
                 "sitzungBis": getattr(request.state, "sitzung_bis", None)}
 
@@ -320,6 +322,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     intern.registrieren(app, e, db, aktuelle_season)
     from . import gemeinschaft
     gemeinschaft.registrieren(app, e, db, spieler, spiel, ich_daten, benutzerliste, aktuelle_season)
+    from . import tester   # Tester-Panel (1.4.0): nur auf dem Testserver (TESTPLAN_DIR gesetzt)
+    tester.einrichten(app, e, spieler)
 
     return app
 

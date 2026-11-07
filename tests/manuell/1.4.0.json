@@ -1,0 +1,167 @@
+{
+  "version": "1.4.0",
+  "hinweis": "Der Testserver ist eine Kopie der echten Bibliothek mit deinem Konto. Nichts davon landet im Live-System – du kannst also ruhig Dinge ausprobieren, Spielstände löschen usw. Tests mit „Nur Seb“ im Bereich lässt du einfach aus.",
+  "tests": [
+    {
+      "id": "konto-name-oeffnet-profil",
+      "bereich": "Konto",
+      "titel": "Klick auf deinen Namen öffnet dein Profil",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Schau oben rechts: Neben deinem Benutzernamen steht ein runder Kreis mit deinen Initialen.",
+        "Klicke auf den Kreis bzw. deinen Namen."
+      ],
+      "erwartet": "Es klappt KEIN Menü mehr auf. Stattdessen öffnet sich direkt „Mein Profil“: oben eine Karte mit großem Initialen-Kreis, deinem Namen, @benutzername, „dabei seit …“ und deinen Rollen; rechts klein Spielzeit, Spiele und Erfolge."
+    },
+    {
+      "id": "konto-leiste",
+      "bereich": "Konto",
+      "titel": "Leiste mit den Bereichen deines Kontos",
+      "schritte": [
+        "Bleib im Profil (Klick auf deinen Namen).",
+        "Schau links auf die Leiste und klicke nacheinander jeden Punkt an: Profil, (Meine Spiele, falls du Entwickler bist), Meine Spielstände, Anfragen, Einstellungen, Sicherheit."
+      ],
+      "erwartet": "Jeder Punkt öffnet die passende Seite, der gewählte Punkt ist markiert, die Leiste bleibt dabei stehen. Unten in der Leiste steht abgesetzt „Tester-Panel“ und „Abmelden“. Nirgends steht mehr das Wort „Anträge“."
+    },
+    {
+      "id": "konto-handy",
+      "bereich": "Konto",
+      "titel": "Konto auf dem Handy",
+      "schritte": [
+        "Öffne test.cuby0401.uk auf dem Handy (gleiche E-Mail-Anmeldung).",
+        "Tippe oben rechts auf den Initialen-Kreis.",
+        "Wische die Leiste mit den Bereichen nach links und rechts und tippe „Sicherheit“ an."
+      ],
+      "erwartet": "Der Initialen-Kreis ist oben rechts vollständig zu sehen. Die Leiste steht oben quer und lässt sich wischen. „Sicherheit“ zeigt deine Anmeldungen. Nichts ist abgeschnitten oder überlappt."
+    },
+    {
+      "id": "meine-angaben",
+      "bereich": "Konto",
+      "titel": "Meine Angaben speichern",
+      "schritte": [
+        "Profil → Abschnitt „Meine Angaben“.",
+        "Trag einen Anzeigenamen ein (z. B. deinen Spitznamen) und klicke „Speichern“.",
+        "Lade die Seite neu (F5)."
+      ],
+      "erwartet": "Oben erscheint „Gespeichert.“. Nach dem Neuladen steht der Anzeigename groß oben in der Profilkarte, der Benutzername steht darunter als @name."
+    },
+    {
+      "id": "spielstaende-seite",
+      "bereich": "Konto",
+      "titel": "Meine Spielstände als eigene Seite",
+      "schritte": [
+        "Spiel ein beliebiges Spiel kurz an, bis es etwas gespeichert hat.",
+        "Klick auf deinen Namen → links „Meine Spielstände“."
+      ],
+      "erwartet": "Das Spiel steht in der Liste mit deinem Spielstand und dem Knopf „Neu anfangen“."
+    },
+    {
+      "id": "sicherheit-anmeldungen",
+      "bereich": "Konto",
+      "titel": "Anmeldungen unter „Sicherheit“",
+      "schritte": [
+        "Klick auf deinen Namen → links „Sicherheit“."
+      ],
+      "erwartet": "Du siehst die Tabelle „Anmeldungen“ mit deinem jetzigen Gerät (Markierung „dieses Gerät“), Ort und IP. Es tauchen keine Geräte auf, mit denen du dich nie angemeldet hast."
+    },
+    {
+      "id": "fremdes-profil",
+      "bereich": "Konto",
+      "titel": "Profil eines anderen Spielers",
+      "schritte": [
+        "Öffne ein Spiel mit Bestenliste (z. B. ein Spiel mit Einträgen rechts neben dem Spiel).",
+        "Klicke in der Bestenliste auf den Namen eines anderen Spielers."
+      ],
+      "erwartet": "Es öffnet sich „Profil von …“ mit Initialen-Kreis, Name und Spielen – OHNE die Leiste links und OHNE „Meine Angaben“, Spielstände oder Anmeldungen der anderen Person."
+    },
+    {
+      "id": "spielen-alle-spiele",
+      "bereich": "Spielen",
+      "titel": "Jedes Spiel startet",
+      "schritte": [
+        "Geh auf die Übersicht (oben links „Spielebibliothek“).",
+        "Klicke bei jedem Spiel nacheinander auf „Spielen“ und warte, bis es geladen ist. Danach „← Übersicht“."
+      ],
+      "erwartet": "Jedes Spiel öffnet sich und lässt sich bedienen. Es erscheint nirgends ein rotes Feld „Da ist leider etwas schiefgelaufen …“."
+    },
+    {
+      "id": "anfrage-stellen",
+      "bereich": "Anfragen",
+      "titel": "Anfrage mit Bild stellen",
+      "schritte": [
+        "Klick auf deinen Namen → links „Anfragen“.",
+        "Wähle „Fehler melden“, ein Spiel, schreib „Test von <dein Name>“ und füge mit „Bild anfügen“ (oder Strg+V) einen Screenshot an.",
+        "Abschicken und danach bei der neuen Anfrage auf „Öffnen“ klicken."
+      ],
+      "erwartet": "Überall steht „Anfrage“/„Anfragen“, nicht „Antrag“. Die Anfrage erscheint in der Liste, „Öffnen“ zeigt Text und Bild."
+    },
+    {
+      "id": "veraltete-seite",
+      "bereich": "Stabilität",
+      "titel": "Nach dem Neuladen alles normal",
+      "schritte": [
+        "Drück auf der Übersicht ein paar Mal hintereinander F5 (normales Neuladen, nicht Strg+F5).",
+        "Öffne danach ein Spiel."
+      ],
+      "erwartet": "Die Seite lädt jedes Mal normal, die Kacheln sind da, das Spiel startet. Die Seite lädt sich nicht von selbst immer wieder neu."
+    },
+    {
+      "id": "seb-crm-personen",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Personen übernommen",
+      "schritte": [
+        "Admin-Panel → Reiter „Personen“.",
+        "Prüfe die Liste: Sind alle da, die auch live Zugang haben?",
+        "Öffne Paul und Emil und schau auf Rollen und Status."
+      ],
+      "erwartet": "Alle Personen sind da. Du bist Admin, Paul und Emil sind Entwickler, alle anderen Spieler. Wer sich schon angemeldet hat, ist „aktiv“."
+    },
+    {
+      "id": "seb-crm-massnahmen",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Testperson von Anfang bis Ende",
+      "schritte": [
+        "Personen → „Person einladen“: E-Mail test+1@example.com, Benutzername testperson, Rolle Spieler.",
+        "Auf der Seite der Person: Notiz schreiben, Rolle Entwickler geben (Passwort wird einmal angezeigt) und wieder nehmen.",
+        "Verwarnen (mit Grund), Sperren (mit Grund), Entsperren.",
+        "Zum Schluss Archivieren (Benutzername zur Bestätigung eintippen).",
+        "Danach „Prüfprotokoll“ öffnen."
+      ],
+      "erwartet": "Jeder Schritt klappt ohne Fehlermeldung. „Einladung senden“ ohne eingerichtete E-Mail gibt eine verständliche Meldung statt eines Absturzes. Zeitleiste und Prüfprotokoll zeigen jeden Schritt mit wer, was, wann, vorher und nachher."
+    },
+    {
+      "id": "seb-upload",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "Hochladen auf dem Testserver",
+      "schritte": [
+        "test-upload.cuby0401.uk öffnen und mit deinem normalen Upload-Passwort anmelden.",
+        "Bei einem deiner Spiele „Update hochladen“ mit einem kleinen ZIP, dann „Testen“."
+      ],
+      "erwartet": "Anmeldung und Upload klappen, „Testen“ öffnet den Entwurf, „← Zurück zum Hochladen“ führt zurück."
+    },
+    {
+      "id": "seb-fehler-und-uebersicht",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "Admin-Übersicht: Not-Aus-Feld, Fehler, Testergebnisse",
+      "schritte": [
+        "Admin-Panel → Übersicht.",
+        "Ganz oben das rote Feld „Not-Aus“ aufklappen (NICHT auslösen) und „Sicherheitsprotokoll“ anklicken.",
+        "Weiter unten bei „Diese Seite ist die Probe-Zentrale“ die Testergebnisse ansehen."
+      ],
+      "erwartet": "Not-Aus-Feld mit Erklärung, Sicherheitsprotokoll leer oder mit Einträgen. Darunter „Keine Fehler in der Bibliothek selbst gemeldet“ oder eine Fehlertabelle mit Nummer und Fundort. Bei der Probe steht „Tests der Tester: … von … bestanden“, fehlgeschlagene Tests mit Begründung."
+    },
+    {
+      "id": "seb-not-aus",
+      "bereich": "Nur Seb (Admin) – als Allerletztes",
+      "titel": "Not-Aus auf dem Testserver",
+      "hinweis": "Danach ist der Testserver für alle aus, bis du ihn wieder einschaltest. Erst testen, wenn alle anderen fertig sind.",
+      "schritte": [
+        "Admin-Panel → Übersicht → „Not-Aus“ aufklappen → „Not-Aus auslösen …“, Grund „Test“, dann NOT-AUS eintippen.",
+        "Lade die Bibliothek neu.",
+        "Am Mac im Terminal: cd ~/Repos/spielebibliothek && scripts/deploy.sh --notaus-aus --probe (mit „ja“ bestätigen).",
+        "Bibliothek neu laden, Admin-Panel → Not-Aus → „Sicherheitsprotokoll“."
+      ],
+      "erwartet": "Nach dem Auslösen: „Not-Aus ist AN“, danach lädt die Bibliothek keine Daten mehr. Nach --notaus-aus geht alles wieder. Im Sicherheitsprotokoll stehen „notaus-ein“ (von dir, Grund Test) und „notaus-aus“ (von mac). Diesen Test trägst du am Ende hier ein."
+    }
+  ]
+}

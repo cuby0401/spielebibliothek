@@ -98,7 +98,16 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await gehe(G + "/admin/", 3500);
   ok(await eval_(`document.body.textContent.includes("Fehler in der Bibliothek") && document.body.textContent.includes("TypeError: E2E-Test")`), "Admin-Übersicht zeigt den Fehler oben");
 
+  // 8b) Tester-Panel (1.4.0, E76): Plan aus tests/manuell, Ergebnis eintragen, Zusammenfassung
+  await gehe(G + "/tester/", 3500);
+  ok(await bis(`document.querySelectorAll(".test").length>=10`), "Tester-Panel zeigt den Testplan");
+  await eval_(`document.querySelector(".test .knopf.nein").click(); true`);
+  ok(await bis(`document.getElementById("meldung").textContent.includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");
+  await eval_(`document.querySelector(".test .knopf.ja").click(); true`);
+  ok(await bis(`document.querySelector(".test-zusammenfassung .ok").textContent.startsWith("✓ 1 ")`), "„Hat geklappt“ zählt als bestanden");
+
   // 9) Not-Aus (1.4.0) – als Letztes, danach antwortet der Teststand absichtlich nicht mehr
+  await gehe(G + "/admin/", 3500);
   ok(await eval_(`!!document.querySelector("details.notaus summary")`), "Not-Aus-Feld in der Übersicht");
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
   const na = await eval_(`fetch("/api/admin/notaus",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({bestaetigung:"NOT-AUS",grund:"E2E"})}).then(r=>r.status)`);

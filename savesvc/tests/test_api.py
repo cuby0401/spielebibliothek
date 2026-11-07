@@ -38,7 +38,7 @@ def test_me_und_grossschreibung(client):
     me = client.get("/api/me", headers=client.als(exp_in=3600)).json()
     assert abs(me.pop("sitzungBis") - (time.time() + 3600)) < 60   # Ende der Cloudflare-Sitzung aus dem JWT
     assert me.pop("probe") is False
-    assert me == {"player": "seb", "uploader": True, "admin": True, "ansicht": None, "echterAdmin": True}
+    assert me == {"player": "seb", "uploader": True, "admin": True, "ansicht": None, "echterAdmin": True, "tester": False}
     assert client.get("/api/me", headers=client.als("PAUL@example.COM")).json()["player"] == "paul"
 
 
@@ -50,7 +50,7 @@ def test_users_yaml_wird_neu_gelesen(client, umgebung):
     # nur spielen: kein eigener Spielordner → kein Upload-Link
     me = client.get("/api/me", headers=client.als("neu@example.com")).json()
     me.pop("sitzungBis"); me.pop("probe")
-    assert me == {"player": "neu", "uploader": False, "admin": False, "ansicht": None, "echterAdmin": False}
+    assert me == {"player": "neu", "uploader": False, "admin": False, "ansicht": None, "echterAdmin": False, "tester": False}
 
 
 def test_ohne_login_kein_404_leck(client):

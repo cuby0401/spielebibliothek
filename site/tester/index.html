@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tester-Panel – Spielebibliothek</title>
+  <link rel="stylesheet" href="/style.css?v=__VERSION__">
+  <link rel="stylesheet" href="/tester/tester.css?v=__VERSION__">
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="/tester/">Spielebibliothek · Tester-Panel</a>
+    <nav><a class="knopf leise" href="/" target="_blank" rel="noopener">Testserver öffnen ↗</a></nav>
+  </header>
+  <p id="abgelaufen" class="abgelaufen" hidden>Deine Anmeldung ist abgelaufen. <a href="">Seite neu laden</a></p>
+  <main class="tester">
+    <p id="meldung" class="meldung" hidden></p>
+    <section id="inhalt"><p class="leise">Lade Testplan …</p></section>
+  </main>
+  <script src="/lib/bridge.js?v=__VERSION__"></script>
+  <script src="/konto.js?v=__VERSION__"></script>
+  <script src="/tester/tester.js?v=__VERSION__"></script>
+</body>
+</html>
