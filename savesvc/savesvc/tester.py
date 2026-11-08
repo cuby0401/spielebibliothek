@@ -10,7 +10,10 @@
 Testplan-Format:
   {"version": "1.4.0", "hinweis": "…",
    "tests": [{"id": "konto-leiste", "bereich": "Konto", "titel": "…", "schritte": ["…", "…"], "erwartet": "…",
-              "neuAb": "2026-11-08T12:00:00+00:00"}]}
+              "neuAb": "2026-11-08T12:00:00+00:00", "nurAdmin": false}]}
+
+„nurAdmin“: Tests, die nur ein Admin machen kann (CRM, Not-Aus, Freigabe). Andere Tester sehen sie gar nicht und können
+dafür nichts eintragen. Der Admin bekommt sie ganz oben (Seb, 08.11.2026: er ist der einzige Admin).
 
 Ergebnisse gelten für die ganze Version, auch über neue Commits hinweg – sonst müsste nach jeder kleinen Korrektur
 alles neu getestet werden. Ändert sich etwas an einem Test-Bereich, bekommt der Test „neuAb“ (Zeitpunkt, 1.4.0
@@ -26,7 +29,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
+
+from . import rollen
 
 ID_MUSTER = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")
 VERSION_MUSTER = re.compile(r"^\d+\.\d+\.\d+$")
@@ -54,7 +59,7 @@ def plan_laden(ordner: Path, version: str) -> dict | None:
         tests.append({"id": t["id"], "bereich": str(t.get("bereich", ""))[:60], "titel": str(t.get("titel", ""))[:200],
                       "schritte": [str(s)[:500] for s in t.get("schritte", []) if isinstance(s, str)][:30],
                       "erwartet": str(t.get("erwartet", ""))[:800], "hinweis": str(t.get("hinweis", ""))[:500],
-                      "neuAb": _zeitpunkt(t.get("neuAb"))})
+                      "neuAb": _zeitpunkt(t.get("neuAb")), "nurAdmin": t.get("nurAdmin") is True})
     return {"version": datei.stem, "hinweis": str(roh.get("hinweis", ""))[:1000], "tests": tests}
 
 
@@ -118,6 +123,13 @@ class Ergebnisse:
                  "commit": z["commit_"]} for z in zeilen]
 
 
+def fuer(plan: dict, admin: bool) -> dict:
+    """Sicht eines Testers: ohne Admin-Tests; für den Admin stehen sie oben (Reihenfolge sonst wie im Plan)."""
+    if admin:
+        return {**plan, "tests": sorted(plan["tests"], key=lambda t: not t["nurAdmin"])}
+    return {**plan, "tests": [t for t in plan["tests"] if not t["nurAdmin"]]}
+
+
 def zusammenfassung(plan: dict, ergebnisse: list[dict]) -> dict:
     """Je Test: bestanden (mind. ein OK, kein offenes Nein), fehlgeschlagen (neuestes Ergebnis eines Testers ist Nein), offen."""
     je_test: dict[str, list[dict]] = {}
@@ -149,14 +161,17 @@ def einrichten(app: FastAPI, e, spieler) -> None:
         return p
 
     @app.get("/api/tester/plan")
-    def plan(player: str = Depends(spieler)):
-        p = plan_oder_404()
-        liste = gueltige(p, erg.liste(p["version"]))
-        return {**p, "commit": commit, "ich": player, "ergebnisse": liste, "zusammenfassung": zusammenfassung(p, liste)}
+    def plan(request: Request, player: str = Depends(spieler)):
+        admin = rollen.rolle(e, request, player)["admin"]
+        p = fuer(plan_oder_404(), admin)
+        sichtbar = {t["id"] for t in p["tests"]}
+        liste = [x for x in gueltige(p, erg.liste(p["version"])) if x["test"] in sichtbar]
+        return {**p, "commit": commit, "ich": player, "admin": admin, "ergebnisse": liste,
+                "zusammenfassung": zusammenfassung(p, liste)}
 
     @app.post("/api/tester/ergebnis", status_code=204)
-    def ergebnis(player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
-        p = plan_oder_404()
+    def ergebnis(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
+        p = fuer(plan_oder_404(), rollen.rolle(e, request, player)["admin"])
         test = body.get("test")
         if test not in {t["id"] for t in p["tests"]}:
             raise HTTPException(404, "Diesen Test gibt es nicht")

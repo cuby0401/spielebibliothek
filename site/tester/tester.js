@@ -59,7 +59,15 @@ async function laden() {
 		d.hinweis ? h("p", { class: "hinweis-box", text: d.hinweis }) : null,
 		zusammenfassungZeigen(d.zusammenfassung),
 		h("p", { class: "leise", text: "Öffne den Testserver in einem zweiten Tab („Testserver öffnen ↗“ oben rechts), geh die Schritte durch und trag hier ein, ob es geklappt hat. Du kannst einen Test jederzeit erneut eintragen – es zählt dein neuester Eintrag." }),
-		...d.tests.map((t) => testKarte(t, d)));
+		...gruppen(d));
+}
+
+// Admin-Tests (nur der Admin sieht sie, Seb ist der einzige) oben unter eigener Überschrift, darunter die für alle Tester.
+function gruppen(d) {
+	const admin = d.tests.filter((t) => t.nurAdmin), alle = d.tests.filter((t) => !t.nurAdmin);
+	if (!admin.length) return alle.map((t) => testKarte(t, d));
+	return [h("h2", { class: "test-gruppe", text: `Nur für dich als Admin (${admin.length})` }), ...admin.map((t) => testKarte(t, d)),
+		h("h2", { class: "test-gruppe", text: `Für alle Tester (${alle.length})` }), ...alle.map((t) => testKarte(t, d))];
 }
 
 laden();

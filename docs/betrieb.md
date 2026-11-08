@@ -118,6 +118,7 @@ Die Probe-Zentrale ist zugleich der Testserver für die Tester:
 - **Testplan:** `tests/manuell/<Version>.json` im Repo (Format in `savesvc/savesvc/tester.py`). Kommt mit `scripts/deploy.sh --probe` mit.
   Ergebnisse gelten für die ganze Version, auch nach neuen Commits. Muss ein Test nach einer Korrektur neu geprüft werden,
   bekommt er `"neuAb": "<ISO-Zeit>"` – ältere Ergebnisse zählen dann nicht mehr, im Panel steht „Bitte neu testen“.
+  Tests, die nur ein Admin machen kann, bekommen `"nurAdmin": true`: Andere Tester sehen sie nicht, der Admin ganz oben.
 - **Tester-Rolle bei der Übernahme ins CRM:** `TESTER` in `compose.yaml` (danach zählt nur das CRM).
 - **Ergebnisse:** `/volume1/docker/spielebibliothek-tests/ergebnisse.db` (überlebt Neubauten), im Admin-Panel der Probe bei der Freigabe.
 - **Tester benachrichtigen:** `deploy.sh --probe` schickt allen mit der CRM-Rolle „Tester“ eine Glocke (ab 1.4.0 live).

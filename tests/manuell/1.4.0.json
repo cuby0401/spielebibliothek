@@ -132,6 +132,16 @@
       "erwartet": "Ohne Text kommt die Meldung, dass du kurz beschreiben sollst, was passiert ist. Nichts wird eingetragen. Nach „Hat geklappt“ steht der Test auf „✓ bestanden“ mit deinem Namen und der Uhrzeit, und oben zählt die Zusammenfassung mit."
     },
     {
+      "id": "tester-admin-tests",
+      "bereich": "Tester-Panel",
+      "titel": "Admin-Tests nur für den Admin, ganz oben",
+      "schritte": [
+        "Öffne das Tester-Panel.",
+        "Schau, welche Überschriften und Tests ganz oben stehen."
+      ],
+      "erwartet": "Als Seb: Ganz oben steht „Nur für dich als Admin (17)“ mit allen CRM-, Upload- und Not-Aus-Tests, darunter „Für alle Tester“. Als Emil: Es gibt keine „Nur Seb“-Tests und keine Admin-Überschrift, die Zusammenfassung oben zählt nur deine Tests (16 insgesamt)."
+    },
+    {
       "id": "spielen-alle-spiele",
       "bereich": "Spielen",
       "titel": "Jedes Spiel startet",
@@ -173,7 +183,8 @@
       ],
       "erwartet": "Alle Personen sind da. Du bist Admin. Paul und Emil sind Entwickler (ebenso jeder, der schon einen eigenen Spieleordner hat), Emil zusätzlich Tester. Alle anderen sind Spieler. Wer sich schon angemeldet hat, ist „aktiv“.",
       "neuAb": "2026-11-08T09:45:00+00:00",
-      "hinweis": "Nachtest: Am 08.11. fehlte bei Emil die Rolle Tester. Der Testserver wird dafür frisch aus den Live-Daten aufgebaut, Emil bekommt die Rolle dabei automatisch."
+      "hinweis": "Nachtest: Am 08.11. fehlte bei Emil die Rolle Tester. Der Testserver wird dafür frisch aus den Live-Daten aufgebaut, Emil bekommt die Rolle dabei automatisch.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-liste-filter",
@@ -185,7 +196,8 @@
         "Feld leeren, dann bei „Rolle“ „Entwickler“ wählen.",
         "Rolle zurück auf „alle Rollen“, bei „Status“ nacheinander „aktiv“ und „archiviert“ wählen."
       ],
-      "erwartet": "Die Suche findet nach Name, Anzeigename und E-Mail. Der Rollen-Filter zeigt nur Entwickler. Ohne Status-Filter fehlen archivierte und gelöschte Personen, bei „archiviert“ erscheinen genau die. Die Zahl in der Überschrift zählt nur die nicht archivierten."
+      "erwartet": "Die Suche findet nach Name, Anzeigename und E-Mail. Der Rollen-Filter zeigt nur Entwickler. Ohne Status-Filter fehlen archivierte und gelöschte Personen, bei „archiviert“ erscheinen genau die. Die Zahl in der Überschrift zählt nur die nicht archivierten.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-einladen",
@@ -196,7 +208,8 @@
         "Auf der Seite der Person ganz nach unten scrollen und „Einladung senden“ klicken."
       ],
       "erwartet": "Nach dem Einladen öffnet sich die Seite von testperson3 mit Status „eingeladen“ und der E-Mail. Oben im Fenster steht der nächste Schritt (Cloudflare-Abgleich). „Einladung senden“ zeigt oben im Fenster gut sichtbar „E-Mail-Versand ist nicht eingerichtet … – Einladung bitte selbst schicken“ (oder fragt nach, ob die E-Mail in Cloudflare steht). Erfolgsmeldungen verschwinden nach ein paar Sekunden, Fehler bleiben, bis du sie anklickst.",
-      "hinweis": "Die Tests „seb-crm-…“ bauen aufeinander auf: der Reihe nach mit testperson3 machen."
+      "hinweis": "Die Tests „seb-crm-…“ bauen aufeinander auf: der Reihe nach mit testperson3 machen.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-stammdaten-emails",
@@ -207,7 +220,8 @@
         "Bei „Login-E-Mails“ test+4@example.com hinzufügen.",
         "Die erste E-Mail entfernen, dann versuchen, auch die letzte verbleibende zu entfernen."
       ],
-      "erwartet": "Stammdaten werden gespeichert und stehen nach dem Neuladen noch da. Die zweite E-Mail erscheint in der Liste. Entfernen fragt nach und klappt. Bei der letzten E-Mail gibt es keinen „Entfernen“-Knopf (oder eine verständliche Ablehnung)."
+      "erwartet": "Stammdaten werden gespeichert und stehen nach dem Neuladen noch da. Die zweite E-Mail erscheint in der Liste. Entfernen fragt nach und klappt. Bei der letzten E-Mail gibt es keinen „Entfernen“-Knopf (oder eine verständliche Ablehnung).",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-rolle-entwickler",
@@ -219,7 +233,8 @@
         "Haken noch einmal setzen → „Rollen speichern“."
       ],
       "erwartet": "Beim Geben erscheint oben eine Karte mit dem Upload-Passwort und die Meldung „+Entwickler“. Nach dem Wegnehmen „−Entwickler“, und der Haken ist auch nach dem Neuladen weg. Erneut geben klappt und zeigt wieder ein Passwort.",
-      "hinweis": "Nachtest von 08.11.: Der Haken blieb vorher nach dem Wegnehmen stehen."
+      "hinweis": "Nachtest von 08.11.: Der Haken blieb vorher nach dem Wegnehmen stehen.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-rolle-tester",
@@ -229,7 +244,8 @@
         "Bei testperson3 den Haken „Tester“ setzen → „Rollen speichern“.",
         "Zurück zur Liste „Personen“, Rollen-Filter „Tester“."
       ],
-      "erwartet": "Meldung „+Tester“. In der Liste steht testperson3 mit Tester, im Filter „Tester“ erscheinen genau Emil und testperson3."
+      "erwartet": "Meldung „+Tester“. In der Liste steht testperson3 mit Tester, im Filter „Tester“ erscheinen genau Emil und testperson3.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-notiz",
@@ -239,7 +255,8 @@
         "Bei testperson3 eine Notiz schreiben → „Notiz speichern“.",
         "Seite neu laden."
       ],
-      "erwartet": "Die Notiz steht mit Datum und deinem Namen auf der Seite. Die Person selbst sieht sie nie (nur Admins)."
+      "erwartet": "Die Notiz steht mit Datum und deinem Namen auf der Seite. Die Person selbst sieht sie nie (nur Admins).",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-verwarnen",
@@ -250,7 +267,8 @@
         "Danach „Verwarnung aufheben“.",
         "Verwarnen ohne Grund versuchen."
       ],
-      "erwartet": "Nach dem Verwarnen steht oben „verwarnt“, in der Zeitleiste die Verwarnung mit Grund. „Verwarnung aufheben“ setzt zurück auf „eingeladen“ (testperson3 hat sich nie angemeldet; wer sich schon angemeldet hat, wird „aktiv“). Ohne Grund kommt „Erst einen Grund eintragen.“"
+      "erwartet": "Nach dem Verwarnen steht oben „verwarnt“, in der Zeitleiste die Verwarnung mit Grund. „Verwarnung aufheben“ setzt zurück auf „eingeladen“ (testperson3 hat sich nie angemeldet; wer sich schon angemeldet hat, wird „aktiv“). Ohne Grund kommt „Erst einen Grund eintragen.“",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-sperren",
@@ -260,7 +278,8 @@
         "Bei testperson3 Grund eintragen, bei „bis“ ein Datum in einigen Tagen wählen → „Sperren“ (Rückfrage bestätigen).",
         "Zurück zur Liste schauen, dann wieder zur Person → „Entsperren“."
       ],
-      "erwartet": "Nach dem Sperren steht „gesperrt“ mit Grund und Ablaufdatum auf der Seite, in der Liste ist der Status rot. Nach „Entsperren“ steht wieder „eingeladen“ (nicht „aktiv“, sie hat sich nie angemeldet), die Zeitleiste zeigt Sperre und Entsperren."
+      "erwartet": "Nach dem Sperren steht „gesperrt“ mit Grund und Ablaufdatum auf der Seite, in der Liste ist der Status rot. Nach „Entsperren“ steht wieder „eingeladen“ (nicht „aktiv“, sie hat sich nie angemeldet), die Zeitleiste zeigt Sperre und Entsperren.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-archivieren",
@@ -272,7 +291,8 @@
         "„Wiederherstellen“ klicken."
       ],
       "erwartet": "Nach dem Archivieren steht „archiviert“. Die Person fehlt in der normalen Liste, im Filter „archiviert“ ist sie da. E-Mails, Notiz, Rollen und Zeitleiste sind alle noch da. „Wiederherstellen“ setzt sie zurück auf „eingeladen“ (sie hat sich nie angemeldet). Weil sie Entwickler ist, erscheint ein neues Upload-Passwort.",
-      "hinweis": "Neu seit 08.11.: Archivieren ist jetzt rückgängig zu machen und löscht nichts mehr."
+      "hinweis": "Neu seit 08.11.: Archivieren ist jetzt rückgängig zu machen und löscht nichts mehr.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-loeschen",
@@ -284,7 +304,8 @@
         "Seite und Prüfprotokoll ansehen."
       ],
       "erwartet": "Löschen geht nur bei archivierten Personen. Ein falscher Name wird abgelehnt. Danach steht „gelöscht“, es gibt kein „Wiederherstellen“ mehr. Name, Geburtstag, E-Mails, Notizen und Rollen sind weg. Auch in Zeitleiste und Prüfprotokoll stehen keine E-Mail-Adressen oder Gründe mehr, nur wer wann was gemacht hat.",
-      "hinweis": "Neu seit 08.11.: endgültiges Löschen als eigener zweiter Schritt."
+      "hinweis": "Neu seit 08.11.: endgültiges Löschen als eigener zweiter Schritt.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-auskunft",
@@ -294,7 +315,8 @@
         "Öffne Paul (oder eine andere echte Person) → „Auskunft (Export)“.",
         "Öffne die heruntergeladene Datei."
       ],
-      "erwartet": "Eine JSON-Datei „auskunft-paul.json“ wird heruntergeladen. Darin stehen Stammdaten, E-Mails, Rollen, Zeitleiste, Anmeldungen, Anfragen und Spielstände (ohne deren Inhalt). Im Prüfprotokoll steht der Export mit deinem Namen."
+      "erwartet": "Eine JSON-Datei „auskunft-paul.json“ wird heruntergeladen. Darin stehen Stammdaten, E-Mails, Rollen, Zeitleiste, Anmeldungen, Anfragen und Spielstände (ohne deren Inhalt). Im Prüfprotokoll steht der Export mit deinem Namen.",
+      "nurAdmin": true
     },
     {
       "id": "seb-crm-pruefprotokoll",
@@ -303,7 +325,8 @@
       "schritte": [
         "Personen → „Prüfprotokoll aller Änderungen →“."
       ],
-      "erwartet": "Jeder Schritt der Tests oben steht drin: einladen, stammdaten, E-Mails, rollen, notiz, verwarnen, sperren, entsperren, archivieren, wiederherstellen, loeschen, export. Jeweils mit Zeit, wer, was und vorher/nachher (bei gelöschten Personen ohne Inhalte)."
+      "erwartet": "Jeder Schritt der Tests oben steht drin: einladen, stammdaten, E-Mails, rollen, notiz, verwarnen, sperren, entsperren, archivieren, wiederherstellen, loeschen, export. Jeweils mit Zeit, wer, was und vorher/nachher (bei gelöschten Personen ohne Inhalte).",
+      "nurAdmin": true
     },
     {
       "id": "seb-upload",
@@ -313,7 +336,8 @@
         "test-upload.cuby0401.uk öffnen und mit deinem normalen Upload-Passwort anmelden.",
         "Bei einem deiner Spiele „Update hochladen“ mit einem kleinen ZIP, dann „Testen“."
       ],
-      "erwartet": "Anmeldung und Upload klappen, „Testen“ öffnet den Entwurf, „← Zurück zum Hochladen“ führt zurück."
+      "erwartet": "Anmeldung und Upload klappen, „Testen“ öffnet den Entwurf, „← Zurück zum Hochladen“ führt zurück.",
+      "nurAdmin": true
     },
     {
       "id": "seb-fehler-und-uebersicht",
@@ -324,7 +348,8 @@
         "Ganz oben das rote Feld „Not-Aus“ aufklappen (NICHT auslösen) und „Sicherheitsprotokoll“ anklicken.",
         "Weiter unten bei „Diese Seite ist die Probe-Zentrale“ die Testergebnisse ansehen."
       ],
-      "erwartet": "Not-Aus-Feld mit Erklärung, Sicherheitsprotokoll leer oder mit Einträgen. Darunter „Keine Fehler in der Bibliothek selbst gemeldet“ oder eine Fehlertabelle mit Nummer und Fundort. Bei der Probe steht „Tests der Tester: … von … bestanden“, fehlgeschlagene Tests mit Begründung."
+      "erwartet": "Not-Aus-Feld mit Erklärung, Sicherheitsprotokoll leer oder mit Einträgen. Darunter „Keine Fehler in der Bibliothek selbst gemeldet“ oder eine Fehlertabelle mit Nummer und Fundort. Bei der Probe steht „Tests der Tester: … von … bestanden“, fehlgeschlagene Tests mit Begründung.",
+      "nurAdmin": true
     },
     {
       "id": "seb-e2e-hintergrund",
@@ -333,7 +358,8 @@
       "schritte": [
         "Auf der ECHTEN Bibliothek (games.cuby0401.uk): Admin-Panel → Reiter „Aufgaben“."
       ],
-      "erwartet": "Ganz oben steht ein Auftrag „Ende-zu-Ende-Tests (Probe)“ von „mac“, ausgelöst durch den letzten Probe-Bau, mit Status ok und „… Prüfpunkte grün“. Wäre einer rot, hättest du eine rote Glocke bekommen."
+      "erwartet": "Ganz oben steht ein Auftrag „Ende-zu-Ende-Tests (Probe)“ von „mac“, ausgelöst durch den letzten Probe-Bau, mit Status ok und „… Prüfpunkte grün“. Wäre einer rot, hättest du eine rote Glocke bekommen.",
+      "nurAdmin": true
     },
     {
       "id": "seb-not-aus",
@@ -347,7 +373,8 @@
         "Bibliothek neu laden, Admin-Panel → Not-Aus → „Sicherheitsprotokoll“."
       ],
       "erwartet": "Nach dem Auslösen: „Not-Aus ist AN“. Danach zeigen Bibliothek, Hilfe und Handbuch nur noch eine schlichte Seite „Not-Aus aktiv – Die Spielebibliothek ist vorübergehend abgeschaltet“. Nach --notaus-aus geht alles wieder. Im Sicherheitsprotokoll stehen „notaus-ein“ (von dir, Grund Test) und „notaus-aus“ (von mac). Diesen Test trägst du am Ende hier ein.",
-      "neuAb": "2026-11-08T09:45:00+00:00"
+      "neuAb": "2026-11-08T09:45:00+00:00",
+      "nurAdmin": true
     }
   ]
 }

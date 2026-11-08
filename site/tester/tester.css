@@ -17,3 +17,4 @@
 .test-knoepfe { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .knopf.ja { background: var(--akzent); color: var(--akzent-text); border-color: var(--akzent); }
 .knopf.nein { background: #b3261e; color: #fff; border-color: #b3261e; }
+.test-gruppe { margin: 1.6rem 0 0.6rem; font-size: 1.1rem; border-bottom: 1px solid var(--linie); padding-bottom: 0.3rem; }

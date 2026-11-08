@@ -12,6 +12,7 @@ from .conftest import AUD, TEAM, Schluessel
 PLAN = {"version": "1.4.0", "hinweis": "Bitte alles am Rechner testen.", "tests": [
     {"id": "konto-leiste", "bereich": "Konto", "titel": "Leiste", "schritte": ["Auf den Namen klicken"], "erwartet": "Profil öffnet sich"},
     {"id": "not-aus", "bereich": "Sicherheit", "titel": "Not-Aus", "schritte": ["…"], "erwartet": "503"},
+    {"id": "crm-sperren", "bereich": "Nur Seb", "titel": "Sperren", "schritte": ["…"], "erwartet": "gesperrt", "nurAdmin": True},
     {"id": "Ungültig!", "titel": "wird übersprungen"},
 ]}
 
@@ -68,3 +69,16 @@ def test_nachtest_neu_ab(tclient, tmp_path, monkeypatch):
     assert d["zusammenfassung"] == {"gesamt": 2, "bestanden": 1, "fehlgeschlagen": 0, "offen": 1}
     assert d["tests"][1]["neuAb"] == "2999-01-01T00:00:00+00:00" and d["tests"][0]["neuAb"] is None
     assert [x["test"] for x in d["ergebnisse"]] == ["konto-leiste"]
+
+
+def test_admin_tests_nur_fuer_admin(tclient):
+    """Admin-Tests sieht nur der Admin, und zwar ganz oben; andere Tester sehen und zählen sie nicht (08.11.2026)."""
+    seb, p = tclient.als(), tclient.als("paul@example.com")
+    d = tclient.get("/api/tester/plan", headers=seb).json()
+    assert [t["id"] for t in d["tests"]] == ["crm-sperren", "konto-leiste", "not-aus"] and d["admin"] is True
+    assert d["zusammenfassung"]["gesamt"] == 3
+    assert tclient.post("/api/tester/ergebnis", json={"test": "crm-sperren", "ok": True}, headers=seb).status_code == 204
+    d = tclient.get("/api/tester/plan", headers=p).json()
+    assert [t["id"] for t in d["tests"]] == ["konto-leiste", "not-aus"] and d["admin"] is False
+    assert d["ergebnisse"] == [] and d["zusammenfassung"]["gesamt"] == 2
+    assert tclient.post("/api/tester/ergebnis", json={"test": "crm-sperren", "ok": True}, headers=p).status_code == 404
