@@ -57,7 +57,9 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
 - Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`, 1.2.1 (Profil, Glocke archivieren, Symbole, Größen): `scripts/e2e-zentrale-1.3.mjs`, 1.3.0 (Beschreibung und Vorschaubild, „noch nie angemeldet“, Cloudflare-Hinweis): `scripts/e2e-zentrale-1.3-steckbrief.mjs`, 1.3.1 (Zurück zum Hochladen, Antragsseite, Bilder an Anträgen): `scripts/e2e-zentrale-1.3.1-antraege.mjs`. Einzelne Tests: `E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh`.
-- **Alle Ende-zu-Ende-Tests auf einmal:** `scripts/e2e-alle.sh` (frischer Teststand je Test, ca. 4–8 Min., räumt danach auf). Vor dem Deploy automatisch mit `scripts/deploy.sh --gruendlich`.
+- **Alle Ende-zu-Ende-Tests auf einmal:** `scripts/e2e-alle.sh` (frischer Teststand je Test, räumt danach auf). Vor dem Deploy automatisch mit `scripts/deploy.sh --gruendlich`.
+- **Seit 1.4.1 auf dem Mac (NAS entlasten):** Läuft Docker Desktop, steht der Teststand auf dem Mac (Ports nur an 127.0.0.1, Hostnamen `127.0.0.1` / `localhost` / `upload.localhost`), volle Runde ca. 2:35 Min. Sonst wie bisher auf der NAS. Erzwingen: `E2E_ORT=mac` bzw. `E2E_ORT=nas`. `deploy.sh --probe` startet die Runde im Hintergrund über `scripts/e2e-mac-hintergrund.sh` und meldet das Ergebnis unter „Aufgaben“. Log: `~/Library/Logs/spielebibliothek-e2e.log`.
+- **Warten in den Tests:** `gehe(url, ms)` wartet höchstens `ms`, bis die Seite geladen ist und das DOM 400 ms still steht. Wo echte Zeit vergehen muss (Spielzeit, verzögerte Erfolge), ausdrücklich `warte()` nehmen.
 
 ## Probe-Zentrale (E56) – erst testen, dann live
 
