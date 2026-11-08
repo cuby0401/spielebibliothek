@@ -26,7 +26,7 @@ const idPfad = (id) => id.split("/").map(encodeURIComponent).join("/");
 async function einstellungenSpeichern(aenderung) {
 	Object.assign(einstellungen, aenderung);
 	try { einstellungen = await Bridge.json("PUT", "/api/einstellungen", aenderung); }
-	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Einstellung nicht gespeichert: " + e.message); }
+	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Einstellung nicht gespeichert: " + e.message, "fehler"); }
 }
 
 const zahl = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 3 });
@@ -121,10 +121,19 @@ async function bestenlisteZeigen(spiel, season) {
 		: (d.season === d.currentSeason ? "Noch keine Einträge – sei die oder der Erste!" : "In dieser Season gab es keine Einträge.");
 }
 
-function meldung(text) {
-	el("meldung").textContent = text;
-	el("meldung").hidden = !text;
+// Meldungen als Pop-up oben im Fenster (1.4.0, Sebs Nachtest 08.11.2026): Vorher standen sie oben auf der Seite und fielen nicht auf.
+// Hinweise und Erfolge verschwinden nach 8 s, Fehler ("fehler") und Dauerhinweise ("bleibt") bleiben bis zum Klick.
+let meldungWeg;
+function meldung(text, art = "") {
+	const m = document.getElementById("meldung");
+	clearTimeout(meldungWeg);
+	m.textContent = text || "";
+	m.className = "meldung " + art;
+	m.hidden = !text;
+	m.title = text ? "Klicken zum Schließen" : "";
+	if (text && art !== "fehler" && art !== "bleibt") meldungWeg = setTimeout(() => { m.hidden = true; }, 8000);
 }
+document.addEventListener("click", (e) => { if (e.target.id === "meldung") e.target.hidden = true; });
 
 // Reihenfolge: Favoriten, dann empfohlene Spiele, dann nach gewählter Sortierung
 function sortiert(liste) {
@@ -169,7 +178,7 @@ async function daumenUmschalten(spiel) {
 		spiel.meinDaumen = d.an;
 		spiel.daumen = d.daumen;
 	} catch (e) {
-		if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Daumen nicht gespeichert: " + e.message);
+		if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung("Daumen nicht gespeichert: " + e.message, "fehler");
 	}
 }
 
@@ -445,7 +454,7 @@ async function zeigeSeite(name) {
 	const konto = KONTO_SEITEN.some((s) => s.name === name) && (name !== "profil" || eigenesProfil);
 	const ziel = konto ? kontoRahmen(name) : el("seite");
 	try { await seiten[name](ziel); }
-	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message); }
+	catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message, "fehler"); }
 	// Pfeil unauffällig links neben die Überschrift der Unterseite
 	const titel = ziel.querySelector("h1");
 	const kopf = document.createElement("div");
@@ -511,7 +520,7 @@ async function zeigeSpiel(id, entwurfSpiel, eigenerOrdner = null) {
 	} catch (e) {
 		if (!(e instanceof Bridge.SitzungAbgelaufen)) {
 			el("rahmen").replaceChildren();
-			meldung("Das Spiel konnte nicht gestartet werden: " + e.message);
+			meldung("Das Spiel konnte nicht gestartet werden: " + e.message, "fehler");
 			location.hash = "#/";
 		}
 	}
@@ -523,7 +532,7 @@ async function zeigeEntwurf(user, ordner) {
 		const d = await Bridge.json("POST", `/api/entwickler/entwurf/${encodeURIComponent(user)}/${encodeURIComponent(ordner)}`);
 		await zeigeSpiel(d.id, d, user === ich.player ? ordner : null);
 	} catch (e) {
-		if (!(e instanceof Bridge.SitzungAbgelaufen)) { meldung("Entwurf nicht verfügbar: " + e.message); location.hash = "#/"; }
+		if (!(e instanceof Bridge.SitzungAbgelaufen)) { meldung("Entwurf nicht verfügbar: " + e.message, "fehler"); location.hash = "#/"; }
 	}
 }
 
@@ -782,7 +791,7 @@ async function start() {
 
 	// Für Spieldateien und Vorschaubilder muss der Browser auch bei play.cuby0401.uk angemeldet sein
 	if (!(await Bridge.sicherstellenPlay())) {
-		meldung("Die Anmeldung für die Spiele (play.cuby0401.uk) hat nicht geklappt. Bitte Seite neu laden.");
+		meldung("Die Anmeldung für die Spiele (play.cuby0401.uk) hat nicht geklappt. Bitte Seite neu laden.", "fehler");
 		return;
 	}
 
@@ -806,7 +815,7 @@ async function start() {
 		if (!(e instanceof Bridge.SitzungAbgelaufen)) {
 			meldung(e.status === 403
 				? "Für deine E-Mail-Adresse gibt es noch kein Konto in der Spielebibliothek. Bitte bei Seb melden."
-				: "Die Spielliste konnte nicht geladen werden (" + e.message + ").");
+				: "Die Spielliste konnte nicht geladen werden (" + e.message + ").", "fehler");
 		}
 		return;
 	}
@@ -816,7 +825,7 @@ async function start() {
 		await einstellungenSpeichern({ sortierung: e.target.value });
 		kachelnZeigen();
 	});
-	if (!spiele.length) meldung("Noch keine Spiele.");
+	if (!spiele.length) meldung("Noch keine Spiele.", "bleibt");
 
 	window.addEventListener("hashchange", route);
 	route();

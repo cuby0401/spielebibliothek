@@ -25,5 +25,4 @@
 .notaus-an strong { color: #b3261e; font-size: 1.2rem; }
 
 /* Meldung klebt oben im Fenster (1.4.0, Nachtest 08.11.), Fehler rot umrandet */
-#meldung { position: sticky; top: 0.5rem; z-index: 30; cursor: pointer; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); }
 #meldung.fehler { border-color: var(--warn); }

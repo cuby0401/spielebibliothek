@@ -4,7 +4,19 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-function meldung(text) { $("meldung").textContent = text || ""; $("meldung").hidden = !text; }
+// Meldungen als Pop-up oben im Fenster (1.4.0, Sebs Nachtest 08.11.2026): Vorher standen sie oben auf der Seite und fielen nicht auf.
+// Hinweise und Erfolge verschwinden nach 8 s, Fehler ("fehler") und Dauerhinweise ("bleibt") bleiben bis zum Klick.
+let meldungWeg;
+function meldung(text, art = "") {
+	const m = document.getElementById("meldung");
+	clearTimeout(meldungWeg);
+	m.textContent = text || "";
+	m.className = "meldung " + art;
+	m.hidden = !text;
+	m.title = text ? "Klicken zum Schließen" : "";
+	if (text && art !== "fehler" && art !== "bleibt") meldungWeg = setTimeout(() => { m.hidden = true; }, 8000);
+}
+document.addEventListener("click", (e) => { if (e.target.id === "meldung") e.target.hidden = true; });
 
 function zusammenfassungZeigen(z) {
 	return h("div", { class: "test-zusammenfassung" },
@@ -25,7 +37,7 @@ function testKarte(t, d) {
 			await Bridge.json("POST", "/api/tester/ergebnis", { test: t.id, ok, text: text.value });
 			meldung(ok ? `„${t.titel}“: als bestanden eingetragen. Danke!` : `„${t.titel}“: als fehlgeschlagen eingetragen. Danke!`);
 			laden();
-		} catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message); }
+		} catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message, "fehler"); }
 	};
 	return h("article", { class: "karte test " + zustand, id: "test-" + t.id },
 		h("div", { class: "test-kopf" },

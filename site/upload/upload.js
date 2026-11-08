@@ -13,11 +13,18 @@ function groesse(b) {
 }
 const datum = (iso) => new Date(iso).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
 
+// Pop-up oben im Fenster (1.4.0, Sebs Nachtest 08.11.2026). Erfolge ("ok") verschwinden nach 8 s, alles andere bleibt bis zum Klick.
+let meldungWeg;
 function meldung(text, art = "") {
-	$("meldung").textContent = text;
-	$("meldung").className = "meldung " + art;
-	$("meldung").hidden = !text;
+	const m = $("meldung");
+	clearTimeout(meldungWeg);
+	m.textContent = text;
+	m.className = "meldung " + art;
+	m.hidden = !text;
+	m.title = text ? "Klicken zum Schließen" : "";
+	if (text && art === "ok") meldungWeg = setTimeout(() => { m.hidden = true; }, 8000);
 }
+document.addEventListener("click", (e) => { if (e.target.id === "meldung") e.target.hidden = true; });
 
 async function api(methode, pfad, body) {
 	const r = await fetch(API + pfad, {

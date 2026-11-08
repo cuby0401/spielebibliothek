@@ -339,7 +339,7 @@ async function personSeite(c, name) {
 	// Stammdaten
 	const f = {};
 	for (const k of ["anzeigename", "vorname", "nachname"]) f[k] = h("input", { value: p[k] || "", maxlength: k === "anzeigename" ? "40" : "60" });
-	f.geburtstag = h("input", { type: "date", value: p.geburtstag || "" });
+	f.geburtstag = h("input", { type: "date", value: p.geburtstag || "", min: "1900-01-01", max: new Date().toISOString().slice(0, 10) });
 	c.append(h("h3", { text: "Stammdaten" }), h("form", { class: "karte", onsubmit: (e) => { e.preventDefault();
 		tun(() => api("PATCH", pfad, { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value, geburtstag: f.geburtstag.value || null }), "Gespeichert."); } },
 		h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag)),

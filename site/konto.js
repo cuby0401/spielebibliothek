@@ -203,8 +203,8 @@ function bildAuswahl(max, einfuegenIn) {
 	};
 	const dazu = async (dateien) => {
 		for (const d of dateien) {
-			if (liste.length >= max) { meldung(`Höchstens ${max} Bilder.`); break; }
-			try { liste.push(await bildVorbereiten(d)); } catch (f) { meldung(f.message); }
+			if (liste.length >= max) { meldung(`Höchstens ${max} Bilder.`, "fehler"); break; }
+			try { liste.push(await bildVorbereiten(d)); } catch (f) { meldung(f.message, "fehler"); }
 		}
 		zeigen();
 	};
@@ -232,7 +232,7 @@ function antraegeProSpiel(c, antraege) {
 				await Bridge.json("PATCH", "/api/entwickler/antraege/" + a.id, { status, antwort: antwort.value || null });
 				meldung(`Anfrage von ${a.player}: ${status}.`);
 				c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
-			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message, "fehler"); }
 		};
 		const k = (text, fn, art = "leise") => h("button", { type: "button", class: "knopf klein " + art, text, onclick: fn });
 		return h("div", { class: "karte" },
@@ -272,7 +272,7 @@ SEITEN_REG["antraege"] = async (c) => {
 				? `Anfrage verschickt – er geht an ${r.an === ich.player ? "dich als Entwickler (unter „Meine Spiele“)" : r.an + ", den Entwickler des Spiels"}. Antwort und Status erscheinen hier.`
 				: "Anfrage verschickt – Seb bekommt ihn. Antwort und Status erscheinen hier.");
 			c.replaceChildren(); SEITEN_REG["antraege"](c);
-		} catch (f) { senden.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+		} catch (f) { senden.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message, "fehler"); }
 	} },
 		h("label", {}, "Art", art), h("label", {}, "Spiel", spiel), h("label", {}, "Beschreibung", text), auswahl.element,
 		h("div", {}, h("button", { type: "submit", class: "knopf", text: "Anfrage senden" })));
@@ -330,10 +330,10 @@ SEITEN_REG["antrag"] = async (c) => {
 		const auswahl = bildAuswahl(a.bilderMax - a.bilder.length);
 		c.append(auswahl.element, h("button", { type: "button", class: "knopf klein", text: "Bilder hochladen", onclick: async (e) => {
 			const bilder = auswahl.bilder();
-			if (!bilder.length) return meldung("Erst ein Bild auswählen.");
+			if (!bilder.length) return meldung("Erst ein Bild auswählen.", "fehler");
 			e.target.disabled = true;
 			try { for (const bild of bilder) await Bridge.json("POST", `/api/antraege/${a.id}/bilder`, { bild }); meldung("Bilder angefügt."); neu(); }
-			catch (f) { e.target.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+			catch (f) { e.target.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message, "fehler"); }
 		} }));
 	}
 	c.append(h("h2", { text: "Antwort" }));
@@ -347,7 +347,7 @@ SEITEN_REG["antrag"] = async (c) => {
 				await Bridge.json("PATCH", "/api/antraege/" + a.id, { status, antwort: antwort.value || null });
 				meldung(`Anfrage #${a.id}: ${status}.` + (a.player !== ich.player && status !== "offen" ? ` ${a.player} bekommt eine Nachricht.` : ""));
 				neu();
-			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message); }
+			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message, "fehler"); }
 		};
 		const k = (text, fn, art = "leise") => h("button", { type: "button", class: "knopf klein " + art, text, onclick: fn });
 		c.append(h("div", { class: "karte" }, antwort,
@@ -413,7 +413,7 @@ async function angabenAbschnitt(c) {
 	if (!k || k.simuliert) return c.append(h("p", { class: "leise", text: "In der Ansicht als Spieler/Entwickler gibt es keine eigenen Angaben." }));
 	const f = {};
 	for (const [feld, max] of [["anzeigename", 40], ["vorname", 60], ["nachname", 60]]) f[feld] = h("input", { value: k[feld] || "", maxlength: String(max) });
-	f.geburtstag = h("input", { type: "date", value: k.geburtstag || "" });
+	f.geburtstag = h("input", { type: "date", value: k.geburtstag || "", min: "1900-01-01", max: new Date().toISOString().slice(0, 10) });
 	const ds = h("input", { type: "checkbox", checked: !!k.datenschutz_bestaetigt, disabled: !!k.datenschutz_bestaetigt });
 	c.append(h("p", { class: "leise", text: "Alles freiwillig. Den Anzeigenamen sehen andere, Name und Geburtstag nur du und Seb." }),
 		h("form", { class: "karte", onsubmit: async (e) => {
@@ -422,7 +422,7 @@ async function angabenAbschnitt(c) {
 				await Bridge.json("PATCH", "/api/mein/konto", { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value,
 					geburtstag: f.geburtstag.value || null, datenschutz: ds.checked });
 				meldung("Gespeichert.");
-			} catch (x) { if (!(x instanceof Bridge.SitzungAbgelaufen)) meldung(x.message); }
+			} catch (x) { if (!(x instanceof Bridge.SitzungAbgelaufen)) meldung(x.message, "fehler"); }
 		} },
 			h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname),
 				h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag)),

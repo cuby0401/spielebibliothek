@@ -65,10 +65,14 @@
       "titel": "Geburtstag in der Zukunft wird abgelehnt",
       "schritte": [
         "Profil → „Meine Angaben“.",
-        "Trag als Geburtstag ein Datum in der Zukunft ein (z. B. 01.01.2030) und klicke „Speichern“.",
-        "Lösch das Datum wieder und speichere erneut."
+        "Öffne den Kalender beim Geburtstag und versuch, einen Tag nach heute zu wählen.",
+        "Tipp von Hand ein Datum in der Zukunft ein (z. B. 01.01.2030) und klicke „Speichern“.",
+        "Lade die Seite neu und schau, was beim Geburtstag steht.",
+        "Lösch das Datum und speichere erneut."
       ],
-      "erwartet": "Beim Datum in der Zukunft kommt eine verständliche Fehlermeldung, gespeichert wird nichts. Ohne Datum klappt das Speichern („Gespeichert.“)."
+      "erwartet": "Im Kalender lassen sich keine Tage nach heute auswählen. Tippst du ein Datum in der Zukunft von Hand ein, erscheint beim Speichern ein rotes Pop-up („Geburtstag liegt außerhalb des gültigen Bereichs“) und nach dem Neuladen steht der alte Geburtstag noch da. Ohne Datum kommt das Pop-up „Gespeichert.“",
+      "neuAb": "2026-11-08T16:50:27+00:00",
+      "hinweis": "Nachtest von 08.11.: Der Server hat das Datum schon vorher abgelehnt, die Fehlermeldung stand aber oben auf der Seite, außer Sicht. Es sah deshalb aus, als wäre gespeichert worden."
     },
     {
       "id": "spielstaende-seite",
@@ -129,7 +133,9 @@
         "Klick „✗ Hat nicht geklappt“, ohne etwas ins Textfeld zu schreiben.",
         "Klick danach „✓ Hat geklappt“."
       ],
-      "erwartet": "Ohne Text kommt die Meldung, dass du kurz beschreiben sollst, was passiert ist. Nichts wird eingetragen. Nach „Hat geklappt“ steht der Test auf „✓ bestanden“ mit deinem Namen und der Uhrzeit, und oben zählt die Zusammenfassung mit."
+      "erwartet": "Ohne Text erscheint ein rotes Pop-up oben im Fenster: kurz beschreiben, was passiert ist. Nichts wird eingetragen. Nach „Hat geklappt“ kommt ein Pop-up „… als bestanden eingetragen“, das nach 8 Sekunden verschwindet. Der Test steht auf „✓ bestanden“ mit deinem Namen und der Uhrzeit, und oben zählt die Zusammenfassung mit.",
+      "neuAb": "2026-11-08T16:50:27+00:00",
+      "hinweis": "Nachtest von 08.11.: Die Meldung stand oben auf der Seite und fiel nicht auf. Alle Meldungen erscheinen jetzt als Pop-up oben in der Mitte des Fensters, egal wo du gerade auf der Seite bist. Erfolge verschwinden nach 8 Sekunden, Fehler bleiben (rot), bis du sie anklickst."
     },
     {
       "id": "tester-admin-tests",
@@ -207,9 +213,10 @@
         "Personen → „Person einladen“ aufklappen: E-Mail test+3@example.com, Benutzername testperson3, Rolle nur Spieler → einladen.",
         "Auf der Seite der Person ganz nach unten scrollen und „Einladung senden“ klicken."
       ],
-      "erwartet": "Nach dem Einladen öffnet sich die Seite von testperson3 mit Status „eingeladen“ und der E-Mail. Oben im Fenster steht der nächste Schritt (Cloudflare-Abgleich). „Einladung senden“ zeigt oben im Fenster gut sichtbar „E-Mail-Versand ist nicht eingerichtet … – Einladung bitte selbst schicken“ (oder fragt nach, ob die E-Mail in Cloudflare steht). Erfolgsmeldungen verschwinden nach ein paar Sekunden, Fehler bleiben, bis du sie anklickst.",
-      "hinweis": "Die Tests „seb-crm-…“ bauen aufeinander auf: der Reihe nach mit testperson3 machen.",
-      "nurAdmin": true
+      "erwartet": "Nach dem Einladen öffnet sich die Seite von testperson3 mit Status „eingeladen“ und der E-Mail, dazu ein Pop-up mit dem nächsten Schritt (Cloudflare-Abgleich). „Einladung senden“ zeigt ein rotes Pop-up „E-Mail-Versand ist nicht eingerichtet … – Einladung bitte selbst schicken“. Das ist hier richtig so: Auf dem Testserver und bis du die Zugangsdaten für den E-Mail-Versand eingetragen hast, verschickt die Bibliothek keine Mails. Bestanden, wenn die Meldung gut sichtbar kommt.",
+      "hinweis": "Die Tests „seb-crm-…“ bauen aufeinander auf: der Reihe nach mit testperson3 machen. Nachtest von 08.11.: Die Meldung „Versand nicht eingerichtet“ war richtig, im Test stand aber nicht klar genug, dass sie erwartet wird.",
+      "nurAdmin": true,
+      "neuAb": "2026-11-08T16:50:27+00:00"
     },
     {
       "id": "seb-crm-stammdaten-emails",
