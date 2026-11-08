@@ -8,6 +8,14 @@ cd "$(dirname "$0")/.."
 NAS="${NAS:-$NAS}"
 LOG="$HOME/Library/Logs/spielebibliothek-e2e.log"
 START=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
+# Nie zwei Läufe gleichzeitig – sie teilen sich Teststand und Ports (1.4.1)
+SPERRE=/tmp/sb-e2e-mac.sperre
+if ! mkdir "$SPERRE" 2>/dev/null; then
+	if kill -0 "$(cat "$SPERRE/pid" 2>/dev/null)" 2>/dev/null; then echo "Es läuft schon eine Runde – übersprungen." >&2; exit 0; fi
+	rm -rf "$SPERRE"; mkdir "$SPERRE"
+fi
+echo $$ > "$SPERRE/pid"
+trap 'rm -rf "$SPERRE"' EXIT
 melden() {   # status, zusammenfassung, [id] → gibt die Auftragsnummer aus
 	python3 -I -c 'import json, sys; s, z, i, start, log = sys.argv[1:6]
 print(json.dumps({"art": "e2e-tests", "ziel": "probe", "status": s, "zusammenfassung": z, "start": start,
