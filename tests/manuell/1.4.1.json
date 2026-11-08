@@ -78,7 +78,7 @@
         "Unter den Stammdaten die Zeile „Angelegt … · erste Anmeldung …“ anschauen.",
         "Dasselbe bei Emil."
       ],
-      "erwartet": "„Angelegt“ ist nicht mehr der 08.11.2026 (Umstellung auf das CRM), sondern der Tag der ersten Aktivität, bei Paul und Emil also etwa der 05.11.2026. „Erste Anmeldung“ ist die früheste bekannte Anmeldung. Personen, die nach der Umstellung eingeladen wurden, behalten ihr Datum.",
+      "erwartet": "„Angelegt“ ist nicht mehr der 08.11.2026 (Umstellung auf das CRM), sondern der Tag der ersten Aktivität, bei Paul und Emil der 06.11.2026, bei dir der 05.11.2026 (früher reichen die Aufzeichnungen nicht zurück). „Erste Anmeldung“ ist die früheste bekannte Anmeldung. Personen, die nach der Umstellung eingeladen wurden, behalten ihr Datum.",
       "nurAdmin": true
     },
     {
