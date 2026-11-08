@@ -25,6 +25,13 @@ Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 - **Neu:** Fehler der Bibliothek selbst werden gemeldet, nicht mehr nur Fehler in Spielen. Der Spieler sieht „Da ist leider etwas schiefgelaufen … nenne die Fehler-Nr. …“, Admins bekommen eine rote Glocke. Die Fehler stehen ganz oben in der Admin-Übersicht, mit Datei, Zeile, Seite, Version und Stacktrace (`lib/bridge.js`, `POST /api/fehler-zentrale`).
 - **Neu:** Passt eine Seite im Browser nicht zur Version, die live läuft, holt sie sich einmal frisch und lädt neu, höchstens einmal je Live-Stand. Das fängt auch andere Cache-Probleme ab als das vom 07.11.
 - **Behoben:** In der Probe erschienen unter „Anmeldungen“ mehrere Geräte mit derselben IP, obwohl es keine Anmeldung gab. Die Probe hat keine Cloudflare-Anmeldung, gespeichert wurde die interne Docker-Adresse. Solche Einträge heißen jetzt „Probe/Teststand – keine echte Anmeldung“ und zeigen keine IP.
+- **Nachbesserung nach dem Test auf dem Testserver (08.11.2026):**
+  - **Behoben:** Handy: Kopfzeile und Initialen-Kreis ragten über den rechten Rand, die ganze Seite wurde dadurch breiter und verkleinert. Die Knöpfe rutschen jetzt bei Bedarf in eine zweite Zeile, lange IP-Adressen brechen um.
+  - **Behoben:** Wurde die Rolle Entwickler entzogen, blieb der Haken stehen und ließ sich nicht neu vergeben. Grund: Der Spieleordner (die Spiele bleiben) zählte weiter als Entwickler. Mit CRM zählt jetzt nur noch die Rolle. Wer beim Umstieg schon einen Ordner hat, bekommt sie bei der Übernahme.
+  - **Behoben:** Meldungen im Admin-Panel (z. B. „E-Mail-Versand ist nicht eingerichtet“ bei „Einladung senden“) kamen oben außer Sicht an. Sie kleben jetzt oben im Fenster, Erfolge verschwinden nach 8 s.
+  - **Geändert:** Not-Aus: Auch Hilfe, Handbuch, Startseite und Spieldateien sind sofort weg. Caddy liefert nur noch eine Seite „Not-Aus aktiv“ (Caddy darf dafür `config/` durchqueren, aber nichts lesen).
+  - **Neu:** `TESTER` (compose): Wer bei der Übernahme ins CRM die Rolle Tester bekommt (Emil).
+  - **Neu:** Tester-Panel: Ergebnisse gelten für die ganze Version, auch über neue Commits hinweg. Geänderte Tests bekommen im Testplan `neuAb` und stehen danach wieder auf offen, mit dem Hinweis „Bitte neu testen“.
 - **Tests:** `tests/test_crm.py` (Übernahme mit gleichen Rechten, Sichtbarkeit der Admin-Felder, Sperre mit Ablauf, Protokoll, Mail ohne Zugangsdaten in Fehlern), `test_fehler_der_bibliothek`, `test_notaus*`, `test_auftragsdienst_notaus.py`, `test_tester.py`, Ende-zu-Ende `scripts/e2e-zentrale-1.4-crm.mjs`.
 
 ## 1.3.1 – 06.11.2026

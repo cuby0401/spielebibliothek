@@ -90,6 +90,8 @@ Bei Verdacht auf ein Datenleck oder einen Angriff. Wirkt nur auf die Spielebibli
 
 **Was passiert:**
 1. Sofort: `config/notaus.json` wird angelegt. Speicher-Dienst und Upload-Dienst antworten auf **jede** Anfrage mit 503 – keine Daten mehr.
+   Caddy liefert ab dann auf allen Adressen nur noch die Seite „Not-Aus aktiv“ (503) – auch Hilfe, Handbuch und Spieldateien.
+   Dafür darf Caddy (UID 10020) `config/` durchqueren (ACL `u:10020:x`), lesen kann er dort nichts.
 2. Innerhalb einer Minute: Der Auftragsdienst stoppt den Tunnel (`spielebibliothek-cloudflared`). Die Seite ist von außen weg.
    Er prüft das jede Minute als Erstes, auch während lange Tests laufen.
 3. Solange die Datei da ist, spielen Auftragsdienst, `nas-deploy.sh` und `deploy.sh --zurueck` nichts ein (das würde den Tunnel wieder starten).
@@ -114,6 +116,9 @@ Die Probe-Zentrale ist zugleich der Testserver für die Tester:
 - **Anmeldung:** echt, per E-Mail-Code – kein `DEV_USER` mehr. Die Ports hängen nur an der LAN-Adresse der NAS.
   **Nie Tunnel-Routen auf einen Dienst mit `DEV_USER` anlegen** (07.11.2026 war die Probe so für wenige Minuten offen).
 - **Testplan:** `tests/manuell/<Version>.json` im Repo (Format in `savesvc/savesvc/tester.py`). Kommt mit `scripts/deploy.sh --probe` mit.
+  Ergebnisse gelten für die ganze Version, auch nach neuen Commits. Muss ein Test nach einer Korrektur neu geprüft werden,
+  bekommt er `"neuAb": "<ISO-Zeit>"` – ältere Ergebnisse zählen dann nicht mehr, im Panel steht „Bitte neu testen“.
+- **Tester-Rolle bei der Übernahme ins CRM:** `TESTER` in `compose.yaml` (danach zählt nur das CRM).
 - **Ergebnisse:** `/volume1/docker/spielebibliothek-tests/ergebnisse.db` (überlebt Neubauten), im Admin-Panel der Probe bei der Freigabe.
 - **Tester benachrichtigen:** `deploy.sh --probe` schickt allen mit der CRM-Rolle „Tester“ eine Glocke (ab 1.4.0 live).
 - **Neuen Tester aufnehmen:** E-Mail in die Richtlinie „Tester“ der Access-Anwendung, Rolle „Tester“ im CRM (für Link und Glocke).

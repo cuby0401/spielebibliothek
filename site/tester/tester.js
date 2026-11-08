@@ -32,6 +32,7 @@ function testKarte(t, d) {
 			h("h2", { text: t.titel }),
 			h("span", { class: "test-status", text: zustand === "fehler" ? "✗ fehlgeschlagen" : zustand === "ok" ? "✓ bestanden" : "offen" })),
 		t.bereich ? h("div", { class: "leise", text: t.bereich }) : null,
+		t.neuAb ? h("p", { class: "hinweis-box", text: `Bitte neu testen – geändert am ${datumZeit(t.neuAb)}. Ältere Ergebnisse zählen nicht mehr.` }) : null,
 		t.hinweis ? h("p", { class: "leise", text: t.hinweis }) : null,
 		h("strong", { text: "So testest du:" }),
 		h("ol", {}, t.schritte.map((s) => h("li", { text: s }))),

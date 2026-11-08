@@ -65,7 +65,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     # CRM (Zentrale 1.4.0): Personen in der Datenbank, users.yaml nur noch als Export (crm.py)
     from . import crm as crm_modul
     crm = crm_modul.Crm(db, e.admins)
-    crm_modul.uebernehmen(crm, e.users_file, e.db_path.parent / "backup", e.admins, e.spiele_dir)
+    crm_modul.uebernehmen(crm, e.users_file, e.db_path.parent / "backup", e.admins, e.spiele_dir, e.tester)
     benutzerliste = crm_modul.CrmBenutzerliste(e.users_file, crm, e.spiele_dir)
     try:
         benutzerliste.exportieren()

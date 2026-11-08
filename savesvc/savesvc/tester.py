@@ -9,7 +9,12 @@
 
 Testplan-Format:
   {"version": "1.4.0", "hinweis": "…",
-   "tests": [{"id": "konto-leiste", "bereich": "Konto", "titel": "…", "schritte": ["…", "…"], "erwartet": "…"}]}
+   "tests": [{"id": "konto-leiste", "bereich": "Konto", "titel": "…", "schritte": ["…", "…"], "erwartet": "…",
+              "neuAb": "2026-11-08T12:00:00+00:00"}]}
+
+Ergebnisse gelten für die ganze Version, auch über neue Commits hinweg – sonst müsste nach jeder kleinen Korrektur
+alles neu getestet werden. Ändert sich etwas an einem Test-Bereich, bekommt der Test „neuAb“ (Zeitpunkt, 1.4.0
+nach Sebs Test am 08.11.2026): Ergebnisse davor zählen nicht mehr, der Test steht wieder auf offen.
 """
 
 import json
@@ -48,8 +53,34 @@ def plan_laden(ordner: Path, version: str) -> dict | None:
             continue
         tests.append({"id": t["id"], "bereich": str(t.get("bereich", ""))[:60], "titel": str(t.get("titel", ""))[:200],
                       "schritte": [str(s)[:500] for s in t.get("schritte", []) if isinstance(s, str)][:30],
-                      "erwartet": str(t.get("erwartet", ""))[:800], "hinweis": str(t.get("hinweis", ""))[:500]})
+                      "erwartet": str(t.get("erwartet", ""))[:800], "hinweis": str(t.get("hinweis", ""))[:500],
+                      "neuAb": _zeitpunkt(t.get("neuAb"))})
     return {"version": datei.stem, "hinweis": str(roh.get("hinweis", ""))[:1000], "tests": tests}
+
+
+def _zeitpunkt(wert) -> str | None:
+    """„neuAb“ als ISO-Zeit in UTC (wie die gespeicherten Ergebnisse) – sonst None."""
+    if not isinstance(wert, str):
+        return None
+    try:
+        d = datetime.fromisoformat(wert)
+    except ValueError:
+        return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def gueltige(plan: dict, ergebnisse: list[dict]) -> list[dict]:
+    """Je Test und Tester das neueste Ergebnis – Ergebnisse vor „neuAb“ des Tests zählen nicht mehr."""
+    neu_ab = {t["id"]: t.get("neuAb") for t in plan["tests"]}
+    neueste: dict[tuple, dict] = {}
+    for x in ergebnisse:                                    # älteste zuerst → spätere überschreiben
+        ab = neu_ab.get(x["test"])
+        if ab and _zeitpunkt(x["zeit"]) < ab:
+            continue
+        neueste[(x["test"], x["player"])] = x
+    return sorted(neueste.values(), key=lambda x: x["zeit"])
 
 
 class Ergebnisse:
@@ -79,13 +110,12 @@ class Ergebnisse:
                       (version, commit, test, player, 1 if ok else 0, text,
                        datetime.now(timezone.utc).isoformat(timespec="seconds")))
 
-    def liste(self, version: str, commit: str) -> list[dict]:
-        """Je Test und Tester nur das neueste Ergebnis (man kann nachtesten), älteste zuerst."""
+    def liste(self, version: str) -> list[dict]:
+        """Alle Ergebnisse dieser Version (über alle Commits), älteste zuerst – gefiltert wird mit gueltige()."""
         with self.verbindung() as v:
-            zeilen = v.execute("""SELECT * FROM ergebnisse WHERE id IN (
-                                      SELECT MAX(id) FROM ergebnisse WHERE version=? AND commit_=? GROUP BY test, player)
-                                  ORDER BY id""", (version, commit)).fetchall()
-        return [{"test": z["test"], "player": z["player"], "ok": bool(z["ok"]), "text": z["text"] or "", "zeit": z["zeit"]} for z in zeilen]
+            zeilen = v.execute("SELECT * FROM ergebnisse WHERE version=? ORDER BY id", (version,)).fetchall()
+        return [{"test": z["test"], "player": z["player"], "ok": bool(z["ok"]), "text": z["text"] or "", "zeit": z["zeit"],
+                 "commit": z["commit_"]} for z in zeilen]
 
 
 def zusammenfassung(plan: dict, ergebnisse: list[dict]) -> dict:
@@ -121,7 +151,7 @@ def einrichten(app: FastAPI, e, spieler) -> None:
     @app.get("/api/tester/plan")
     def plan(player: str = Depends(spieler)):
         p = plan_oder_404()
-        liste = erg.liste(p["version"], commit)
+        liste = gueltige(p, erg.liste(p["version"]))
         return {**p, "commit": commit, "ich": player, "ergebnisse": liste, "zusammenfassung": zusammenfassung(p, liste)}
 
     @app.post("/api/tester/ergebnis", status_code=204)

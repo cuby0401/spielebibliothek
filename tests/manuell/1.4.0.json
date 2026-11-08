@@ -28,11 +28,14 @@
       "bereich": "Konto",
       "titel": "Konto auf dem Handy",
       "schritte": [
-        "Öffne test.cuby0401.uk auf dem Handy (gleiche E-Mail-Anmeldung).",
-        "Tippe oben rechts auf den Initialen-Kreis.",
-        "Wische die Leiste mit den Bereichen nach links und rechts und tippe „Sicherheit“ an."
+        "Öffne test.cuby0401.uk auf dem Handy (gleiche E-Mail-Anmeldung). Hast du die Seite schon offen: einmal neu laden.",
+        "Schau dir die Kopfzeile an und tippe oben rechts auf den Initialen-Kreis.",
+        "Wische die Leiste mit den Bereichen nach links und rechts und tippe „Sicherheit“ an.",
+        "Versuch, die Seite seitlich zu verschieben."
       ],
-      "erwartet": "Der Initialen-Kreis ist oben rechts vollständig zu sehen. Die Leiste steht oben quer und lässt sich wischen. „Sicherheit“ zeigt deine Anmeldungen. Nichts ist abgeschnitten oder überlappt."
+      "erwartet": "Kopfzeile und das orange Probe-Band gehen genau bis zum rechten Bildschirmrand, der Initialen-Kreis ist vollständig zu sehen. Passt nicht alles in eine Zeile, rutschen die Knöpfe in eine zweite Zeile. Die Seite lässt sich nicht seitlich verschieben und wirkt nicht verkleinert. Nur die Leiste mit den Bereichen lässt sich wischen. „Sicherheit“ zeigt deine Anmeldungen, lange IP-Adressen brechen um statt über den Rand zu laufen.",
+      "neuAb": "2026-11-08T09:45:00+00:00",
+      "hinweis": "Nachtest: Am 08.11. ragten Admin-Knopf und Initialen-Kreis rechts über den Rand, die ganze Seite war dadurch breiter als das Handy und verkleinert."
     },
     {
       "id": "meine-angaben",
@@ -114,20 +117,28 @@
         "Prüfe die Liste: Sind alle da, die auch live Zugang haben?",
         "Öffne Paul und Emil und schau auf Rollen und Status."
       ],
-      "erwartet": "Alle Personen sind da. Du bist Admin, Paul und Emil sind Entwickler, alle anderen Spieler. Wer sich schon angemeldet hat, ist „aktiv“."
+      "erwartet": "Alle Personen sind da. Du bist Admin. Paul und Emil sind Entwickler (ebenso jeder, der schon einen eigenen Spieleordner hat), Emil zusätzlich Tester. Alle anderen sind Spieler. Wer sich schon angemeldet hat, ist „aktiv“.",
+      "neuAb": "2026-11-08T09:45:00+00:00",
+      "hinweis": "Nachtest: Am 08.11. fehlte bei Emil die Rolle Tester. Der Testserver wird dafür frisch aus den Live-Daten aufgebaut, Emil bekommt die Rolle dabei automatisch."
     },
     {
       "id": "seb-crm-massnahmen",
       "bereich": "Nur Seb (Admin)",
       "titel": "CRM: Testperson von Anfang bis Ende",
       "schritte": [
-        "Personen → „Person einladen“: E-Mail test+1@example.com, Benutzername testperson, Rolle Spieler.",
-        "Auf der Seite der Person: Notiz schreiben, Rolle Entwickler geben (Passwort wird einmal angezeigt) und wieder nehmen.",
+        "Personen → „Person einladen“: E-Mail test+2@example.com, Benutzername testperson2, Rolle Spieler.",
+        "Auf der Seite der Person ganz nach unten scrollen und „Einladung senden“ klicken.",
+        "Notiz schreiben.",
+        "Haken bei Entwickler setzen → „Rollen speichern“ (das Passwort wird einmal angezeigt).",
+        "Haken bei Entwickler wieder wegnehmen → „Rollen speichern“. Danach die Seite neu laden (F5).",
+        "Haken bei Entwickler noch einmal setzen → „Rollen speichern“.",
         "Verwarnen (mit Grund), Sperren (mit Grund), Entsperren.",
         "Zum Schluss Archivieren (Benutzername zur Bestätigung eintippen).",
         "Danach „Prüfprotokoll“ öffnen."
       ],
-      "erwartet": "Jeder Schritt klappt ohne Fehlermeldung. „Einladung senden“ ohne eingerichtete E-Mail gibt eine verständliche Meldung statt eines Absturzes. Zeitleiste und Prüfprotokoll zeigen jeden Schritt mit wer, was, wann, vorher und nachher."
+      "erwartet": "„Einladung senden“ zeigt oben im Fenster gut sichtbar: „E-Mail-Versand ist nicht eingerichtet … – Einladung bitte selbst schicken“. Nach dem Wegnehmen ist der Haken bei Entwickler auch nach dem Neuladen weg (die Seite sagt: „Hat noch einen Spieleordner …“). Erneut setzen klappt und zeigt wieder ein Passwort. Jeder Schritt klappt ohne Fehlermeldung. Zeitleiste und Prüfprotokoll zeigen jeden Schritt mit wer, was, wann, vorher und nachher.",
+      "neuAb": "2026-11-08T09:45:00+00:00",
+      "hinweis": "Nachtest: Am 08.11. blieb nach dem Entziehen der Haken bei Entwickler stehen, und beim Einladen kam keine sichtbare Meldung. Meldungen erscheinen jetzt oben im Fenster, auch wenn du weit unten bist."
     },
     {
       "id": "seb-upload",
@@ -154,14 +165,15 @@
       "id": "seb-not-aus",
       "bereich": "Nur Seb (Admin) – als Allerletztes",
       "titel": "Not-Aus auf dem Testserver",
-      "hinweis": "Danach ist der Testserver für alle aus, bis du ihn wieder einschaltest. Erst testen, wenn alle anderen fertig sind.",
+      "hinweis": "Danach ist der Testserver für alle aus, bis du ihn wieder einschaltest. Erst testen, wenn alle anderen fertig sind. Nachtest: Am 08.11. waren Hilfe und Handbuch während des Not-Aus noch erreichbar – das war nicht gewollt, jetzt ist wirklich alles aus.",
       "schritte": [
         "Admin-Panel → Übersicht → „Not-Aus“ aufklappen → „Not-Aus auslösen …“, Grund „Test“, dann NOT-AUS eintippen.",
-        "Lade die Bibliothek neu.",
+        "Lade die Bibliothek neu. Öffne dann test.cuby0401.uk/hilfe/ und test.cuby0401.uk/handbuch/.",
         "Am Mac im Terminal: cd ~/Repos/spielebibliothek && scripts/deploy.sh --notaus-aus --probe (mit „ja“ bestätigen).",
         "Bibliothek neu laden, Admin-Panel → Not-Aus → „Sicherheitsprotokoll“."
       ],
-      "erwartet": "Nach dem Auslösen: „Not-Aus ist AN“, danach lädt die Bibliothek keine Daten mehr. Nach --notaus-aus geht alles wieder. Im Sicherheitsprotokoll stehen „notaus-ein“ (von dir, Grund Test) und „notaus-aus“ (von mac). Diesen Test trägst du am Ende hier ein."
+      "erwartet": "Nach dem Auslösen: „Not-Aus ist AN“. Danach zeigen Bibliothek, Hilfe und Handbuch nur noch eine schlichte Seite „Not-Aus aktiv – Die Spielebibliothek ist vorübergehend abgeschaltet“. Nach --notaus-aus geht alles wieder. Im Sicherheitsprotokoll stehen „notaus-ein“ (von dir, Grund Test) und „notaus-aus“ (von mac). Diesen Test trägst du am Ende hier ein.",
+      "neuAb": "2026-11-08T09:45:00+00:00"
     }
   ]
 }

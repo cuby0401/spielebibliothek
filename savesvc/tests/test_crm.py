@@ -151,3 +151,34 @@ def test_protokoll_hat_vorher_nachher(client):
     eintrag = client.get("/api/admin/protokoll", headers=client.als()).json()[0]
     assert eintrag["aktion"] == "stammdaten" and eintrag["von"] == "seb" and eintrag["ziel"] == "paul"
     assert json.loads(eintrag["vorher"]) == {"vorname": None} and json.loads(eintrag["nachher"]) == {"vorname": "Paul"}
+
+
+def test_entwickler_entziehen_trotz_spieleordner(client, upload):  # noqa: F811
+    """1.4.0, Nachtest 08.11. (Sebs Test seb-crm-massnahmen): Nach dem Entziehen blieb der Haken bei Entwickler stehen, weil der
+    Spieleordner (die Spiele bleiben) weiter als Entwickler zählte – neu vergeben ging dann nicht mehr."""
+    upload.konten.discard("paul")
+    r = client.put("/api/admin/personen/paul/rollen", json={"rollen": ["spieler"]}, headers=client.als())
+    assert r.json() == {"dazu": [], "weg": ["entwickler"]}
+    p = client.get("/api/admin/personen/paul", headers=client.als()).json()
+    assert p["rollen"] == ["spieler"] and p["ordner"] is True               # Haken weg, Ordner bleibt
+    liste = {x["name"]: x for x in client.get("/api/admin/personen", headers=client.als()).json()["personen"]}
+    assert liste["paul"]["rollen"] == ["spieler"]
+    me = client.get("/api/me", headers=client.als(PAUL)).json()
+    assert me["uploader"] is False
+    # Wieder vergeben klappt und legt ein neues Upload-Konto an
+    r = client.put("/api/admin/personen/paul/rollen", json={"rollen": ["spieler", "entwickler"]}, headers=client.als())
+    assert r.json()["dazu"] == ["entwickler"] and r.json()["passwort"] == "X" * 20
+    assert client.get("/api/me", headers=client.als(PAUL)).json()["uploader"] is True
+
+
+def test_uebernahme_mit_testern(tmp_path, umgebung):
+    """1.4.0, Nachtest 08.11. (Sebs Test seb-crm-personen): Emil war schon Tester, das CRM wusste davon nichts. TESTER setzt die Rolle
+    bei der Übernahme; danach zählt nur noch das CRM."""
+    umgebung.users.write_text(umgebung.users.read_text() + "emil@example.com: emil\n")
+    db = Datenbank(umgebung.db)
+    c = crm_modul.Crm(db, frozenset({"seb"}))
+    assert crm_modul.uebernehmen(c, umgebung.users, tmp_path / "b", frozenset({"seb"}), umgebung.spiele, frozenset({"emil"})) == 3
+    rollen = {p["name"]: p["rollen"] for p in c.personen()}
+    assert rollen["emil"] == ["spieler", "tester"] and "tester" not in rollen["paul"]
+    # zweiter Start: nichts passiert mehr (CRM nicht leer)
+    assert crm_modul.uebernehmen(c, umgebung.users, tmp_path / "b", frozenset({"seb"}), umgebung.spiele, frozenset({"paul"})) == 0

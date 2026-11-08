@@ -74,6 +74,27 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await eval_(`{ const l=[...document.querySelectorAll("#inhalt label.haken")].find(x=>x.textContent.includes("Tester")); l.querySelector("input").click(); (${KNOPF("Rollen speichern")}).click(); } true`);
   ok(await bis(`document.getElementById("meldung").textContent.includes("+Tester")`), "Rolle Tester vergeben");
 
+  // 5b) Entwickler geben, nehmen, wieder geben (1.4.0, Nachtest 08.11., Sebs Test seb-crm-massnahmen): Der Spieleordner bleibt nach dem
+  //     Entziehen stehen – der Haken darf trotzdem nicht hängen bleiben
+  const ENTW = `[...document.querySelectorAll("#inhalt label.haken")].find(x=>x.textContent.includes("Entwickler")).querySelector("input")`;
+  const rolleKlicken = async () => { await eval_(`(${ENTW}).click(); (${KNOPF("Rollen speichern")}).click(); true`); };
+  await rolleKlicken();
+  ok(await bis(`document.getElementById("meldung").textContent.includes("+Entwickler")`) && await bis(`!!document.querySelector(".passwort-box")`, 3000),
+    "Entwickler vergeben, Upload-Passwort angezeigt");
+  await bis(`(${ENTW}).checked`);
+  await rolleKlicken();
+  ok(await bis(`document.getElementById("meldung").textContent.includes("−Entwickler")`), "Entwickler entzogen");
+  await gehe(G + "/admin/?neu=2#person/lea", 3500);
+  ok(await bis(`!!(${ENTW}) && !(${ENTW}).checked`), "Nach dem Neuladen: Haken bei Entwickler ist weg");
+  await rolleKlicken();
+  ok(await bis(`document.getElementById("meldung").textContent.includes("+Entwickler")`), "Entwickler erneut vergeben");
+
+  // 5c) Einladung ohne E-Mail-Versand (1.4.0, Nachtest 08.11.): Die Meldung muss sichtbar sein, auch wenn der Knopf weit unten steht
+  await eval_(`scrollTo(0, document.body.scrollHeight); (${KNOPF("Einladung senden")}).click(); true`);
+  ok(await bis(`document.getElementById("meldung").textContent.includes("nicht eingerichtet")`), "Einladung ohne SMTP: verständliche Meldung");
+  ok(await eval_(`{ const r=document.getElementById("meldung").getBoundingClientRect(); r.top>=0 && r.bottom<=innerHeight && r.height>0 }`),
+    "Die Meldung steht im sichtbaren Bereich (unten gescrollt)");
+
   // 6) Prüfprotokoll
   await gehe(G + "/admin/#protokoll", 3000);
   const aktionen = await eval_(`[...document.querySelectorAll("tbody tr td:nth-child(3)")].map(t=>t.textContent)`);
@@ -106,6 +127,22 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await eval_(`document.querySelector(".test .knopf.ja").click(); true`);
   ok(await bis(`document.querySelector(".test-zusammenfassung .ok").textContent.startsWith("✓ 1 ")`), "„Hat geklappt“ zählt als bestanden");
 
+  // 8c) Handy (1.4.0, Nachtest 08.11., Sebs Test konto-handy): nichts ragt über den rechten Rand, das Initialen-Bild ist ganz zu sehen.
+  //     Safari auf dem iPhone setzt Schrift breiter als Chrome – deshalb auch mit 320 px prüfen (kleinstes iPhone)
+  for (const breite of [320, 390]) {
+    await cdp("Emulation.setDeviceMetricsOverride", { width: breite, height: 844, deviceScaleFactor: 3, mobile: true }, S);
+    for (const seite of ["sicherheit", "profil"]) {
+      await gehe(G + `/?handy=${breite}${seite}#/${seite}`, 3500);
+      await bis(`!!document.querySelector(".konto-leiste")`);
+      const m = await eval_(`({ breit: document.documentElement.scrollWidth,
+        raus: [...document.querySelectorAll(".kopf a, .kopf button, .marke, #avatar")].filter(x=>x.offsetParent && x.getBoundingClientRect().right > ${breite} + 0.5)
+          .map(x=>x.id || x.textContent.trim() || x.className) })`);
+      // Nicht mit innerWidth vergleichen: Ist die Seite zu breit, zoomt der Browser heraus und innerWidth wächst mit
+      ok(m.breit <= breite && !m.raus.length, `Handy ${breite} px #/${seite}: Seite ${m.breit} px breit` + (m.raus.length ? `, über den Rand: ${m.raus.join(", ")}` : ", nichts über den Rand"));
+    }
+  }
+  await cdp("Emulation.clearDeviceMetricsOverride", {}, S);
+
   // 9) Not-Aus (1.4.0) – als Letztes, danach antwortet der Teststand absichtlich nicht mehr
   await gehe(G + "/admin/", 3500);
   ok(await eval_(`!!document.querySelector("details.notaus summary")`), "Not-Aus-Feld in der Übersicht");
@@ -114,6 +151,11 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(na === 200, "Not-Aus ausgelöst");
   ok(await eval_(`fetch("/api/me").then(r=>r.status)`) === 503, "Danach: Speicher-Dienst antwortet 503");
   ok(await eval_(`fetch("/api/games").then(r=>r.status)`) === 503, "Danach: keine Spielliste mehr");
+  // 1.4.0, Nachtest 08.11. (Sebs Test seb-not-aus): auch Hilfe, Handbuch und die Startseite sind weg – Caddy liefert nur noch die Not-Aus-Seite
+  for (const pfad of ["/", "/hilfe/", "/handbuch/", "/lib/bridge.js"]) {
+    const r = await eval_(`fetch(${JSON.stringify(pfad)},{cache:"no-store"}).then(async r=>[r.status,(await r.text()).includes("Not-Aus aktiv")])`);
+    ok(r[0] === 503 && r[1], `Danach: ${pfad} → 503 mit Not-Aus-Seite`);
+  }
   console.log(ergebnis.join("\n"));
   chrome.kill(); process.exit();
 })().catch((e) => { console.log(ergebnis.join("\n")); console.error("ABBRUCH:", e.message); chrome.kill(); process.exit(1); });

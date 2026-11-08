@@ -478,8 +478,10 @@ class CrmBenutzerliste(Benutzerliste):
         raise RuntimeError("users.yaml wird aus dem CRM erzeugt – Änderungen über crm.Crm")
 
 
-def uebernehmen(crm: Crm, users_file: Path, backup_dir: Path, admins: frozenset, spiele_dir: Path) -> int:
-    """Erster Start mit CRM: alle aus users.yaml übernehmen. Vorher wird users.yaml gesichert. → Anzahl."""
+def uebernehmen(crm: Crm, users_file: Path, backup_dir: Path, admins: frozenset, spiele_dir: Path,
+                tester: frozenset = frozenset()) -> int:
+    """Erster Start mit CRM: alle aus users.yaml übernehmen. Vorher wird users.yaml gesichert. → Anzahl.
+    tester (Umgebung TESTER, 1.4.0, Nachtest 08.11.): wer schon vor dem CRM Tester war – steht sonst nirgends, nur in Cloudflare."""
     if not crm.leer():
         return 0
     alt = Benutzerliste(users_file).alle()
@@ -496,7 +498,8 @@ def uebernehmen(crm: Crm, users_file: Path, backup_dir: Path, admins: frozenset,
         if name in namen_fertig:
             crm.email_dazu("übernahme", name, email)
             continue
-        rollen = ["spieler"] + (["admin"] if name in admins else []) + (["entwickler"] if (spiele_dir / name).is_dir() else [])
+        rollen = ["spieler"] + (["admin"] if name in admins else []) + (["entwickler"] if (spiele_dir / name).is_dir() else []) \
+            + (["tester"] if name in tester else [])
         crm.anlegen("übernahme", name, email, rollen, status="aktiv", aktion="uebernommen")
         namen_fertig.add(name)
         n += 1

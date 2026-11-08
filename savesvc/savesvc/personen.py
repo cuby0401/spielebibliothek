@@ -59,10 +59,10 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         cf, fehlt = cloudflare_stand(konten or set())
         ergebnis = []
         for p in crm.personen():
-            # Wirksame Rollen: eigener Spieleordner zählt wie bisher als Entwickler (rollen.rolle), auch ohne CRM-Rolle
+            # Rollen nur aus dem CRM (1.4.0, Nachtest 08.11.). Früher zählte ein eigener Spieleordner zusätzlich als Entwickler – dann blieb
+            # der Haken nach dem Entziehen gesetzt, weil der Ordner (mit den Spielen) bleibt. Wer beim Umstieg aufs CRM
+            # einen Ordner hatte, hat die Rolle bei der Übernahme bekommen (crm.uebernehmen).
             ordner = (e.spiele_dir / p["name"]).is_dir()
-            if ordner and "entwickler" not in p["rollen"] and p["status"] != "archiviert":
-                p["rollen"] = sorted(p["rollen"] + ["entwickler"])
             entw = "entwickler" in p["rollen"]
             ergebnis.append({
                 "name": p["name"], "anzeigename": p["anzeigename"], "vorname": p["vorname"], "nachname": p["nachname"],
@@ -97,9 +97,7 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         if not p:
             raise HTTPException(404, "Person nicht gefunden")
         konten = upload_konten()
-        if (e.spiele_dir / name).is_dir() and "entwickler" not in p["rollen"] and p["status"] != "archiviert":
-            p["rollen"] = sorted(p["rollen"] + ["entwickler"])      # wie in der Liste: eigener Ordner = Entwickler
-        return {**p, "notfallAdmin": name in e.admins, "uploadKonto": None if konten is None else name in konten,
+        return {**p, "notfallAdmin": name in e.admins, "ordner": (e.spiele_dir / name).is_dir(), "uploadKonto": None if konten is None else name in konten,
                 "notizen": crm.notizen(name), "zeitleiste": zeitleiste(name), "protokoll": crm.protokoll(name, 100),
                 "anmeldungen": db.anmeldungen(name, 50)}
 

@@ -76,9 +76,10 @@ find . -path ./config -prune -o -type d -exec chmod 755 {} +
 find . -path ./config -prune -o -type f -exec chmod 644 {} +
 chmod 755 scripts/*.sh
 chmod 600 .env
-# config/: savesvc (UID 10022) schreibt users.yaml (Admin-Panel), der Upload-Dienst (10021) liest, Sebi darf alles
+# config/: savesvc (UID 10022) schreibt users.yaml (Admin-Panel), der Upload-Dienst (10021) liest, Sebi darf alles.
+# Caddy (10020) darf nur hindurch (x), um config/notaus.json zu sehen (Not-Aus, 1.4.0, Nachtest 08.11.) – lesen kann er dort nichts
 chmod 770 config
-setfacl -m u:10022:rwx,u:10021:rx -d -m u:1000:rw,u:10022:rw,u:10021:r config 2>/dev/null || true
+setfacl -m u:10022:rwx,u:10021:rx,u:10020:x -d -m u:1000:rw,u:10022:rw,u:10021:r config 2>/dev/null || true
 if [ -O config/users.yaml ]; then chmod 660 config/users.yaml && { setfacl -m u:10022:rw,u:10021:r config/users.yaml 2>/dev/null || true; }; fi
 grep -q "^INTERN_TOKEN=" .env || printf "INTERN_TOKEN=%s\n" "$(head -c 48 /dev/urandom | base64 | tr -dc A-Za-z0-9 | cut -c1-40)" >> .env
 

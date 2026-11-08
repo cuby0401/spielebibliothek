@@ -21,6 +21,22 @@
 		-Server
 	}
 
+	# ---------- Not-Aus (1.4.0, Nachtest 08.11.): solange config/notaus.json existiert, gibt es auf KEINER Adresse mehr etwas ----------
+	# Auch keine Hilfe, kein Handbuch, keine Spieldateien. Nur /api/* geht weiter an die Dienste – die antworten selbst
+	# mit 503 und dem Grund (das Admin-Panel zeigt dann „Not-Aus ist AN“). Caddy darf config/ nur durchqueren (x), nicht lesen.
+	@notaus {
+		file {
+			root /config
+			try_files /notaus.json
+		}
+		not path /api/*
+	}
+	handle @notaus {
+		header Content-Type "text/html; charset=utf-8"
+		header Cache-Control "no-store"
+		respond `<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Spielebibliothek – Not-Aus</title><h1>Not-Aus aktiv</h1><p>Die Spielebibliothek ist vorübergehend abgeschaltet. Bitte später noch einmal versuchen.</p></html>` 503
+	}
+
 	# ---------- play.cuby0401.uk: nur Spiele ----------
 	@play host play.cuby0401.uk
 	handle @play {

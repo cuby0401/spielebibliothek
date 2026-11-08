@@ -8,11 +8,19 @@ const idPfad = (id) => id.split("/").map(encodeURIComponent).join("/");
 let spieleCache = [];
 const titel = (id) => (spieleCache.find((s) => s.id === id) || {}).title || id;
 
+// Die Meldung klebt oben im Fenster (1.4.0, Nachtest 08.11.): Knöpfe wie „Einladung senden“ stehen weit unten – vorher kam die Antwort
+// oben außer Sicht an und es sah aus, als wäre nichts passiert. Erfolge verschwinden nach 8 s, Fehler bleiben bis zum Klick.
+let meldungWeg;
 function meldung(text, fehler) {
-	$("meldung").textContent = text || "";
-	$("meldung").hidden = !text;
-	$("meldung").style.borderColor = fehler ? "var(--warn)" : "";
+	const m = $("meldung");
+	clearTimeout(meldungWeg);
+	m.textContent = text || "";
+	m.hidden = !text;
+	m.classList.toggle("fehler", !!fehler);
+	m.title = text ? "Klicken zum Schließen" : "";
+	if (text && !fehler) meldungWeg = setTimeout(() => { m.hidden = true; }, 8000);
 }
+document.addEventListener("click", (e) => { if (e.target.id === "meldung") e.target.hidden = true; });
 async function sicher(fn) {
 	try { await fn(); } catch (e) { if (!(e instanceof Bridge.SitzungAbgelaufen)) meldung(e.message, true); }
 }
@@ -351,7 +359,7 @@ async function personSeite(c, name) {
 	if (p.status !== "archiviert") {
 		const wahl = rollenWahl(p.rollen, p.notfallAdmin ? ["admin"] : []);
 		c.append(h("h3", { text: "Rollen" }), h("div", { class: "karte" }, wahl.el,
-			h("p", { class: "leise", text: "Entwickler bekommt ein Upload-Konto (Passwort wird einmal angezeigt), ohne Entwickler wird es entfernt – die Spiele bleiben. Tester: für Testkonten." }),
+			h("p", { class: "leise", text: (p.ordner && !p.rollen.includes("entwickler") ? "Hat noch einen Spieleordner (die Spiele bleiben), aber keine Entwickler-Rechte. " : "") + "Entwickler bekommt ein Upload-Konto (Passwort wird einmal angezeigt), ohne Entwickler wird es entfernt – die Spiele bleiben. Tester: sieht auf dem Testserver das Tester-Panel und bekommt eine Glocke, wenn neue Tests anstehen." }),
 			h("div", { class: "zeile" }, knopf("Rollen speichern", async () => {
 				const r = await api("PUT", pfad + "/rollen", { rollen: wahl.werte() });
 				await neu();

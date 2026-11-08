@@ -71,6 +71,7 @@ up)
 			echo "  Kopie der echten Daten angelegt"
 		else
 			printf 'seb@example.com: seb\npaul@example.com: paul\n' > "$T/config/users.yaml"
+			mkdir -p "$T/spiele/paul"   # vor dem Start: Wer bei der Übernahme ins CRM einen Ordner hat, wird Entwickler (wie live)
 		fi
 		docker run --rm -v "$T":/z caddy:2 sh -c 'chmod -R a+rwX /z/data /z/udata /z/config /z/spiele'
 		setfacl -R -m u:10020:rX,u:10022:rX,u:10021:rwX "$T/spiele" 2>/dev/null || true
@@ -91,7 +92,7 @@ up)
 	docker run --rm -v "$TESTERGEBNISSE":/z caddy:2 chmod a+rwX /z
 	docker run -d --name $N-savesvc --network $N $ANMELDUNG -e WAECHTER=0 \
 		-e TESTPLAN_DIR=/testplan -e TESTERGEBNISSE=/tests/ergebnisse.db -v "$T/repo/tests/manuell:/testplan:ro" -v "$TESTERGEBNISSE:/tests" \
-		-e ADMINS=seb -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://$N-upload:8000 \
+		-e ADMINS=seb -e TESTER=emil -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://$N-upload:8000 \
 		-e PROBE="$( [ "$ART" = probe ] && echo 1 || echo 0 )" -e ZENTRALE_COMMIT="${ZENTRALE_COMMIT:-}" -e ZENTRALE_VERSION="${ZENTRALE_VERSION:-}" \
 		-v "$T/data:/data" -v "$T/spiele:/spiele:ro" -v "$T/config:/config" spielebibliothek-savesvc:$N >/dev/null
 	docker run -d --name $N-upload --network $N --user 10021:10021 $ANMELDUNG -e UPLOAD_DATA=/data \
@@ -99,7 +100,7 @@ up)
 		uvicorn savesvc.upload:app_factory --factory --host 0.0.0.0 --port 8000 >/dev/null
 	docker run -d --name $N-caddy --network $N --user 10020:10020 -e XDG_CONFIG_HOME=/tmp -e XDG_DATA_HOME=/tmp \
 		$PORTS \
-		-v "$T/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$T/repo/site:/srv/site:ro" -v "$T/repo/lib:/srv/lib:ro" -v "$T/spiele:/srv/spiele:ro" \
+		-v "$T/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$T/repo/site:/srv/site:ro" -v "$T/repo/lib:/srv/lib:ro" -v "$T/spiele:/srv/spiele:ro" -v "$T/config:/config:ro" \
 		caddy:2 >/dev/null
 	sleep 2; docker logs $N-caddy 2>&1 | grep -iE "error" | grep -v "not formatted" | head -3 || true
 	echo "$ART: $G (games)  $P (play)  $U (upload)";;

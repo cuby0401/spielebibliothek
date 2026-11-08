@@ -28,7 +28,9 @@ def admins(e) -> set[str]:
 def rolle(e, request: Request, player: str) -> dict:
     crm = crm_rollen(player)
     echter_admin = player in e.admins or "admin" in crm
-    hat_ordner = (e.spiele_dir / player).is_dir() or "entwickler" in crm
+    # Mit CRM zählt nur die Rolle (1.4.0, Nachtest 08.11.): Ein Spieleordner bleibt nach dem Entziehen der Rolle stehen (die Spiele
+    # bleiben), darf aber nicht weiter als „Entwickler“ gelten. Ohne CRM (Upload-Dienst, alte Tests) wie bisher der Ordner.
+    hat_ordner = "entwickler" in crm if QUELLE is not None else (e.spiele_dir / player).is_dir()
     ansicht = request.headers.get("x-ansicht")
     if echter_admin and ansicht in ANSICHTEN:
         return {"admin": False, "entwickler": ansicht == "entwickler", "uploader": ansicht == "entwickler" and hat_ordner,

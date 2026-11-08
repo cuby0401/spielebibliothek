@@ -21,7 +21,8 @@
 #   0. Live nur nach Test in der Probe-Zentrale und „Für Live freigeben“ im Admin-Panel der Probe.
 #   1. Nur ein sauberer, committeter Stand wird deployt – mit neuer Nummer in VERSION und Eintrag „## <Version>“ in CHANGELOG.md.
 #      Dieselbe Nummer für einen anderen Commit wird abgelehnt (Git-Tag zentrale-v<Version>).
-#   2. Vorher laufen alle Unit-Tests auf der NAS (Python 3.12 wie in Produktion). Rot = kein Deploy.
+#   2. Vorher laufen alle Unit-Tests auf dem Mac (Python 3.12 wie in Produktion, ca. 10 s, ohne uv auf der NAS). Rot = kein Deploy.
+#      Nach --probe laufen die Ende-zu-Ende-Tests im Hintergrund auf der NAS weiter – der Testserver wartet nicht darauf.
 #   3. Vorher wird die Datenbank gesichert: /volume1/games/data/backup/vor-deploy/<Anlass>-<Zeit>.db (die letzten 10).
 #   4. Vorher wird der laufende Stand archiviert: /volume1/docker/spielebibliothek-releases/<Version>.tar (die letzten 5).
 #   5. Spiele, Spielstände, .env und config/ liegen außerhalb und werden nie angefasst.
@@ -109,9 +110,10 @@ NACHARBEIT='
 	find . -path ./config -prune -o -type f -exec chmod 644 {} +
 	chmod 755 scripts/*.sh
 	chmod 600 .env
-	# config/: savesvc (UID 10022) schreibt users.yaml (Admin-Panel), der Upload-Dienst (10021) liest, Sebi darf alles
+	# config/: savesvc (UID 10022) schreibt users.yaml (Admin-Panel), der Upload-Dienst (10021) liest, Sebi darf alles.
+	# Caddy (10020) darf nur hindurch (x), um config/notaus.json zu sehen (Not-Aus, 1.4.0, Nachtest 08.11.) – lesen kann er dort nichts
 	chmod 770 config
-	setfacl -m u:10022:rwx,u:10021:rx -d -m u:1000:rw,u:10022:rw,u:10021:r config
+	setfacl -m u:10022:rwx,u:10021:rx,u:10020:x -d -m u:1000:rw,u:10022:rw,u:10021:r config
 	if [ -O config/users.yaml ]; then chmod 660 config/users.yaml && setfacl -m u:10022:rw,u:10021:r config/users.yaml; fi
 	grep -q "^INTERN_TOKEN=" .env || printf "INTERN_TOKEN=%s\n" $(head -c 48 /dev/urandom | base64 | tr -dc A-Za-z0-9 | cut -c1-40) >> .env
 '
@@ -204,13 +206,29 @@ if [ "$PROBE" = 0 ] && [ "$OHNE_PROBE" = 0 ]; then
 fi
 
 if [ "$TESTS" = 1 ]; then
-	echo "→ Tests auf der NAS (dauert ca. 2–3 Minuten) …"
-	if ! git ls-files savesvc | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
-		rm -rf /tmp/sb-deploy-test && mkdir -p /tmp/sb-deploy-test && tar -xf - -C /tmp/sb-deploy-test && cd /tmp/sb-deploy-test/savesvc &&
-		docker build -q --target test -t savesvc-deploytest . >/dev/null && docker run --rm savesvc-deploytest > /tmp/sb-deploy-test.log 2>&1;
-		r=\$?; tail -1 /tmp/sb-deploy-test.log; docker rmi savesvc-deploytest >/dev/null 2>&1; rm -rf /tmp/sb-deploy-test; exit \$r"; then
-		echo "✗ Tests fehlgeschlagen – nichts deployt. Log auf der NAS: /tmp/sb-deploy-test.log" >&2
-		exit 1
+	# Seit 08.11.2026 auf dem Mac (ca. 10 s statt 8 Min. auf der NAS) – mit Python 3.12 wie in Produktion, über uv.
+	# Die NAS-Runde im Container läuft weiter über den Auftragsdienst (Zeitplan im Admin-Panel, nach jedem Probe-Bau).
+	if command -v uv >/dev/null 2>&1; then
+		echo "→ Unit-Tests auf dem Mac (Python 3.12) …"
+		if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))' 2>/dev/null; then
+			uv venv -q --python 3.12 .venv
+		fi
+		uv pip install -q --python .venv/bin/python -r savesvc/requirements-dev.txt
+		if ! (cd savesvc && ../.venv/bin/python -m pytest -q -p no:cacheprovider -W ignore::DeprecationWarning tests > /tmp/sb-deploy-test.log 2>&1); then
+			tail -15 /tmp/sb-deploy-test.log >&2
+			echo "✗ Tests fehlgeschlagen – nichts deployt. Log: /tmp/sb-deploy-test.log" >&2
+			exit 1
+		fi
+		echo "  ✓ $(tail -1 /tmp/sb-deploy-test.log | tr -d '=')"
+	else
+		echo "→ Tests auf der NAS (uv fehlt auf dem Mac – dauert ca. 8 Minuten) …"
+		if ! git ls-files savesvc | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+			rm -rf /tmp/sb-deploy-test && mkdir -p /tmp/sb-deploy-test && tar -xf - -C /tmp/sb-deploy-test && cd /tmp/sb-deploy-test/savesvc &&
+			docker build -q --target test -t savesvc-deploytest . >/dev/null && docker run --rm savesvc-deploytest > /tmp/sb-deploy-test.log 2>&1;
+			r=\$?; tail -1 /tmp/sb-deploy-test.log; docker rmi savesvc-deploytest >/dev/null 2>&1; rm -rf /tmp/sb-deploy-test; exit \$r"; then
+			echo "✗ Tests fehlgeschlagen – nichts deployt. Log auf der NAS: /tmp/sb-deploy-test.log" >&2
+			exit 1
+		fi
 	fi
 fi
 
@@ -237,6 +255,15 @@ if [ "$PROBE" = 1 ]; then
 	if [ -f "tests/manuell/$VERSION_ZENTRALE.json" ]; then
 		ANZAHL=$(grep -c '"id":' "tests/manuell/$VERSION_ZENTRALE.json" || true)
 		ssh -o LogLevel=ERROR "$NAS" "docker exec spielebibliothek-savesvc python -m savesvc tester-melden $VERSION_ZENTRALE $ANZAHL 2>/dev/null" | sed 's/^/  /' || true
+	fi
+	# Ende-zu-Ende-Tests NICHT abwarten (08.11.2026): Der Testserver ist sofort da, die Tests laufen parallel im Teststand
+	# auf der NAS (Auftragsdienst, Ziel „probe“ = genau dieser Stand). Ergebnis: Admin-Panel → Aufgaben, rot = rote Glocke.
+	if [ "$TESTS" = 1 ]; then
+		AID=$(ssh -o LogLevel=ERROR "$NAS" "docker exec spielebibliothek-savesvc python -c 'from pathlib import Path; from savesvc.db import Datenbank; print(Datenbank(Path(\"/data/saves.db\")).auftrag_anlegen(\"e2e-tests\", \"probe\", \"deploy\", \"mac\"))'" 2>/dev/null || true)
+		case "$AID" in
+			''|None) echo "  (Ende-zu-Ende-Tests nicht angestoßen – läuft schon einer? Sonst im Admin-Panel → Aufgaben starten)" ;;
+			*) echo "  Ende-zu-Ende-Tests laufen jetzt im Hintergrund auf der NAS (Auftrag $AID, ca. 10 Min.) – Ergebnis: Admin-Panel → Aufgaben, bei Rot eine rote Glocke" ;;
+		esac
 	fi
 	echo "  Testen, dann dort Admin-Panel → „Für Live freigeben“ – der Auftragsdienst spielt dann innerhalb einer Minute live ein."
 	echo "  (Ohne eingerichteten Auftragsdienst danach: scripts/deploy.sh)"

@@ -55,3 +55,16 @@ def test_ohne_anmeldung(tclient):
 
 def test_live_ohne_testserver(client):
     assert client.get("/api/tester/plan", headers=client.als()).status_code == 404   # live (ohne TESTPLAN_DIR) gibt es das nicht
+
+
+def test_nachtest_neu_ab(tclient, tmp_path, monkeypatch):
+    """Ergebnisse gelten über Commits hinweg; nur Tests mit „neuAb“ stehen danach wieder auf offen (08.11.2026)."""
+    p = tclient.als("paul@example.com")
+    tclient.post("/api/tester/ergebnis", json={"test": "konto-leiste", "ok": True}, headers=p)
+    tclient.post("/api/tester/ergebnis", json={"test": "not-aus", "ok": False, "text": "Hilfe geht noch"}, headers=p)
+    plan = dict(PLAN, tests=[PLAN["tests"][0], dict(PLAN["tests"][1], neuAb="2999-01-01T00:00:00+00:00")])
+    (tmp_path / "testplan" / "1.4.0.json").write_text(json.dumps(plan))
+    d = tclient.get("/api/tester/plan", headers=p).json()
+    assert d["zusammenfassung"] == {"gesamt": 2, "bestanden": 1, "fehlgeschlagen": 0, "offen": 1}
+    assert d["tests"][1]["neuAb"] == "2999-01-01T00:00:00+00:00" and d["tests"][0]["neuAb"] is None
+    assert [x["test"] for x in d["ergebnisse"]] == ["konto-leiste"]

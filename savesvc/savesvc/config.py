@@ -16,6 +16,7 @@ class Einstellungen:
     backup_ziel: Path | None = None   # nächtliche Kopie für borgmatic (None = aus)
     backup_uhrzeit: str = "01:45"     # Europe/Berlin, vor borgmatic um 02:00
     admins: frozenset = frozenset({"seb"})   # dürfen /admin
+    tester: frozenset = frozenset()          # bekommen bei der Übernahme ins CRM die Rolle Tester (TESTER, 1.4.0, Nachtest 08.11.)
     intern_token: str = ""                  # für den Upload-Dienst (Spiele löschen, Upload-Konten)
     upload_url: str = "http://upload:8000"
     ha_webhook: str = ""                    # Home-Assistant-Webhook für Wächter und Anfragen (leer = aus)
@@ -53,6 +54,7 @@ def laden() -> Einstellungen:
         backup_ziel=Path(os.environ["BACKUP_ZIEL"]) if os.environ.get("BACKUP_ZIEL") else None,
         backup_uhrzeit=os.environ.get("BACKUP_UHRZEIT", "01:45"),
         admins=frozenset(n.strip() for n in os.environ.get("ADMINS", "seb").split(",") if n.strip()),
+        tester=frozenset(n.strip() for n in os.environ.get("TESTER", "").split(",") if n.strip()),
         intern_token=os.environ.get("INTERN_TOKEN", ""),
         upload_url=os.environ.get("UPLOAD_URL", "http://upload:8000"),
         ha_webhook=os.environ.get("HA_WEBHOOK_URL", ""),
