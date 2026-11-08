@@ -18,3 +18,13 @@
 .knopf.ja { background: var(--akzent); color: var(--akzent-text); border-color: var(--akzent); }
 .knopf.nein { background: #b3261e; color: #fff; border-color: #b3261e; }
 .test-gruppe { margin: 1.6rem 0 0.6rem; font-size: 1.1rem; border-bottom: 1px solid var(--linie); padding-bottom: 0.3rem; }
+/* 1.4.1: Reiter Offen / Abgelehnt / Bestanden, Archiv eingeklappt, Verlauf mit Fotos */
+.test-reiter { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0 0 1rem; border-bottom: 1px solid var(--linie); }
+.test-reiter a { padding: 0.45rem 0.9rem; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; text-decoration: none; color: inherit; }
+.test-reiter a.aktiv { border-color: var(--linie); background: var(--flaeche); font-weight: 700; margin-bottom: -1px; }
+details.test > summary { cursor: pointer; list-style: none; }
+details.test > summary::-webkit-details-marker { display: none; }
+details.test[open] > summary { margin-bottom: 0.6rem; }
+details.test { display: block; }
+details.test > * + * { margin-top: 0.6rem; }
+.test-ergebnisse li.veraltet { opacity: 0.6; }

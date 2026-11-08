@@ -548,3 +548,43 @@ def uebernehmen(crm: Crm, users_file: Path, backup_dir: Path, admins: frozenset,
         n += 1
     log.info("CRM: %d Personen aus users.yaml übernommen", n)
     return n
+
+
+# Zeitstempel der Aktivität je Spieler – das früheste ist der echte Beginn (1.4.1)
+_AKTIVITAET = [("anmeldungen", "erste"), ("saves", "updated_at"), ("save_history", "saved_at"), ("scores", "created_at"),
+               ("erfolge", "zeit"), ("antraege", "erstellt"), ("daumen", "zeit"), ("spielzeit", "zuletzt")]
+
+
+def _utc(wert) -> datetime | None:
+    try:
+        d = datetime.fromisoformat(str(wert).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
+
+
+def dabei_seit_nachholen(crm: Crm) -> int:
+    """„Dabei seit“ (1.4.1): Bei der Übernahme ins CRM (1.4.0) bekam jede Person den Zeitpunkt der Übernahme als Beginn.
+    Richtig ist die früheste bekannte Aktivität (Anmeldung, Spielstand, Rangliste, Erfolg, Anfrage, Daumen) – ebenso die erste
+    Anmeldung. Läuft bei jedem Start, ändert nur übernommene Personen und nur nach vorn (früher). → Anzahl geänderter Personen."""
+    n = 0
+    with crm.db.verbindung() as v:
+        for p in v.execute("SELECT name, angelegt, erste_anmeldung FROM personen WHERE eingeladen_von='übernahme'").fetchall():
+            zeiten = []
+            for tabelle, spalte in _AKTIVITAET:
+                z = v.execute(f"SELECT MIN({spalte}) FROM {tabelle} WHERE player=?", (p["name"],)).fetchone()[0]
+                if _utc(z):
+                    zeiten.append(_utc(z))
+            anm = _utc(v.execute("SELECT MIN(erste) FROM anmeldungen WHERE player=?", (p["name"],)).fetchone()[0])
+            neu = {}
+            frueh, alt = (min(zeiten) if zeiten else None), _utc(p["angelegt"])
+            if frueh and (not alt or frueh < alt):
+                neu["angelegt"] = frueh.isoformat(timespec="seconds")
+            if anm and (not _utc(p["erste_anmeldung"]) or anm < _utc(p["erste_anmeldung"])):
+                neu["erste_anmeldung"] = anm.isoformat(timespec="seconds")
+            if neu:
+                v.execute(f"UPDATE personen SET {', '.join(f'{k}=?' for k in neu)} WHERE name=?", (*neu.values(), p["name"]))
+                n += 1
+    if n:
+        log.info("CRM: „Dabei seit“ bei %d übernommenen Personen auf die früheste Aktivität gesetzt", n)
+    return n

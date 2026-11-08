@@ -184,6 +184,23 @@ def test_uebernahme_mit_testern(tmp_path, umgebung):
     assert crm_modul.uebernehmen(c, umgebung.users, tmp_path / "b", frozenset({"seb"}), umgebung.spiele, frozenset({"paul"})) == 0
 
 
+def test_dabei_seit_frueheste_aktivitaet(tmp_path, umgebung):
+    """1.4.1: „Dabei seit“ war bei übernommenen Personen der Zeitpunkt der Übernahme. Jetzt die früheste Aktivität."""
+    db = Datenbank(umgebung.db)
+    c = crm_modul.Crm(db, frozenset({"seb"}))
+    crm_modul.uebernehmen(c, umgebung.users, tmp_path / "b", frozenset({"seb"}), umgebung.spiele)
+    with db.verbindung() as v:
+        v.execute("INSERT INTO scores (player, game, season, score, created_at) VALUES ('paul','g',1,5,'2026-11-03T10:00:00+00:00')")
+        v.execute("INSERT INTO anmeldungen (player, sitzung, geraet, erste, letzte) VALUES "
+                  "('paul',1,'Mac','2026-11-05T08:00:00+00:00','2026-11-05T09:00:00+00:00')")
+    c.angemeldet("paul")                                     # erste Anmeldung nach der Übernahme – zählt nicht als Beginn
+    c.anlegen("seb", "neu", "neu@example.com", ["spieler"])    # Eingeladene bleiben unberührt
+    assert crm_modul.dabei_seit_nachholen(c) == 1
+    p = c.person("paul")
+    assert p["angelegt"] == "2026-11-03T10:00:00+00:00" and p["erste_anmeldung"] == "2026-11-05T08:00:00+00:00"
+    assert c.person("seb")["angelegt"] > "2026-11-07" and crm_modul.dabei_seit_nachholen(c) == 0   # ohne Aktivität / zweiter Lauf
+
+
 def test_nie_angemeldet_bleibt_eingeladen(client, upload):  # noqa: F811
     """Entsperren, Verwarnung aufheben, Wiederherstellen: wer sich nie angemeldet hat, ist danach „eingeladen“, nicht „aktiv“."""
     h = client.als()

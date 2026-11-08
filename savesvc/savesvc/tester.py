@@ -15,6 +15,9 @@ Testplan-Format:
 „nurAdmin“: Tests, die nur ein Admin machen kann (CRM, Not-Aus, Freigabe). Andere Tester sehen sie gar nicht und können
 dafür nichts eintragen. Der Admin bekommt sie ganz oben (Seb, 08.11.2026: er ist der einzige Admin).
 
+Fotos (1.4.1, Seb): an jedes Ergebnis bis zu 5 Bilder (vor allem bei „Hat nicht geklappt“), in derselben Datenbank wie die
+Ergebnisse. Sehen kann sie, wer den Test sehen darf; anfügen nur, wer das Ergebnis eingetragen hat.
+
 Ergebnisse gelten für die ganze Version, auch über neue Commits hinweg – sonst müsste nach jeder kleinen Korrektur
 alles neu getestet werden. Ändert sich etwas an einem Test-Bereich, bekommt der Test „neuAb“ (Zeitpunkt, 1.4.0
 nach Sebs Test am 08.11.2026): Ergebnisse davor zählen nicht mehr, der Test steht wieder auf offen.
@@ -29,10 +32,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Request
+from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Path as P
 
 from . import rollen
 
+BILDER_MAX = 5                    # Fotos je Ergebnis (1.4.1), je höchstens 2 MB – die Seite verkleinert vorher
 ID_MUSTER = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")
 VERSION_MUSTER = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -97,7 +102,11 @@ class Ergebnisse:
                 CREATE TABLE IF NOT EXISTS ergebnisse (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, version TEXT NOT NULL, commit_ TEXT NOT NULL, test TEXT NOT NULL,
                     player TEXT NOT NULL, ok INTEGER NOT NULL, text TEXT, zeit TEXT NOT NULL);
-                CREATE INDEX IF NOT EXISTS ergebnisse_version ON ergebnisse (version, commit_);""")
+                CREATE INDEX IF NOT EXISTS ergebnisse_version ON ergebnisse (version, commit_);
+                CREATE TABLE IF NOT EXISTS bilder (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, ergebnis INTEGER NOT NULL, art TEXT NOT NULL, daten BLOB NOT NULL,
+                    zeit TEXT NOT NULL);
+                CREATE INDEX IF NOT EXISTS bilder_ergebnis ON bilder (ergebnis, id);""")
 
     @contextmanager
     def verbindung(self):
@@ -109,18 +118,40 @@ class Ergebnisse:
         finally:
             v.close()
 
-    def eintragen(self, version: str, commit: str, test: str, player: str, ok: bool, text: str) -> None:
+    def eintragen(self, version: str, commit: str, test: str, player: str, ok: bool, text: str) -> int:
         with self.verbindung() as v:
-            v.execute("INSERT INTO ergebnisse (version, commit_, test, player, ok, text, zeit) VALUES (?,?,?,?,?,?,?)",
+            return v.execute("INSERT INTO ergebnisse (version, commit_, test, player, ok, text, zeit) VALUES (?,?,?,?,?,?,?)",
                       (version, commit, test, player, 1 if ok else 0, text,
-                       datetime.now(timezone.utc).isoformat(timespec="seconds")))
+                       datetime.now(timezone.utc).isoformat(timespec="seconds"))).lastrowid
+
+    def ergebnis(self, ergebnis_id: int) -> dict | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT version, test, player FROM ergebnisse WHERE id=?", (ergebnis_id,)).fetchone()
+        return dict(z) if z else None
+
+    def bild_anlegen(self, ergebnis_id: int, art: str, daten: bytes, maximal: int) -> int | None:
+        with self.verbindung() as v:
+            v.execute("BEGIN IMMEDIATE")
+            if v.execute("SELECT COUNT(*) FROM bilder WHERE ergebnis=?", (ergebnis_id,)).fetchone()[0] >= maximal:
+                return None
+            return v.execute("INSERT INTO bilder (ergebnis, art, daten, zeit) VALUES (?,?,?,?)",
+                             (ergebnis_id, art, daten, datetime.now(timezone.utc).isoformat(timespec="seconds"))).lastrowid
+
+    def bild(self, bild_id: int) -> tuple[int, str, bytes] | None:
+        with self.verbindung() as v:
+            z = v.execute("SELECT ergebnis, art, daten FROM bilder WHERE id=?", (bild_id,)).fetchone()
+        return (z["ergebnis"], z["art"], z["daten"]) if z else None
 
     def liste(self, version: str) -> list[dict]:
         """Alle Ergebnisse dieser Version (über alle Commits), älteste zuerst – gefiltert wird mit gueltige()."""
         with self.verbindung() as v:
             zeilen = v.execute("SELECT * FROM ergebnisse WHERE version=? ORDER BY id", (version,)).fetchall()
-        return [{"test": z["test"], "player": z["player"], "ok": bool(z["ok"]), "text": z["text"] or "", "zeit": z["zeit"],
-                 "commit": z["commit_"]} for z in zeilen]
+            bilder: dict[int, list[int]] = {}
+            for b in v.execute("SELECT b.id, b.ergebnis FROM bilder b JOIN ergebnisse e ON e.id = b.ergebnis WHERE e.version=? "
+                               "ORDER BY b.id", (version,)):
+                bilder.setdefault(b["ergebnis"], []).append(b["id"])
+        return [{"id": z["id"], "test": z["test"], "player": z["player"], "ok": bool(z["ok"]), "text": z["text"] or "",
+                 "zeit": z["zeit"], "commit": z["commit_"], "bilder": bilder.get(z["id"], [])} for z in zeilen]
 
 
 def fuer(plan: dict, admin: bool) -> dict:
@@ -165,11 +196,13 @@ def einrichten(app: FastAPI, e, spieler) -> None:
         admin = rollen.rolle(e, request, player)["admin"]
         p = fuer(plan_oder_404(), admin)
         sichtbar = {t["id"] for t in p["tests"]}
-        liste = [x for x in gueltige(p, erg.liste(p["version"])) if x["test"] in sichtbar]
-        return {**p, "commit": commit, "ich": player, "admin": admin, "ergebnisse": liste,
+        alle = [x for x in erg.liste(p["version"]) if x["test"] in sichtbar]
+        liste = gueltige(p, alle)
+        # verlauf (1.4.1): alle Einträge, auch ältere und vor einem Nachtest – fürs Archiv „wer hat wann geprüft“
+        return {**p, "commit": commit, "ich": player, "admin": admin, "ergebnisse": liste, "verlauf": alle,
                 "zusammenfassung": zusammenfassung(p, liste)}
 
-    @app.post("/api/tester/ergebnis", status_code=204)
+    @app.post("/api/tester/ergebnis", status_code=201)
     def ergebnis(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
         p = fuer(plan_oder_404(), rollen.rolle(e, request, player)["admin"])
         test = body.get("test")
@@ -182,4 +215,37 @@ def einrichten(app: FastAPI, e, spieler) -> None:
         text = text.strip()[:2000]
         if not ok and len(text) < 5:
             raise HTTPException(422, "Bitte kurz beschreiben, was falsch lief")
-        erg.eintragen(p["version"], commit, test, player, ok, text)
+        return {"id": erg.eintragen(p["version"], commit, test, player, ok, text)}
+
+    def darf_sehen(request: Request, player: str, ergebnis_id: int) -> dict:
+        x = erg.ergebnis(ergebnis_id)
+        p = fuer(plan_oder_404(), rollen.rolle(e, request, player)["admin"])
+        if not x or x["test"] not in {t["id"] for t in p["tests"]}:
+            raise HTTPException(404, "Ergebnis nicht gefunden")
+        return x
+
+    @app.post("/api/tester/ergebnis/{ergebnis_id}/bilder", status_code=201)
+    def bild_dazu(request: Request, player: str = Depends(spieler), ergebnis_id: int = P(...), body: dict[str, Any] = Body(...)):
+        from . import steckbrief
+        from .verwaltung import bild_aus_daten_url
+        if darf_sehen(request, player, ergebnis_id)["player"] != player:
+            raise HTTPException(403, "Bilder kann nur anfügen, wer das Ergebnis eingetragen hat")
+        try:
+            art, daten = bild_aus_daten_url(body.get("bild"))
+        except steckbrief.UngueltigesBild as f:
+            raise HTTPException(422, str(f)) from None
+        bid = erg.bild_anlegen(ergebnis_id, art, daten, BILDER_MAX)
+        if bid is None:
+            raise HTTPException(409, f"Schon {BILDER_MAX} Bilder an diesem Ergebnis")
+        return {"id": bid}
+
+    @app.get("/api/tester/bild/{bild_id}")
+    def bild_zeigen(request: Request, player: str = Depends(spieler), bild_id: int = P(...)):
+        from . import steckbrief
+        b = erg.bild(bild_id)
+        if not b:
+            raise HTTPException(404, "Bild nicht gefunden")
+        darf_sehen(request, player, b[0])
+        return Response(b[2], media_type=steckbrief.ARTEN[b[1]],
+                        headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
+                                 "Content-Security-Policy": "default-src 'none'; sandbox"})

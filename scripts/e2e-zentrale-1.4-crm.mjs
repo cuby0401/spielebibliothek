@@ -140,8 +140,27 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await bis(`document.querySelectorAll(".test").length>=10`), "Tester-Panel zeigt den Testplan");
   await eval_(`document.querySelector(".test .knopf.nein").click(); true`);
   ok(await bis(`document.getElementById("meldung").textContent.includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");
+  const offenVorher = await eval_(`document.querySelectorAll("#inhalt > .test").length`);
   await eval_(`document.querySelector(".test .knopf.ja").click(); true`);
   ok(await bis(`document.querySelector(".test-zusammenfassung .ok").textContent.startsWith("✓ 1 ")`), "„Hat geklappt“ zählt als bestanden");
+  // 1.4.1 (Seb): eingetragene Tests verschwinden aus „Offen“ und stehen im Archiv „Bestanden“ bzw. „Abgelehnt“, mit Verlauf und Fotos
+  ok(await bis(`document.querySelectorAll("#inhalt > .test").length===${offenVorher}-1`), "Bestandener Test verschwindet aus „Offen“");
+  await eval_(`(async()=>{const t=document.querySelector("#inhalt > article.test textarea");t.value="E2E: geht nicht";
+    t.closest(".test").querySelector(".knopf.nein").click()})(); true`);
+  ok(await bis(`document.querySelectorAll("#inhalt > .test").length===${offenVorher}-2`), "Abgelehnter Test verschwindet aus „Offen“");
+  const foto = await eval_(`fetch("/api/tester/plan").then(r=>r.json()).then(d=>{const x=d.verlauf.find(x=>!x.ok);
+    const c=document.createElement("canvas");c.width=c.height=8;
+    return fetch("/api/tester/ergebnis/"+x.id+"/bilder",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},
+      body:JSON.stringify({bild:c.toDataURL("image/png")})}).then(r=>r.status)})`);
+  ok(foto === 201, "Foto an das abgelehnte Ergebnis angefügt");
+  await gehe(G + "/tester/#abgelehnt", 3500);
+  ok(await bis(`document.querySelectorAll("#inhalt > details.test").length===1`), "Reiter „Abgelehnt“ zeigt den Test eingeklappt");
+  await eval_(`document.querySelector("#inhalt > details.test").open=true; true`);
+  ok(await bis(`(()=>{const i=document.querySelector("details.test .test-ergebnisse img");return !!i && i.complete && i.naturalWidth===8})()`),
+    "Archiv zeigt Verlauf mit Foto");
+  await gehe(G + "/tester/#bestanden", 3500);
+  ok(await bis(`document.querySelectorAll("#inhalt > details.test").length===1 && document.querySelector(".test-reiter .aktiv").textContent.startsWith("Bestanden")`),
+    "Reiter „Bestanden“ zeigt den Test");
 
   // 8c) Handy (1.4.0, Nachtest 08.11., Sebs Test konto-handy): nichts ragt über den rechten Rand, das Initialen-Bild ist ganz zu sehen.
   //     Safari auf dem iPhone setzt Schrift breiter als Chrome – deshalb auch mit 320 px prüfen (kleinstes iPhone)

@@ -36,12 +36,12 @@ def test_plan_und_ergebnisse(tclient):
     d = tclient.get("/api/tester/plan", headers=p).json()
     assert [t["id"] for t in d["tests"]] == ["konto-leiste", "not-aus"] and d["version"] == "1.4.0"
     assert d["zusammenfassung"] == {"gesamt": 2, "bestanden": 0, "fehlgeschlagen": 0, "offen": 2}
-    assert tclient.post("/api/tester/ergebnis", json={"test": "konto-leiste", "ok": True}, headers=p).status_code == 204
+    assert tclient.post("/api/tester/ergebnis", json={"test": "konto-leiste", "ok": True}, headers=p).status_code == 201
     # Nein braucht eine Begründung, unbekannte Tests gibt es nicht
     assert tclient.post("/api/tester/ergebnis", json={"test": "not-aus", "ok": False, "text": ""}, headers=p).status_code == 422
     assert tclient.post("/api/tester/ergebnis", json={"test": "gibtsnicht", "ok": True}, headers=p).status_code == 404
     assert tclient.post("/api/tester/ergebnis", json={"test": "not-aus", "ok": False, "text": "Seite lädt weiter"},
-                        headers=tclient.als()).status_code == 204
+                        headers=tclient.als()).status_code == 201
     d = tclient.get("/api/tester/plan", headers=p).json()
     assert d["zusammenfassung"] == {"gesamt": 2, "bestanden": 1, "fehlgeschlagen": 1, "offen": 0}
     assert {(x["test"], x["player"], x["ok"]) for x in d["ergebnisse"]} == {("konto-leiste", "paul", True), ("not-aus", "seb", False)}
@@ -77,8 +77,33 @@ def test_admin_tests_nur_fuer_admin(tclient):
     d = tclient.get("/api/tester/plan", headers=seb).json()
     assert [t["id"] for t in d["tests"]] == ["crm-sperren", "konto-leiste", "not-aus"] and d["admin"] is True
     assert d["zusammenfassung"]["gesamt"] == 3
-    assert tclient.post("/api/tester/ergebnis", json={"test": "crm-sperren", "ok": True}, headers=seb).status_code == 204
+    assert tclient.post("/api/tester/ergebnis", json={"test": "crm-sperren", "ok": True}, headers=seb).status_code == 201
     d = tclient.get("/api/tester/plan", headers=p).json()
     assert [t["id"] for t in d["tests"]] == ["konto-leiste", "not-aus"] and d["admin"] is False
     assert d["ergebnisse"] == [] and d["zusammenfassung"]["gesamt"] == 2
     assert tclient.post("/api/tester/ergebnis", json={"test": "crm-sperren", "ok": True}, headers=p).status_code == 404
+
+
+def test_fotos_und_verlauf(tclient):
+    """1.4.1: Fotos an Ergebnissen; nur der Eintragende fügt an, sehen darf, wer den Test sieht; Verlauf mit allen Einträgen."""
+    import base64
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+    url = "data:image/png;base64," + base64.b64encode(png).decode()
+    seb, p = tclient.als(), tclient.als("paul@example.com")
+    eid = tclient.post("/api/tester/ergebnis", json={"test": "konto-leiste", "ok": False, "text": "Knopf fehlt"}, headers=p).json()["id"]
+    bid = tclient.post(f"/api/tester/ergebnis/{eid}/bilder", json={"bild": url}, headers=p).json()["id"]
+    assert tclient.post(f"/api/tester/ergebnis/{eid}/bilder", json={"bild": url}, headers=seb).status_code == 403   # nicht seins
+    assert tclient.post(f"/api/tester/ergebnis/{eid}/bilder", json={"bild": "kein Bild"}, headers=p).status_code == 422
+    b = tclient.get(f"/api/tester/bild/{bid}", headers=seb)
+    assert b.status_code == 200 and b.content == png and b.headers["content-type"] == "image/png"
+    tclient.post("/api/tester/ergebnis", json={"test": "konto-leiste", "ok": True}, headers=p)
+    d = tclient.get("/api/tester/plan", headers=p).json()
+    assert [x["ok"] for x in d["verlauf"]] == [False, True] and d["verlauf"][0]["bilder"] == [bid]
+    assert [x["ok"] for x in d["ergebnisse"]] == [True]                          # gezählt wird nur der neueste
+    # Fotos an Admin-Tests sieht nur der Admin
+    aid = tclient.post("/api/tester/ergebnis", json={"test": "crm-sperren", "ok": False, "text": "geht nicht"}, headers=seb).json()["id"]
+    abid = tclient.post(f"/api/tester/ergebnis/{aid}/bilder", json={"bild": url}, headers=seb).json()["id"]
+    assert tclient.get(f"/api/tester/bild/{abid}", headers=p).status_code == 404
+    for _ in range(4):
+        tclient.post(f"/api/tester/ergebnis/{aid}/bilder", json={"bild": url}, headers=seb)
+    assert tclient.post(f"/api/tester/ergebnis/{aid}/bilder", json={"bild": url}, headers=seb).status_code == 409

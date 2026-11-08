@@ -5,6 +5,14 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.4.1 – in Arbeit (ab 08.11.2026)
+
+Kleines Update nach dem ersten Testdurchgang mit dem Tester-Panel: Tester-Panel aufräumen, „Dabei seit“ korrigieren, schnellere Ende-zu-Ende-Tests, NAS entlasten.
+
+- **Behoben:** „Dabei seit“ im Profil und im CRM zeigte bei allen übernommenen Personen den Zeitpunkt der Übernahme (erster Start von 1.4.0). Jetzt steht dort die früheste bekannte Aktivität (Anmeldung, Spielstand, Rangliste, Erfolg, Anfrage, Daumen), die erste Anmeldung ebenso. Wird bei jedem Start nachgeholt, nur für übernommene Personen.
+- **Neu:** Tester-Panel mit drei Reitern (Sebs Notiz vom 08.11.): „Offen“ ist die Startseite und zeigt nur, was noch zu testen ist, Nachtests eingeschlossen. Eingetragene Tests wandern nach „Abgelehnt“ bzw. „Bestanden“ (Archiv, eingeklappt). Dort steht der ganze Verlauf: wer wann geprüft hat, mit Begründung und Fotos, auch ältere Einträge vor einem Nachtest. Neu eintragen geht dort weiterhin.
+- **Neu:** Fotos an Testergebnissen: bis zu 5 Bilder je Eintrag (Datei wählen oder Screenshot mit Strg/⌘+V), im Browser verkleinert, in der Ergebnis-Datenbank außerhalb der Probe-Daten. Sehen darf sie, wer den Test sieht, anfügen nur, wer eingetragen hat.
+
 ## 1.4.0 – 06.11.2026
 
 **Großer Umbau der Benutzerverwaltung: CRM** (E67/E68). Anleitung: `docs/crm.md`.
