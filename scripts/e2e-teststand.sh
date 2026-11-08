@@ -5,7 +5,7 @@
 # Hostnamen wie in teststand.sh über GH/PH/UH (Mac: Tailscale-Namen, NAS: 127.0.0.1/localhost/127.0.0.2).
 set -eu
 REPO="$1"
-sh "$REPO/scripts/teststand.sh" up "$REPO" >/dev/null 2>&1; sleep 3
+sh "$REPO/scripts/teststand.sh" up "$REPO" >&2; sleep 3   # Ausgaben nach stderr – e2e-alle.sh legt sie ins Log
 # Spiel von „paul“ mit Kategorien, Erfolgen und Bestenliste
 d=/tmp/sb-teststand/spiele/paul/raetsel; mkdir -p $d
 printf "%s" "{\"title\":\"Rätselspaß\",\"description\":\"Test\",\"tags\":[\"Puzzle\",\"Wörter\"],\"leaderboard\":{\"enabled\":true},\"erfolge\":[{\"id\":\"start\",\"titel\":\"Losgelegt\"},{\"id\":\"profi\",\"titel\":\"Profi\",\"geheim\":true}]}" > $d/game.json

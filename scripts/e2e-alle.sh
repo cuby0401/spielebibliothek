@@ -36,15 +36,23 @@ else
 fi
 
 # Teststand frisch aufbauen, Spiel von „paul“ anlegen, Upload-Passwort zurückgeben (gemeinsam mit dem Auftragsdienst)
+teststand_einmal() {
+	if [ "$ORT" = mac ]; then sh "$REPO/scripts/e2e-teststand.sh" "$REPO" 2>"$TMP/teststand.log"
+	else ssh -o LogLevel=ERROR "$NAS" 'sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo' 2>"$TMP/teststand.log"; fi
+}
+# Ein zweiter Versuch, falls der Aufbau einmal hakt (1.4.1); schlägt auch der fehl, steht der Grund im Log
 teststand() {
-	if [ "$ORT" = mac ]; then sh "$REPO/scripts/e2e-teststand.sh" "$REPO" 2>/dev/null
-	else ssh -o LogLevel=ERROR "$NAS" 'sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo' 2>/dev/null; fi
+	teststand_einmal && return 0
+	echo "  Teststand: zweiter Versuch" >&2
+	teststand_einmal && return 0
+	echo "ABBRUCH: Teststand ließ sich nicht aufbauen:" >&2; tail -15 "$TMP/teststand.log" | sed 's/^/  /' >&2
+	return 1
 }
 
 FEHLER=""
 for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm boese}; do
 	echo "→ Ende-zu-Ende: $t"
-	PW=$(teststand)
+	PW=$(teststand) || { FEHLER="$FEHLER $t"; continue; }
 	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"
 	# Auf dem Mac aus der Kopie – so stört es nicht, wenn während eines Hintergrundlaufs am Repo weitergearbeitet wird
 	S=scripts; [ "$ORT" = mac ] && S="$REPO/scripts"
