@@ -12,6 +12,9 @@ Kleines Update nach dem ersten Testdurchgang mit dem Tester-Panel: Tester-Panel 
 - **Behoben:** „Dabei seit“ im Profil und im CRM zeigte bei allen übernommenen Personen den Zeitpunkt der Übernahme (erster Start von 1.4.0). Jetzt steht dort die früheste bekannte Aktivität (Anmeldung, Spielstand, Rangliste, Erfolg, Anfrage, Daumen), die erste Anmeldung ebenso. Wird bei jedem Start nachgeholt, nur für übernommene Personen.
 - **Neu:** Tester-Panel mit drei Reitern (Sebs Notiz vom 08.11.): „Offen“ ist die Startseite und zeigt nur, was noch zu testen ist, Nachtests eingeschlossen. Eingetragene Tests wandern nach „Abgelehnt“ bzw. „Bestanden“ (Archiv, eingeklappt). Dort steht der ganze Verlauf: wer wann geprüft hat, mit Begründung und Fotos, auch ältere Einträge vor einem Nachtest. Neu eintragen geht dort weiterhin.
 - **Neu:** Fotos an Testergebnissen: bis zu 5 Bilder je Eintrag (Datei wählen oder Screenshot mit Strg/⌘+V), im Browser verkleinert, in der Ergebnis-Datenbank außerhalb der Probe-Daten. Sehen darf sie, wer den Test sieht, anfügen nur, wer eingetragen hat.
+- **Geändert (NAS entlasten):** Ende-zu-Ende-Tests laufen auf dem Mac, wenn Docker Desktop läuft. Teststand und Chrome stehen dann auf dem Mac, die NAS rechnet nichts. `deploy.sh --probe` startet sie im Hintergrund (`scripts/e2e-mac-hintergrund.sh`), das Ergebnis steht wie bisher unter „Aufgaben“ im Admin-Panel. Ohne Docker Desktop wie bisher auf der NAS. Erzwingen mit `E2E_ORT=mac|nas`.
+- **Geändert (schnellere Tests):** Die Ende-zu-Ende-Tests warten nach jedem Seitenwechsel nicht mehr fest 2,5–6,5 s, sondern bis die Seite geladen ist und sich nichts mehr ändert. Die volle Runde braucht auf dem Mac etwa 2:35 Min. (vorher etwa 10 Min. auf der NAS bzw. 5:40 auf dem Mac).
+- **Testplan:** `tests/manuell/1.4.1.json`, 9 Tests (3 nur für Seb).
 
 ## 1.4.0 – 06.11.2026
 

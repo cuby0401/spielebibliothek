@@ -233,7 +233,7 @@ if [ "$TESTS" = 1 ]; then
 fi
 
 if [ "$GRUENDLICH" = 1 ]; then
-	echo "→ Ende-zu-Ende-Tests im Teststand (ca. 6–8 Minuten) …"
+	echo "→ Ende-zu-Ende-Tests im Teststand (ca. 3 Min. auf dem Mac mit Docker Desktop, sonst ca. 6–8 Min. auf der NAS) …"
 	sh scripts/e2e-alle.sh || { echo "✗ Ende-zu-Ende-Tests fehlgeschlagen – nichts deployt." >&2; exit 1; }
 fi
 
@@ -258,7 +258,11 @@ if [ "$PROBE" = 1 ]; then
 	fi
 	# Ende-zu-Ende-Tests NICHT abwarten (08.11.2026): Der Testserver ist sofort da, die Tests laufen parallel im Teststand
 	# auf der NAS (Auftragsdienst, Ziel „probe“ = genau dieser Stand). Ergebnis: Admin-Panel → Aufgaben, rot = rote Glocke.
-	if [ "$TESTS" = 1 ]; then
+	# Seit 1.4.1 (NAS entlasten): Läuft Docker Desktop auf dem Mac, laufen sie dort (ca. 3 Min.) und die NAS rechnet nichts.
+	if [ "$TESTS" = 1 ] && docker info >/dev/null 2>&1; then
+		nohup sh scripts/e2e-mac-hintergrund.sh >/dev/null 2>&1 &
+		echo "  Ende-zu-Ende-Tests laufen jetzt im Hintergrund auf dem Mac (ca. 3 Min., Log ~/Library/Logs/spielebibliothek-e2e.log) – Ergebnis: Admin-Panel → Aufgaben, bei Rot eine rote Glocke"
+	elif [ "$TESTS" = 1 ]; then
 		AID=$(ssh -o LogLevel=ERROR "$NAS" "docker exec spielebibliothek-savesvc python -c 'from pathlib import Path; from savesvc.db import Datenbank; print(Datenbank(Path(\"/data/saves.db\")).auftrag_anlegen(\"e2e-tests\", \"probe\", \"deploy\", \"mac\"))'" 2>/dev/null || true)
 		case "$AID" in
 			''|None) echo "  (Ende-zu-Ende-Tests nicht angestoßen – läuft schon einer? Sonst im Admin-Panel → Aufgaben starten)" ;;

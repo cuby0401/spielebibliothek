@@ -1,36 +1,58 @@
 #!/bin/sh
-# Alle Ende-zu-Ende-Tests im Teststand auf der NAS (Idee 10, Zentrale 1.2.0). Läuft auch bei scripts/deploy.sh --gruendlich.
-# Braucht auf dem Mac: Google Chrome und Node ≥ 22. Dauer ca. 6–8 Minuten. Der Teststand wird für jeden Test frisch aufgebaut
-# und am Ende wieder entfernt – die echte Bibliothek wird nicht angefasst.
+# Alle Ende-zu-Ende-Tests (Idee 10, Zentrale 1.2.0). Läuft auch bei scripts/deploy.sh --gruendlich.
+# Braucht auf dem Mac: Google Chrome und Node ≥ 22. Der Teststand wird für jeden Test frisch aufgebaut und am Ende wieder
+# entfernt – die echte Bibliothek wird nicht angefasst.
+#
+# Seit 1.4.1 (NAS entlasten): Läuft Docker Desktop auf dem Mac, steht auch der Teststand auf dem Mac – die NAS hat dann
+# nichts zu tun. Sonst wie bisher auf der NAS (über ssh). Erzwingen: E2E_ORT=mac oder E2E_ORT=nas.
+# Einzelne Tests: E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh
 set -eu
 cd "$(dirname "$0")/.."
 NAS="${NAS:-$NAS}"
+ORT="${E2E_ORT:-$(docker info >/dev/null 2>&1 && echo mac || echo nas)}"
 TMP=$(mktemp -d)
-aufraeumen() {
-	ssh -o LogLevel=ERROR "$NAS" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:sbtest >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
-	rm -rf "$TMP"
-}
+if [ "$ORT" = mac ]; then
+	export LOKAL=1 GH=127.0.0.1 PH=localhost UH=upload.localhost
+	export E2E_G="http://$GH:18088" E2E_U="http://$UH:18090"
+	REPO="$TMP/repo"
+	aufraeumen() {
+		sh "$REPO/scripts/teststand.sh" down >/dev/null 2>&1 || true
+		rm -rf "$TMP"
+	}
+else
+	aufraeumen() {
+		ssh -o LogLevel=ERROR "$NAS" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:sbtest >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
+		rm -rf "$TMP"
+	}
+fi
 trap aufraeumen EXIT
+echo "  Teststand auf: $ORT"
 
 python3 -I scripts/e2e-vorbereiten.py "$TMP"
-git ls-files -co --exclude-standard | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$NAS" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
+if [ "$ORT" = mac ]; then
+	mkdir -p "$REPO" && git ls-files -co --exclude-standard | tar --no-mac-metadata --no-xattrs -cf - -T - | tar -xf - -C "$REPO"
+else
+	git ls-files -co --exclude-standard | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$NAS" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
+fi
 
 # Teststand frisch aufbauen, Spiel von „paul“ anlegen, Upload-Passwort zurückgeben (gemeinsam mit dem Auftragsdienst)
 teststand() {
-	ssh -o LogLevel=ERROR "$NAS" 'sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo' 2>/dev/null
+	if [ "$ORT" = mac ]; then sh "$REPO/scripts/e2e-teststand.sh" "$REPO" 2>/dev/null
+	else ssh -o LogLevel=ERROR "$NAS" 'sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo' 2>/dev/null; fi
 }
 
 FEHLER=""
-# Einzelne Tests: E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh
 for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm boese}; do
 	echo "→ Ende-zu-Ende: $t"
 	PW=$(teststand)
 	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"
-	if [ "$t" = boese ]; then set -- node scripts/e2e-boese.mjs "$TMP"; else set -- node "scripts/e2e-$t.mjs" "$TMP" "$PW"; fi
+	# Auf dem Mac aus der Kopie – so stört es nicht, wenn während eines Hintergrundlaufs am Repo weitergearbeitet wird
+	S=scripts; [ "$ORT" = mac ] && S="$REPO/scripts"
+	if [ "$t" = boese ]; then set -- node "$S/e2e-boese.mjs" "$TMP"; else set -- node "$S/e2e-$t.mjs" "$TMP" "$PW"; fi
 	if "$@" > "$TMP/log" 2>&1; then
 		echo "  ✓ $(grep -c '^✓' "$TMP/log") Prüfpunkte grün"
 	else
-		grep -E "^✗|ABBRUCH" "$TMP/log" | sed 's/^/  /'
+		grep -E "^✗|ABBRUCH" "$TMP/log" | sed 's/^/  /' || tail -5 "$TMP/log" | sed 's/^/  /'
 		FEHLER="$FEHLER $t"
 	fi
 done

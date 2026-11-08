@@ -20,7 +20,20 @@ async function eval_(ausdruck) {
   if (r.exceptionDetails) throw new Error("eval: " + (r.exceptionDetails.exception?.description || r.exceptionDetails.text));
   return r.result.value;
 }
-async function gehe(url, ms = 2500) { await cdp("Page.navigate", { url }, S); await warte(ms); }
+// 1.4.1 (schnellere Tests): statt fest ms zu warten, bis die Seite geladen ist und das DOM 400 ms still steht – höchstens ms
+const RUHIG = `new Promise((fertig) => { const los = () => { let t; const o = new MutationObserver(() => { clearTimeout(t); t = setTimeout(ende, 400); });
+  const ende = () => { o.disconnect(); fertig(true); }; o.observe(document, { subtree: true, childList: true, characterData: true, attributes: true }); t = setTimeout(ende, 400); };
+  document.readyState === "complete" ? los() : addEventListener("load", los, { once: true }); })`;
+async function gehe(url, ms = 2500) {
+  await cdp("Page.navigate", { url }, S);
+  const ende = Date.now() + ms;
+  await warte(200);
+  while (Date.now() < ende) {
+    const ok = await Promise.race([eval_(RUHIG).catch(() => false), warte(Math.max(0, ende - Date.now())).then(() => true)]);
+    if (ok) return;
+    await warte(100);
+  }
+}
 async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (Date.now() < ende) { if (await eval_(ausdruck).catch(() => false)) return true; await warte(250); } return false; }
 async function hochladen(datei, neu) {
   const doc = await cdp("DOM.getDocument", {}, S);
@@ -77,9 +90,10 @@ const dialoge = [];
 
   // 3) Spiel: Wochen-Bestenliste, Erfolg-Einblendung, Erfolge-Liste, Spielzeit
   await gehe(G + "/#/spiel/paul/raetsel", 6500);
+  await warte(6000);   // echte Spielzeit (wird gezählt) – nicht durch das schnellere gehe() abkürzen
   ok((await eval_(`document.getElementById("bl-titel").textContent`)).startsWith("⭐ Diese Woche"), "Bestenliste zeigt zuerst „Diese Woche“");
   ok(await eval_(`[...document.getElementById("bl-season").options].some(o=>o.value==="woche")`), "Auswahl enthält „Diese Woche“");
-  ok(await eval_(`document.getElementById("toast").textContent.includes("Losgelegt")`), "Einblendung „Erfolg freigeschaltet: Losgelegt“");
+  ok(await bis(`document.getElementById("toast").textContent.includes("Losgelegt")`), "Einblendung „Erfolg freigeschaltet: Losgelegt“");
   ok(await bis(`document.getElementById("erfolge").textContent.includes("Erfolge 1/2") && document.getElementById("erfolge").textContent.includes("🔒 ???")`), "Erfolge 1/2, geheimer als ???");
   ok(await eval_(`document.getElementById("daumen").textContent==="1" && !document.getElementById("daumen").disabled`), "Daumen im Spiel zeigt 1");
   await gehe(G + "/#/", 2500);

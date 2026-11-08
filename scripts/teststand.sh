@@ -14,6 +14,9 @@
 #                  Änderungen dort bleiben dort. „Für Live freigeben“ im Admin-Panel der Probe schreibt data/freigabe.json,
 #                  die scripts/deploy.sh vor jedem Live-Deploy prüft.
 #
+# LOKAL=1 (1.4.1, NAS entlasten): Teststand in Docker Desktop auf dem Mac statt auf der NAS. Ports nur an 127.0.0.1,
+#                  Hostnamen 127.0.0.1 / localhost / upload.localhost (Chrome löst *.localhost selbst auf).
+#
 # Im Teststand ist man automatisch als seb angemeldet (DEV_USER) – Cloudflare Access gibt es dort nicht.
 # In der Probe nicht mehr (07.11.2026): Nach dem Anlegen der Tunnel-Routen war sie kurz ohne Anmeldung als „seb“ im Internet.
 set -eu
@@ -36,6 +39,7 @@ else
 	ANMELDUNG="-e DEV_USER=seb -e DEV_ALLOW=1"
 	COOKIE_SECURE=0
 	PORTS="-p $PG:8080 -p $PP:8080 -p $PU:8080"
+	[ "${LOKAL:-0}" = 1 ] && PORTS="-p 127.0.0.1:$PG:8080 -p 127.0.0.1:$PP:8080 -p 127.0.0.1:$PU:8080"
 	TESTERGEBNISSE=$T/tests
 fi
 LIVE=/volume1/games
@@ -79,7 +83,7 @@ up)
 	fi
 	cp -r "$2"/. "$T/repo"
 	find "$T/repo/site" "$T/repo/lib" "$T/repo/examples" -type f \( -name '*.js' -o -name '*.html' \) \
-		-exec sed -i "s#https://games.cuby0401.uk#$G#g; s#https://play.cuby0401.uk#$P#g; s#https://upload.cuby0401.uk#$U#g" {} +
+		-exec sh -c 'if sed --version >/dev/null 2>&1; then sed -i "$0" "$@"; else sed -i "" "$0" "$@"; fi' "s#https://games.cuby0401.uk#$G#g; s#https://play.cuby0401.uk#$P#g; s#https://upload.cuby0401.uk#$U#g" {} +
 	sed -e "s#https://games.cuby0401.uk#$G#g" -e "s#https://play.cuby0401.uk#$P#g" -e "s#https://upload.cuby0401.uk#$U#g" \
 		-e "s#\([^-]\)play\.cuby0401\.uk#\1$PH#g" -e "s#\([^-]\)upload\.cuby0401\.uk#\1$UH#g" \
 		-e "s#savesvc:8000#$N-savesvc:8000#" -e "s#upload:8000#$N-upload:8000#" "$T/repo/Caddyfile" > "$T/Caddyfile"

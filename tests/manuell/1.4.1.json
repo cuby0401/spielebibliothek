@@ -1,0 +1,108 @@
+{
+  "version": "1.4.1",
+  "hinweis": "Der Testserver ist eine Kopie der echten Bibliothek mit deinem Konto. Nichts davon landet im Live-System. Hier stehen nur Dinge, die in 1.4.1 NEU sind, jedes einzeln. Die Admin-Tests sieht nur Seb.",
+  "tests": [
+    {
+      "id": "dabei-seit-profil",
+      "bereich": "Konto",
+      "titel": "„Dabei seit“ zeigt deinen echten Beginn",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Klick oben rechts auf deinen Namen, „Mein Profil“ öffnet sich.",
+        "Schau in der Karte oben auf „dabei seit …“."
+      ],
+      "erwartet": "Dort steht der Tag, an dem du zum ersten Mal in der Bibliothek aktiv warst (erste Anmeldung oder erster Spielstand), also vor dem 08.11.2026. Bisher stand bei allen der 08.11.2026, der Tag der Umstellung auf das CRM."
+    },
+    {
+      "id": "tester-reiter-offen",
+      "bereich": "Tester-Panel",
+      "titel": "Startseite zeigt nur offene Tests",
+      "schritte": [
+        "Öffne das Tester-Panel neu.",
+        "Schau unter der Zusammenfassung: Dort gibt es drei Reiter „Offen“, „Abgelehnt“ und „Bestanden“, jeweils mit einer Zahl."
+      ],
+      "erwartet": "„Offen“ ist ausgewählt und zeigt nur Tests, die noch niemand eingetragen hat. Die Zahlen an den Reitern passen zur Zusammenfassung darüber (offen, fehlgeschlagen, bestanden)."
+    },
+    {
+      "id": "tester-eintragen-wandert",
+      "bereich": "Tester-Panel",
+      "titel": "Eingetragener Test wandert ins Archiv",
+      "schritte": [
+        "Mach einen anderen Test aus dieser Liste fertig und klick „✓ Hat geklappt“ (dieser hier bleibt dafür offen).",
+        "Schau auf die Liste „Offen“ und die Zahlen an den Reitern.",
+        "Klick auf den Reiter „Bestanden“."
+      ],
+      "erwartet": "Nach dem Eintragen kommt oben ein Pop-up „… als bestanden eingetragen“. Der Test verschwindet aus „Offen“, die Zahl bei „Offen“ sinkt um eins, bei „Bestanden“ steigt sie um eins. Unter „Bestanden“ steht er eingeklappt, mit deinem Namen und der Uhrzeit."
+    },
+    {
+      "id": "tester-archiv-verlauf",
+      "bereich": "Tester-Panel",
+      "titel": "Archiv: wer hat wann geprüft",
+      "schritte": [
+        "Im Reiter „Bestanden“ auf den eben eingetragenen Test klicken.",
+        "Klapp ihn auf und schau unter „Verlauf“.",
+        "Trag ihn unten bei „Neu eintragen“ noch einmal als „✓ Hat geklappt“ ein, mit einem kurzen Text."
+      ],
+      "erwartet": "Aufgeklappt stehen Verlauf, Anleitung und „Neu eintragen“. Nach dem zweiten Eintrag stehen im Verlauf beide Einträge, der neueste oben. Der ältere ist blasser und mit „(älter, zählt nicht mehr)“ markiert."
+    },
+    {
+      "id": "tester-foto-datei",
+      "bereich": "Tester-Panel",
+      "titel": "Foto bei „Hat nicht geklappt“ anhängen",
+      "schritte": [
+        "Mach einen Screenshot oder nimm ein Foto mit dem Handy.",
+        "Im Reiter „Offen“ bei diesem Test unten auf „🖼 Bild anfügen“ klicken und das Bild wählen.",
+        "Schreib „Test mit Foto“ ins Textfeld und klick „✗ Hat nicht geklappt“.",
+        "Wechsle in den Reiter „Abgelehnt“ und klapp diesen Test auf."
+      ],
+      "erwartet": "Vor dem Absenden siehst du eine kleine Vorschau des Bildes. Nach dem Absenden kommt ein Pop-up „… als fehlgeschlagen eingetragen (mit 1 Foto)“. Unter „Abgelehnt“ steht der Test, im Verlauf dein Eintrag mit Text und Foto. Ein Klick auf das Foto öffnet es groß in einem neuen Tab. Danach den Test hier bitte noch einmal als „✓ Hat geklappt“ eintragen, wenn alles stimmte.",
+      "hinweis": "Fotos vom Handy werden vor dem Hochladen verkleinert, das dauert einen Moment."
+    },
+    {
+      "id": "tester-foto-einfuegen",
+      "bereich": "Tester-Panel",
+      "titel": "Screenshot mit Strg/⌘+V einfügen",
+      "schritte": [
+        "Am Rechner einen Screenshot in die Zwischenablage legen (Mac: ⌘+Ctrl+Shift+4, Windows: Win+Shift+S).",
+        "Bei diesem Test ins Textfeld klicken und ⌘+V bzw. Strg+V drücken.",
+        "Text dazu schreiben und eintragen („Hat geklappt“ oder „Hat nicht geklappt“)."
+      ],
+      "erwartet": "Nach dem Einfügen erscheint die Vorschau des Screenshots unter dem Textfeld. Nach dem Eintragen steht er im Verlauf des Tests im Archiv."
+    },
+    {
+      "id": "seb-dabei-seit-crm",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: „Angelegt“ und „erste Anmeldung“ korrigiert",
+      "schritte": [
+        "Admin-Panel → Personen → Paul öffnen.",
+        "Unter den Stammdaten die Zeile „Angelegt … · erste Anmeldung …“ anschauen.",
+        "Dasselbe bei Emil."
+      ],
+      "erwartet": "„Angelegt“ ist nicht mehr der 08.11.2026 (Umstellung auf das CRM), sondern der Tag der ersten Aktivität, bei Paul und Emil also etwa der 05.11.2026. „Erste Anmeldung“ ist die früheste bekannte Anmeldung. Personen, die nach der Umstellung eingeladen wurden, behalten ihr Datum.",
+      "nurAdmin": true
+    },
+    {
+      "id": "seb-fotos-admin-tests",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "Fotos an Admin-Tests sieht nur der Admin",
+      "schritte": [
+        "Hänge bei einem deiner Admin-Tests ein Foto an (wie im Test „Foto bei „Hat nicht geklappt“ anhängen“).",
+        "Bitte Emil, kurz ins Tester-Panel zu schauen, oder prüf es im Admin-Panel der Probe unter „Für Live freigeben“."
+      ],
+      "erwartet": "Du siehst das Foto im Verlauf deines Admin-Tests. Emil sieht den Admin-Test weder in „Offen“ noch im Archiv, also auch das Foto nicht.",
+      "nurAdmin": true
+    },
+    {
+      "id": "seb-e2e-mac",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "Ende-zu-Ende-Tests laufen auf dem Mac",
+      "schritte": [
+        "Nach dem Bau des Testservers (macht Claude mit scripts/deploy.sh --probe) im Admin-Panel der LIVE-Bibliothek → „Aufgaben“ schauen.",
+        "Nach etwa 3 Minuten neu laden."
+      ],
+      "erwartet": "Zuerst steht dort ein Lauf „Ende-zu-Ende-Tests“ (Probe) mit „läuft auf dem Mac“. Nach etwa 3 Minuten wechselt er auf grün mit „Mac: ✓ Alle Ende-zu-Ende-Tests grün“, das Protokoll lässt sich öffnen. Die NAS hat dabei nichts gerechnet (vorher etwa 10 Minuten Last auf der NAS).",
+      "hinweis": "Voraussetzung: Docker Desktop läuft auf dem Mac. Läuft es nicht, laufen die Tests wie bisher auf der NAS.",
+      "nurAdmin": true
+    }
+  ]
+}
