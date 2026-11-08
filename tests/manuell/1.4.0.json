@@ -1,6 +1,6 @@
 {
   "version": "1.4.0",
-  "hinweis": "Der Testserver ist eine Kopie der echten Bibliothek mit deinem Konto. Nichts davon landet im Live-System – du kannst also ruhig Dinge ausprobieren, Spielstände löschen usw. Tests mit „Nur Seb“ im Bereich lässt du einfach aus.",
+  "hinweis": "Der Testserver ist eine Kopie der echten Bibliothek mit deinem Konto. Nichts davon landet im Live-System, du kannst also ruhig Dinge ausprobieren, Spielstände löschen usw. Hier stehen nur Dinge, die in 1.4.0 NEU sind, jedes einzeln. Tests mit „Nur Seb“ im Bereich lässt du einfach aus.",
   "tests": [
     {
       "id": "konto-name-oeffnet-profil",
@@ -49,6 +49,28 @@
       "erwartet": "Oben erscheint „Gespeichert.“. Nach dem Neuladen steht der Anzeigename groß oben in der Profilkarte, der Benutzername steht darunter als @name."
     },
     {
+      "id": "datenschutz-bestaetigen",
+      "bereich": "Konto",
+      "titel": "Datenschutzhinweis bestätigen",
+      "schritte": [
+        "Klick auf deinen Namen → Profil → Abschnitt „Meine Angaben“.",
+        "Setz den Haken beim Datenschutzhinweis und klicke „Speichern“.",
+        "Lade die Seite neu (F5)."
+      ],
+      "erwartet": "Nach dem Neuladen ist der Haken gesetzt und ausgegraut, daneben steht, wann du bestätigt hast. Abwählen geht nicht mehr."
+    },
+    {
+      "id": "geburtstag-pruefen",
+      "bereich": "Konto",
+      "titel": "Geburtstag in der Zukunft wird abgelehnt",
+      "schritte": [
+        "Profil → „Meine Angaben“.",
+        "Trag als Geburtstag ein Datum in der Zukunft ein (z. B. 01.01.2030) und klicke „Speichern“.",
+        "Lösch das Datum wieder und speichere erneut."
+      ],
+      "erwartet": "Beim Datum in der Zukunft kommt eine verständliche Fehlermeldung, gespeichert wird nichts. Ohne Datum klappt das Speichern („Gespeichert.“)."
+    },
+    {
       "id": "spielstaende-seite",
       "bereich": "Konto",
       "titel": "Meine Spielstände als eigene Seite",
@@ -76,6 +98,38 @@
         "Klicke in der Bestenliste auf den Namen eines anderen Spielers."
       ],
       "erwartet": "Es öffnet sich „Profil von …“ mit Initialen-Kreis, Name und Spielen – OHNE die Leiste links und OHNE „Meine Angaben“, Spielstände oder Anmeldungen der anderen Person."
+    },
+    {
+      "id": "hilfe-deine-daten",
+      "bereich": "Konto",
+      "titel": "Hilfe: Abschnitt „Deine Daten“",
+      "schritte": [
+        "Oben „Hilfe“ öffnen.",
+        "Such den Abschnitt „Deine Daten“ und lies ihn kurz."
+      ],
+      "erwartet": "Der Abschnitt ist da und erklärt verständlich, welche Angaben freiwillig sind, wer sie sieht und wie du Auskunft oder Löschung bekommst."
+    },
+    {
+      "id": "tester-link",
+      "bereich": "Konto",
+      "titel": "Tester: Link zum Tester-Panel",
+      "schritte": [
+        "Klick auf deinen Namen.",
+        "Schau unten in die Leiste mit den Bereichen und klicke „Tester-Panel“."
+      ],
+      "erwartet": "Unten in der Leiste steht „Tester-Panel“. Der Klick öffnet dieses Panel mit den Tests der Version 1.4.0.",
+      "hinweis": "Nur für Tester (z. B. Emil) und Seb. Wer die Rolle Tester nicht hat, sieht den Link nicht."
+    },
+    {
+      "id": "tester-eintragen",
+      "bereich": "Tester-Panel",
+      "titel": "Ergebnis eintragen und ändern",
+      "schritte": [
+        "Wähl im Tester-Panel einen Test, den du schon gemacht hast.",
+        "Klick „✗ Hat nicht geklappt“, ohne etwas ins Textfeld zu schreiben.",
+        "Klick danach „✓ Hat geklappt“."
+      ],
+      "erwartet": "Ohne Text kommt die Meldung, dass du kurz beschreiben sollst, was passiert ist. Nichts wird eingetragen. Nach „Hat geklappt“ steht der Test auf „✓ bestanden“ mit deinem Namen und der Uhrzeit, und oben zählt die Zusammenfassung mit."
     },
     {
       "id": "spielen-alle-spiele",
@@ -122,23 +176,134 @@
       "hinweis": "Nachtest: Am 08.11. fehlte bei Emil die Rolle Tester. Der Testserver wird dafür frisch aus den Live-Daten aufgebaut, Emil bekommt die Rolle dabei automatisch."
     },
     {
-      "id": "seb-crm-massnahmen",
+      "id": "seb-crm-liste-filter",
       "bereich": "Nur Seb (Admin)",
-      "titel": "CRM: Testperson von Anfang bis Ende",
+      "titel": "CRM: Suche und Filter",
       "schritte": [
-        "Personen → „Person einladen“: E-Mail test+2@example.com, Benutzername testperson2, Rolle Spieler.",
-        "Auf der Seite der Person ganz nach unten scrollen und „Einladung senden“ klicken.",
-        "Notiz schreiben.",
-        "Haken bei Entwickler setzen → „Rollen speichern“ (das Passwort wird einmal angezeigt).",
-        "Haken bei Entwickler wieder wegnehmen → „Rollen speichern“. Danach die Seite neu laden (F5).",
-        "Haken bei Entwickler noch einmal setzen → „Rollen speichern“.",
-        "Verwarnen (mit Grund), Sperren (mit Grund), Entsperren.",
-        "Zum Schluss Archivieren (Benutzername zur Bestätigung eintippen).",
-        "Danach „Prüfprotokoll“ öffnen."
+        "Admin-Panel → „Personen“.",
+        "Tipp ins Suchfeld einen Teil eines Namens oder einer E-Mail (z. B. „phil“).",
+        "Feld leeren, dann bei „Rolle“ „Entwickler“ wählen.",
+        "Rolle zurück auf „alle Rollen“, bei „Status“ nacheinander „aktiv“ und „archiviert“ wählen."
       ],
-      "erwartet": "„Einladung senden“ zeigt oben im Fenster gut sichtbar: „E-Mail-Versand ist nicht eingerichtet … – Einladung bitte selbst schicken“. Nach dem Wegnehmen ist der Haken bei Entwickler auch nach dem Neuladen weg (die Seite sagt: „Hat noch einen Spieleordner …“). Erneut setzen klappt und zeigt wieder ein Passwort. Jeder Schritt klappt ohne Fehlermeldung. Zeitleiste und Prüfprotokoll zeigen jeden Schritt mit wer, was, wann, vorher und nachher.",
-      "neuAb": "2026-11-08T09:45:00+00:00",
-      "hinweis": "Nachtest: Am 08.11. blieb nach dem Entziehen der Haken bei Entwickler stehen, und beim Einladen kam keine sichtbare Meldung. Meldungen erscheinen jetzt oben im Fenster, auch wenn du weit unten bist."
+      "erwartet": "Die Suche findet nach Name, Anzeigename und E-Mail. Der Rollen-Filter zeigt nur Entwickler. Ohne Status-Filter fehlen archivierte und gelöschte Personen, bei „archiviert“ erscheinen genau die. Die Zahl in der Überschrift zählt nur die nicht archivierten."
+    },
+    {
+      "id": "seb-crm-einladen",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Person einladen",
+      "schritte": [
+        "Personen → „Person einladen“ aufklappen: E-Mail test+3@example.com, Benutzername testperson3, Rolle nur Spieler → einladen.",
+        "Auf der Seite der Person ganz nach unten scrollen und „Einladung senden“ klicken."
+      ],
+      "erwartet": "Nach dem Einladen öffnet sich die Seite von testperson3 mit Status „eingeladen“ und der E-Mail. Oben im Fenster steht der nächste Schritt (Cloudflare-Abgleich). „Einladung senden“ zeigt oben im Fenster gut sichtbar „E-Mail-Versand ist nicht eingerichtet … – Einladung bitte selbst schicken“ (oder fragt nach, ob die E-Mail in Cloudflare steht). Erfolgsmeldungen verschwinden nach ein paar Sekunden, Fehler bleiben, bis du sie anklickst.",
+      "hinweis": "Die Tests „seb-crm-…“ bauen aufeinander auf: der Reihe nach mit testperson3 machen."
+    },
+    {
+      "id": "seb-crm-stammdaten-emails",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Stammdaten und Login-E-Mails",
+      "schritte": [
+        "Seite von testperson3: Anzeigename, Vorname und Geburtstag eintragen → „Speichern“.",
+        "Bei „Login-E-Mails“ test+4@example.com hinzufügen.",
+        "Die erste E-Mail entfernen, dann versuchen, auch die letzte verbleibende zu entfernen."
+      ],
+      "erwartet": "Stammdaten werden gespeichert und stehen nach dem Neuladen noch da. Die zweite E-Mail erscheint in der Liste. Entfernen fragt nach und klappt. Bei der letzten E-Mail gibt es keinen „Entfernen“-Knopf (oder eine verständliche Ablehnung)."
+    },
+    {
+      "id": "seb-crm-rolle-entwickler",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Entwickler geben, nehmen, wieder geben",
+      "schritte": [
+        "Bei testperson3 den Haken „Entwickler“ setzen → „Rollen speichern“.",
+        "Haken wieder wegnehmen → „Rollen speichern“, dann die Seite neu laden (F5).",
+        "Haken noch einmal setzen → „Rollen speichern“."
+      ],
+      "erwartet": "Beim Geben erscheint oben eine Karte mit dem Upload-Passwort und die Meldung „+Entwickler“. Nach dem Wegnehmen „−Entwickler“, und der Haken ist auch nach dem Neuladen weg. Erneut geben klappt und zeigt wieder ein Passwort.",
+      "hinweis": "Nachtest von 08.11.: Der Haken blieb vorher nach dem Wegnehmen stehen."
+    },
+    {
+      "id": "seb-crm-rolle-tester",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Rolle Tester",
+      "schritte": [
+        "Bei testperson3 den Haken „Tester“ setzen → „Rollen speichern“.",
+        "Zurück zur Liste „Personen“, Rollen-Filter „Tester“."
+      ],
+      "erwartet": "Meldung „+Tester“. In der Liste steht testperson3 mit Tester, im Filter „Tester“ erscheinen genau Emil und testperson3."
+    },
+    {
+      "id": "seb-crm-notiz",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Interne Notiz",
+      "schritte": [
+        "Bei testperson3 eine Notiz schreiben → „Notiz speichern“.",
+        "Seite neu laden."
+      ],
+      "erwartet": "Die Notiz steht mit Datum und deinem Namen auf der Seite. Die Person selbst sieht sie nie (nur Admins)."
+    },
+    {
+      "id": "seb-crm-verwarnen",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Verwarnen und Verwarnung aufheben",
+      "schritte": [
+        "Bei testperson3 ins Feld „Grund“ etwas schreiben → „Verwarnen“.",
+        "Danach „Verwarnung aufheben“.",
+        "Verwarnen ohne Grund versuchen."
+      ],
+      "erwartet": "Nach dem Verwarnen steht oben „verwarnt“, in der Zeitleiste die Verwarnung mit Grund. „Verwarnung aufheben“ setzt zurück auf „eingeladen“ (testperson3 hat sich nie angemeldet; wer sich schon angemeldet hat, wird „aktiv“). Ohne Grund kommt „Erst einen Grund eintragen.“"
+    },
+    {
+      "id": "seb-crm-sperren",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Sperren mit Ablaufdatum, entsperren",
+      "schritte": [
+        "Bei testperson3 Grund eintragen, bei „bis“ ein Datum in einigen Tagen wählen → „Sperren“ (Rückfrage bestätigen).",
+        "Zurück zur Liste schauen, dann wieder zur Person → „Entsperren“."
+      ],
+      "erwartet": "Nach dem Sperren steht „gesperrt“ mit Grund und Ablaufdatum auf der Seite, in der Liste ist der Status rot. Nach „Entsperren“ steht wieder „eingeladen“ (nicht „aktiv“, sie hat sich nie angemeldet), die Zeitleiste zeigt Sperre und Entsperren."
+    },
+    {
+      "id": "seb-crm-archivieren",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Archivieren und Wiederherstellen",
+      "schritte": [
+        "testperson3 hat die Rolle Entwickler (sonst vorher geben). „Archivieren …“ klicken und die Rückfrage bestätigen.",
+        "Liste „Personen“ ansehen, dann Status-Filter „archiviert“ und testperson3 öffnen.",
+        "„Wiederherstellen“ klicken."
+      ],
+      "erwartet": "Nach dem Archivieren steht „archiviert“. Die Person fehlt in der normalen Liste, im Filter „archiviert“ ist sie da. E-Mails, Notiz, Rollen und Zeitleiste sind alle noch da. „Wiederherstellen“ setzt sie zurück auf „eingeladen“ (sie hat sich nie angemeldet). Weil sie Entwickler ist, erscheint ein neues Upload-Passwort.",
+      "hinweis": "Neu seit 08.11.: Archivieren ist jetzt rückgängig zu machen und löscht nichts mehr."
+    },
+    {
+      "id": "seb-crm-loeschen",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Endgültig löschen (anonymisieren)",
+      "schritte": [
+        "Bei testperson3 prüfen: Im Zustand „aktiv“ oder „eingeladen“ gibt es KEINEN Knopf „Endgültig löschen“.",
+        "„Archivieren …“, dann „Endgültig löschen (anonymisieren) …“. Zuerst einen falschen Namen eintippen, danach noch einmal mit testperson3.",
+        "Seite und Prüfprotokoll ansehen."
+      ],
+      "erwartet": "Löschen geht nur bei archivierten Personen. Ein falscher Name wird abgelehnt. Danach steht „gelöscht“, es gibt kein „Wiederherstellen“ mehr. Name, Geburtstag, E-Mails, Notizen und Rollen sind weg. Auch in Zeitleiste und Prüfprotokoll stehen keine E-Mail-Adressen oder Gründe mehr, nur wer wann was gemacht hat.",
+      "hinweis": "Neu seit 08.11.: endgültiges Löschen als eigener zweiter Schritt."
+    },
+    {
+      "id": "seb-crm-auskunft",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Auskunft (Export)",
+      "schritte": [
+        "Öffne Paul (oder eine andere echte Person) → „Auskunft (Export)“.",
+        "Öffne die heruntergeladene Datei."
+      ],
+      "erwartet": "Eine JSON-Datei „auskunft-paul.json“ wird heruntergeladen. Darin stehen Stammdaten, E-Mails, Rollen, Zeitleiste, Anmeldungen, Anfragen und Spielstände (ohne deren Inhalt). Im Prüfprotokoll steht der Export mit deinem Namen."
+    },
+    {
+      "id": "seb-crm-pruefprotokoll",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "CRM: Prüfprotokoll",
+      "schritte": [
+        "Personen → „Prüfprotokoll aller Änderungen →“."
+      ],
+      "erwartet": "Jeder Schritt der Tests oben steht drin: einladen, stammdaten, E-Mails, rollen, notiz, verwarnen, sperren, entsperren, archivieren, wiederherstellen, loeschen, export. Jeweils mit Zeit, wer, was und vorher/nachher (bei gelöschten Personen ohne Inhalte)."
     },
     {
       "id": "seb-upload",
@@ -160,6 +325,15 @@
         "Weiter unten bei „Diese Seite ist die Probe-Zentrale“ die Testergebnisse ansehen."
       ],
       "erwartet": "Not-Aus-Feld mit Erklärung, Sicherheitsprotokoll leer oder mit Einträgen. Darunter „Keine Fehler in der Bibliothek selbst gemeldet“ oder eine Fehlertabelle mit Nummer und Fundort. Bei der Probe steht „Tests der Tester: … von … bestanden“, fehlgeschlagene Tests mit Begründung."
+    },
+    {
+      "id": "seb-e2e-hintergrund",
+      "bereich": "Nur Seb (Admin)",
+      "titel": "Ende-zu-Ende-Tests laufen nach dem Probe-Bau im Hintergrund",
+      "schritte": [
+        "Auf der ECHTEN Bibliothek (games.cuby0401.uk): Admin-Panel → Reiter „Aufgaben“."
+      ],
+      "erwartet": "Ganz oben steht ein Auftrag „Ende-zu-Ende-Tests (Probe)“ von „mac“, ausgelöst durch den letzten Probe-Bau, mit Status ok und „… Prüfpunkte grün“. Wäre einer rot, hättest du eine rote Glocke bekommen."
     },
     {
       "id": "seb-not-aus",

@@ -15,7 +15,7 @@ function cdp(method, params = {}, sessionId) {
   const id = ++nr; ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
   return new Promise((ja, nein) => offen.set(id, { ja, nein }));
 }
-let S;
+let S, eingabe = "";   // Antwort auf prompt()-Dialoge
 async function eval_(ausdruck) {
   const r = await cdp("Runtime.evaluate", { expression: ausdruck, awaitPromise: true, returnByValue: true }, S);
   if (r.exceptionDetails) throw new Error("eval: " + (r.exceptionDetails.exception?.description || r.exceptionDetails.text));
@@ -33,7 +33,7 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
     const d = JSON.parse(m.data);
     if (d.id && offen.has(d.id)) { const o = offen.get(d.id); offen.delete(d.id); d.error ? o.nein(new Error(d.error.message)) : o.ja(d.result); }
     if (d.method === "Runtime.exceptionThrown") fehler.push(d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text);
-    if (d.method === "Page.javascriptDialogOpening") cdp("Page.handleJavaScriptDialog", { accept: true }, d.sessionId);
+    if (d.method === "Page.javascriptDialogOpening") cdp("Page.handleJavaScriptDialog", { accept: true, promptText: eingabe }, d.sessionId);
   });
   const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
@@ -65,7 +65,7 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await eval_(`document.querySelector('#inhalt input[placeholder^="Grund"]').value="E2E-Sperre"; (${KNOPF("Sperren")}).click(); true`);
   ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("gesperrt") && document.body.textContent.includes("Gesperrt: E2E-Sperre")`), "Gesperrt, Grund angezeigt");
   await eval_(`(${KNOPF("Entsperren")}).click(); true`);
-  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("aktiv")`), "Entsperrt → aktiv");
+  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("eingeladen")`), "Entsperrt → wieder eingeladen (lea hat sich nie angemeldet)");
   ok(await eval_(`[...document.querySelectorAll("#inhalt td")].some(t=>t.textContent==="sperre")`), "Zeitleiste zeigt die Sperre");
 
   // 5) Stammdaten und Rolle Tester
@@ -95,10 +95,26 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await eval_(`{ const r=document.getElementById("meldung").getBoundingClientRect(); r.top>=0 && r.bottom<=innerHeight && r.height>0 }`),
     "Die Meldung steht im sichtbaren Bereich (unten gescrollt)");
 
+  // 5d) Archivieren ist rückgängig zu machen, endgültig löschen ein eigener Schritt (Sebs Test 08.11.2026)
+  await gehe(G + "/admin/?neu=3#person/lea", 3500);
+  await bis(`!!(${KNOPF("Archivieren …")})`);
+  await eval_(`(${KNOPF("Archivieren …")}).click(); true`);
+  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("archiviert") && !!(${KNOPF("Wiederherstellen")})`), "Archiviert → Knopf „Wiederherstellen“");
+  ok(await eval_(`document.body.textContent.includes("lea@example.com") && document.body.textContent.includes("E2E: interne Notiz")`), "Archiviert: E-Mail und Notiz bleiben");
+  await eval_(`(${KNOPF("Wiederherstellen")}).click(); true`);
+  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("eingeladen") && !!document.querySelector(".passwort-box")`), "Wiederhergestellt: eingeladen (nie angemeldet), Entwickler bekommt neues Upload-Passwort");
+  await eval_(`(${KNOPF("Archivieren …")}).click(); true`);
+  await bis(`!!(${KNOPF("Endgültig löschen (anonymisieren) …")})`);
+  eingabe = "lea";
+  await eval_(`(${KNOPF("Endgültig löschen (anonymisieren) …")}).click(); true`);
+  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("gelöscht") && !document.body.textContent.includes("lea@example.com") && !(${KNOPF("Wiederherstellen")})`),
+    "Endgültig gelöscht: E-Mail nirgends mehr auf der Seite (auch nicht im Protokoll), kein „Wiederherstellen“");
+  eingabe = "";
+
   // 6) Prüfprotokoll
   await gehe(G + "/admin/#protokoll", 3000);
   const aktionen = await eval_(`[...document.querySelectorAll("tbody tr td:nth-child(3)")].map(t=>t.textContent)`);
-  ok(["einladen", "notiz", "verwarnen", "sperren", "entsperren", "stammdaten", "rollen"].every((a) => aktionen.includes(a)), "Protokoll: " + aktionen.slice(0, 8).join(", "));
+  ok(["einladen", "notiz", "verwarnen", "sperren", "entsperren", "stammdaten", "rollen", "archivieren", "wiederherstellen", "loeschen"].every((a) => aktionen.includes(a)), "Protokoll: " + aktionen.slice(0, 8).join(", "));
 
   // 7) Meine Angaben im eigenen Profil
   await gehe(G + "/#/profil", 3500);

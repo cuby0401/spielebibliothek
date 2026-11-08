@@ -32,7 +32,9 @@ from .auth import BENUTZER_MUSTER, Benutzerliste
 log = logging.getLogger("savesvc.crm")
 
 ROLLEN = ("spieler", "entwickler", "admin", "tester")
-STATUS = ("eingeladen", "aktiv", "verwarnt", "gesperrt", "archiviert")
+# archiviert: aus den Listen, kein Zugang, alle Daten bleiben – rückgängig mit „Wiederherstellen“ (Sebs Test 08.11.2026).
+# geloescht: endgültig anonymisiert, nur der Benutzername bleibt (geht nur aus „archiviert“).
+STATUS = ("eingeladen", "aktiv", "verwarnt", "gesperrt", "archiviert", "geloescht")
 ZUGELASSEN = ("eingeladen", "aktiv", "verwarnt")      # dürfen hinein
 TEXT_MAX = {"anzeigename": 40, "vorname": 60, "nachname": 60}
 
@@ -174,7 +176,7 @@ class Crm:
             self._ablaufen_lassen(v)
             z = v.execute("""SELECT p.status, p.sperrgrund, p.gesperrt_bis FROM person_emails e JOIN personen p ON p.name = e.name
                              WHERE e.email=?""", (email.strip().lower(),)).fetchone()
-        if z and z["status"] in ("gesperrt", "archiviert"):
+        if z and z["status"] in ("gesperrt", "archiviert", "geloescht"):
             return {"status": z["status"], "grund": z["sperrgrund"], "bis": z["gesperrt_bis"]}
         return None
 
@@ -344,8 +346,8 @@ class Crm:
             bis = None
         with self.db.verbindung() as v:
             alt = self._vorhanden(v, name)
-            if alt["status"] == "archiviert":
-                raise Konflikt("Person ist archiviert")
+            if alt["status"] in ("archiviert", "geloescht"):
+                raise Konflikt(f"Person ist {alt['status']}")
             v.execute("UPDATE personen SET status='gesperrt', sperrgrund=?, gesperrt_bis=?, geaendert=? WHERE name=?",
                       (grund.strip(), bis, jetzt(), name))
             self._ereignis(v, name, "sperre", grund.strip() + (f" (bis {bis})" if bis else ""), von)
@@ -356,35 +358,76 @@ class Crm:
             alt = self._vorhanden(v, name)
             if alt["status"] != "gesperrt":
                 raise Konflikt("Person ist nicht gesperrt")
-            v.execute("UPDATE personen SET status='aktiv', sperrgrund=NULL, gesperrt_bis=NULL, geaendert=? WHERE name=?", (jetzt(), name))
+            neu = self._zurueck(alt)
+            v.execute("UPDATE personen SET status=?, sperrgrund=NULL, gesperrt_bis=NULL, geaendert=? WHERE name=?", (neu, jetzt(), name))
             self._ereignis(v, name, "entsperrt", "Entsperrt", von)
-            self._protokoll(v, von, "entsperren", name, {"status": "gesperrt", "grund": alt["sperrgrund"]}, "aktiv")
+            self._protokoll(v, von, "entsperren", name, {"status": "gesperrt", "grund": alt["sperrgrund"]}, neu)
 
     def verwarnung_aufheben(self, von: str, name: str) -> None:
         with self.db.verbindung() as v:
             alt = self._vorhanden(v, name)
             if alt["status"] != "verwarnt":
                 raise Konflikt("Person ist nicht verwarnt")
-            v.execute("UPDATE personen SET status='aktiv', geaendert=? WHERE name=?", (jetzt(), name))
+            neu = self._zurueck(alt)
+            v.execute("UPDATE personen SET status=?, geaendert=? WHERE name=?", (neu, jetzt(), name))
             self._ereignis(v, name, "status", "Verwarnung aufgehoben", von)
-            self._protokoll(v, von, "verwarnung-aufheben", name, "verwarnt", "aktiv")
+            self._protokoll(v, von, "verwarnung-aufheben", name, "verwarnt", neu)
+
+    @staticmethod
+    def _zurueck(alt) -> str:
+        """Status nach Entsperren, Aufheben der Verwarnung oder Wiederherstellen: aktiv – oder eingeladen, wenn sich die
+        Person nie angemeldet hat (vorher wurde auch dann „aktiv“ angezeigt)."""
+        return "aktiv" if alt["erste_anmeldung"] else "eingeladen"
 
     def archivieren(self, von: str, name: str) -> None:
-        """„Löschen“ als Anonymisieren: kein Zugang mehr, persönliche Angaben, E-Mails, Notizen und Rollen weg.
-        Der Benutzername bleibt als Pseudonym (Spielstände, Bestenliste, Spiele hängen daran)."""
+        """Aus den Listen nehmen und den Zugang beenden – alle Daten (E-Mails, Notizen, Rollen, Zeitleiste) bleiben.
+        Rückgängig mit wiederherstellen(). Endgültig weg erst mit loeschen()."""
         if name in self.admins or name == von:
             raise Konflikt("Admins und du selbst können nicht archiviert werden")
         with self.db.verbindung() as v:
             alt = self._vorhanden(v, name)
+            if alt["status"] in ("archiviert", "geloescht"):
+                raise Konflikt(f"Person ist schon {alt['status']}")
+            v.execute("UPDATE personen SET status='archiviert', geaendert=? WHERE name=?", (jetzt(), name))
+            self._ereignis(v, name, "archiviert", "Archiviert – kein Zugang mehr, Daten bleiben", von)
+            self._protokoll(v, von, "archivieren", name, alt["status"], "archiviert")
+
+    def wiederherstellen(self, von: str, name: str) -> str:
+        """Archivierte Person zurückholen: aktiv (oder eingeladen, wenn sie sich nie angemeldet hat). → neuer Status."""
+        with self.db.verbindung() as v:
+            alt = self._vorhanden(v, name)
+            if alt["status"] != "archiviert":
+                raise Konflikt("Nur archivierte Personen lassen sich wiederherstellen" +
+                               (" – gelöschte Personen sind anonymisiert" if alt["status"] == "geloescht" else ""))
+            neu = self._zurueck(alt)
+            v.execute("UPDATE personen SET status=?, sperrgrund=NULL, gesperrt_bis=NULL, geaendert=? WHERE name=?", (neu, jetzt(), name))
+            self._ereignis(v, name, "wiederhergestellt", f"Wiederhergestellt – {neu}", von)
+            self._protokoll(v, von, "wiederherstellen", name, "archiviert", neu)
+        return neu
+
+    def loeschen(self, von: str, name: str) -> None:
+        """Endgültig löschen als Anonymisieren (z. B. auf Wunsch der Person): persönliche Angaben, E-Mails, Notizen und
+        Rollen weg. Der Benutzername bleibt als Pseudonym (Spielstände, Bestenliste, Spiele hängen daran).
+        Nur aus „archiviert“ – so geht nie jemand versehentlich in einem Schritt verloren."""
+        if name in self.admins or name == von:
+            raise Konflikt("Admins und du selbst können nicht gelöscht werden")
+        with self.db.verbindung() as v:
+            alt = self._vorhanden(v, name)
+            if alt["status"] != "archiviert":
+                raise Konflikt("Erst archivieren, dann endgültig löschen")
             mails = [z["email"] for z in v.execute("SELECT email FROM person_emails WHERE name=?", (name,))]
-            v.execute("""UPDATE personen SET status='archiviert', anzeigename=NULL, vorname=NULL, nachname=NULL, geburtstag=NULL,
+            v.execute("""UPDATE personen SET status='geloescht', anzeigename=NULL, vorname=NULL, nachname=NULL, geburtstag=NULL,
                          sperrgrund=NULL, gesperrt_bis=NULL, geaendert=? WHERE name=?""", (jetzt(), name))
             v.execute("DELETE FROM person_emails WHERE name=?", (name,))
             v.execute("DELETE FROM person_notizen WHERE name=?", (name,))
             v.execute("DELETE FROM person_rollen WHERE name=?", (name,))
-            self._ereignis(v, name, "archiviert", "Archiviert – persönliche Angaben entfernt", von)
+            # Auch Zeitleiste und Prüfprotokoll enthalten E-Mails, Namen und Gründe – Inhalte leeren, nur „wer, was, wann“
+            # bleibt (fiel im Ende-zu-Ende-Test am 08.11.2026 auf: die Einladungs-E-Mail stand noch im Protokoll)
+            v.execute("UPDATE person_ereignisse SET text='(Inhalt gelöscht)' WHERE name=?", (name,))
+            v.execute("UPDATE crm_protokoll SET vorher=NULL, nachher=NULL WHERE ziel=?", (name,))
+            self._ereignis(v, name, "geloescht", "Endgültig gelöscht – persönliche Angaben entfernt", von)
             # Protokoll ohne die gelöschten Inhalte – nur, dass es passiert ist und wie viele E-Mails es waren
-            self._protokoll(v, von, "archivieren", name, {"status": alt["status"], "emails": len(mails)}, "archiviert")
+            self._protokoll(v, von, "loeschen", name, {"status": "archiviert", "emails": len(mails)}, "geloescht")
 
     def einladung_gesendet(self, von: str, name: str) -> None:
         with self.db.verbindung() as v:

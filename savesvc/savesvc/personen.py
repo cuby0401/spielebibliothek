@@ -177,15 +177,31 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         return crm.person(name)
 
     @app.post("/api/admin/personen/{name}/archivieren")
-    def archivieren(admin_name: str = Depends(admin), name: str = P(...), body: dict[str, Any] = Body(...)):
-        if body.get("bestaetigung") != name:
-            raise HTTPException(422, "Zur Bestätigung den Benutzernamen eingeben")
+    def archivieren(admin_name: str = Depends(admin), name: str = P(...)):
+        """Rückgängig zu machen: kein Zugang mehr, das Upload-Konto wird entfernt, alle Daten bleiben."""
         ausfuehren(crm.archivieren, admin_name, name)
         try:
             upload("DELETE", f"/intern/entwickler/{name}")
         except HTTPException:
             pass
         log.info("%s hat %s archiviert", admin_name, name)
+        return crm.person(name)
+
+    @app.post("/api/admin/personen/{name}/wiederherstellen")
+    def wiederherstellen(admin_name: str = Depends(admin), name: str = P(...)):
+        ausfuehren(crm.wiederherstellen, admin_name, name)
+        antwort: dict = {"person": crm.person(name)}
+        if "entwickler" in antwort["person"]["rollen"]:          # Upload-Konto wurde beim Archivieren entfernt
+            antwort["passwort"] = upload_konto_anlegen(name)
+        log.info("%s hat %s wiederhergestellt", admin_name, name)
+        return antwort
+
+    @app.post("/api/admin/personen/{name}/loeschen")
+    def loeschen(admin_name: str = Depends(admin), name: str = P(...), body: dict[str, Any] = Body(...)):
+        if body.get("bestaetigung") != name:
+            raise HTTPException(422, "Zur Bestätigung den Benutzernamen eingeben")
+        ausfuehren(crm.loeschen, admin_name, name)
+        log.info("%s hat %s endgültig gelöscht (anonymisiert)", admin_name, name)
         return crm.person(name)
 
     @app.get("/api/admin/personen/{name}/export")

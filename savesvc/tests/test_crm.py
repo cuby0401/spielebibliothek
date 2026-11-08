@@ -182,3 +182,15 @@ def test_uebernahme_mit_testern(tmp_path, umgebung):
     assert rollen["emil"] == ["spieler", "tester"] and "tester" not in rollen["paul"]
     # zweiter Start: nichts passiert mehr (CRM nicht leer)
     assert crm_modul.uebernehmen(c, umgebung.users, tmp_path / "b", frozenset({"seb"}), umgebung.spiele, frozenset({"paul"})) == 0
+
+
+def test_nie_angemeldet_bleibt_eingeladen(client, upload):  # noqa: F811
+    """Entsperren, Verwarnung aufheben, Wiederherstellen: wer sich nie angemeldet hat, ist danach „eingeladen“, nicht „aktiv“."""
+    h = client.als()
+    client.post("/api/admin/personen", json={"email": "neu@example.com", "name": "neu"}, headers=h)
+    client.post("/api/admin/personen/neu/sperren", json={"grund": "Test"}, headers=h)
+    assert client.post("/api/admin/personen/neu/entsperren", headers=h).json()["status"] == "eingeladen"
+    client.post("/api/admin/personen/neu/verwarnen", json={"grund": "Test"}, headers=h)
+    assert client.post("/api/admin/personen/neu/verwarnung-aufheben", headers=h).json()["status"] == "eingeladen"
+    client.post("/api/admin/personen/neu/archivieren", headers=h)
+    assert client.post("/api/admin/personen/neu/wiederherstellen", headers=h).json()["person"]["status"] == "eingeladen"

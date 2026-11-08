@@ -121,12 +121,30 @@ def test_person_einladen_sperren_archivieren(client, umgebung, upload):
     assert "emil" not in umgebung.users.read_text()
     assert client.post("/api/admin/personen/emil/entsperren", headers=client.als()).status_code == 200
     assert client.get("/api/me", headers=client.als("emil@example.com")).status_code == 200
-    # Archivieren: nur mit Bestätigung, danach kein Zugang, persönliche Angaben weg
-    assert client.post("/api/admin/personen/emil/archivieren", json={}, headers=client.als()).status_code == 422
-    assert client.post("/api/admin/personen/emil/archivieren", json={"bestaetigung": "emil"}, headers=client.als()).status_code == 200
+    # Archivieren (Sebs Test 08.11.2026): kein Zugang, Upload-Konto weg, aber alle Daten bleiben – rückgängig zu machen
+    client.post("/api/admin/personen/emil/notizen", json={"text": "kommt evtl. zurück"}, headers=client.als())
+    assert client.post("/api/admin/personen/emil/archivieren", headers=client.als()).status_code == 200
     assert client.get("/api/me", headers=client.als("emil@example.com")).status_code == 403
-    assert client.get("/api/admin/personen/emil", headers=client.als()).json()["emails"] == []
+    assert "emil" not in umgebung.users.read_text()
     assert ("DELETE", "/intern/entwickler/emil", None) in upload.aufrufe
+    p = client.get("/api/admin/personen/emil", headers=client.als()).json()
+    assert p["status"] == "archiviert" and p["emails"] == ["emil@example.com"] and "entwickler" in p["rollen"] and p["notizen"]
+    assert client.post("/api/admin/personen/emil/archivieren", headers=client.als()).status_code == 409   # schon archiviert
+    # Wiederherstellen: wieder aktiv, Entwickler bekommt ein neues Upload-Passwort
+    upload.konten.discard("emil")
+    r = client.post("/api/admin/personen/emil/wiederherstellen", headers=client.als())
+    assert r.status_code == 200 and r.json()["person"]["status"] == "aktiv" and r.json()["passwort"] == "X" * 20
+    assert client.get("/api/me", headers=client.als("emil@example.com")).status_code == 200
+    # Endgültig löschen: nur aus „archiviert“ und nur mit Bestätigung, danach anonymisiert und nicht wiederherstellbar
+    assert client.post("/api/admin/personen/emil/loeschen", json={"bestaetigung": "emil"}, headers=client.als()).status_code == 409
+    client.post("/api/admin/personen/emil/archivieren", headers=client.als())
+    assert client.post("/api/admin/personen/emil/loeschen", json={}, headers=client.als()).status_code == 422
+    assert client.post("/api/admin/personen/emil/loeschen", json={"bestaetigung": "emil"}, headers=client.als()).status_code == 200
+    p = client.get("/api/admin/personen/emil", headers=client.als()).json()
+    assert p["status"] == "geloescht" and p["emails"] == [] and p["rollen"] == [] and not p["notizen"]
+    assert "emil@example.com" not in json.dumps(p).lower() and "Spam in der Anfrage" not in json.dumps(p)   # auch nicht in Zeitleiste/Protokoll
+    assert client.post("/api/admin/personen/emil/wiederherstellen", headers=client.als()).status_code == 409
+    assert client.get("/api/me", headers=client.als("emil@example.com")).status_code == 403
 
 
 def test_zuletzt_aktiv_auch_ohne_spielstand(client, upload):

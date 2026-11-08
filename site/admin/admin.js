@@ -250,8 +250,10 @@ async function bestenlisteDetail(c, s) {
 }
 
 // ---------- Personen (CRM, Zentrale 1.4.0) ----------
-const STATUS_TEXTE = { eingeladen: "eingeladen", aktiv: "aktiv", verwarnt: "verwarnt", gesperrt: "gesperrt", archiviert: "archiviert" };
-const STATUS_KLASSE = { eingeladen: "offen", aktiv: "erledigt", verwarnt: "offen", gesperrt: "abgelehnt", archiviert: "" };
+const STATUS_TEXTE = { eingeladen: "eingeladen", aktiv: "aktiv", verwarnt: "verwarnt", gesperrt: "gesperrt", archiviert: "archiviert", geloescht: "gelöscht" };
+const STATUS_KLASSE = { eingeladen: "offen", aktiv: "erledigt", verwarnt: "offen", gesperrt: "abgelehnt", archiviert: "", geloescht: "" };
+// Archiviert (zurückholbar) und gelöscht (anonymisiert) stehen nicht in der normalen Liste und lassen sich nicht bearbeiten
+const RAUS = (status) => status === "archiviert" || status === "geloescht";
 const ROLLEN_TEXT = { spieler: "Spieler", entwickler: "Entwickler", admin: "Admin", tester: "Tester" };
 const anzeige = (p) => p.anzeigename || [p.vorname, p.nachname].filter(Boolean).join(" ") || "";
 function passwortKarte(name, pw) {
@@ -287,13 +289,13 @@ async function personenSeite(c) {
 			h("div", {}, h("button", { type: "submit", class: "knopf", text: "Einladen" })))));
 	// Filter
 	const suche = h("input", { type: "search", placeholder: "Name oder E-Mail" });
-	const status = h("select", {}, h("option", { value: "", text: "alle außer archiviert" }), ...d.status.map((s) => h("option", { value: s, text: STATUS_TEXTE[s] })));
+	const status = h("select", {}, h("option", { value: "", text: "alle außer archiviert/gelöscht" }), ...d.status.map((s) => h("option", { value: s, text: STATUS_TEXTE[s] })));
 	const rolle = h("select", {}, h("option", { value: "", text: "alle Rollen" }), ...d.rollen.map((r) => h("option", { value: r, text: ROLLEN_TEXT[r] })));
 	const tbody = h("tbody", {});
 	const mitCf = d.cloudflare.geprueft;
 	const fuellen = () => {
 		const q = suche.value.trim().toLowerCase();
-		tbody.replaceChildren(...d.personen.filter((p) => (status.value ? p.status === status.value : p.status !== "archiviert")
+		tbody.replaceChildren(...d.personen.filter((p) => (status.value ? p.status === status.value : !RAUS(p.status))
 			&& (!rolle.value || p.rollen.includes(rolle.value))
 			&& (!q || [p.name, anzeige(p), ...p.emails].some((x) => x.toLowerCase().includes(q)))).map((p) => h("tr", {},
 			h("td", {}, h("a", { href: "#person/" + p.name }, h("strong", { text: p.name })), anzeige(p) ? h("div", { class: "leise", text: anzeige(p) }) : null),
@@ -301,7 +303,7 @@ async function personenSeite(c) {
 			h("td", { text: p.rollen.filter((r) => r !== "spieler").map((r) => ROLLEN_TEXT[r]).join(", ") || "Spieler" }),
 			h("td", {}, h("span", { class: "status " + STATUS_KLASSE[p.status], text: STATUS_TEXTE[p.status] }),
 				p.status === "eingeladen" ? h("div", { class: "leise", text: p.einladungGesendet ? "Mail " + datumZeit(p.einladungGesendet) : "noch keine Mail" }) : null),
-			p.nieAngemeldet && p.status !== "archiviert"
+			p.nieAngemeldet && !RAUS(p.status)
 				? h("td", { class: "warn", title: "Noch keine Anmeldung, kein Spielstand, kein Upload. Kommt der E-Mail-Code nicht an? Dann fehlt die Adresse meist in der Cloudflare-Richtlinie „Kollegen“.", text: "noch nie angemeldet" })
 				: h("td", { text: datumZeit(p.zuletzt) }),
 			...(mitCf ? [p.cloudflare ? h("td", { class: p.cloudflare.kollegen && p.cloudflare.entwickler !== false ? "" : "warn",
@@ -309,7 +311,7 @@ async function personenSeite(c) {
 	};
 	for (const x of [suche, status, rolle]) x.addEventListener("input", fuellen);
 	fuellen();
-	c.append(h("h2", { text: `Personen (${d.personen.filter((p) => p.status !== "archiviert").length})` }), cloudflareBox(cf),
+	c.append(h("h2", { text: `Personen (${d.personen.filter((p) => !RAUS(p.status)).length})` }), cloudflareBox(cf),
 		d.mail ? null : h("p", { class: "leise", text: "E-Mail-Versand nicht eingerichtet (SMTP_* in der .env) – Einladungen dann selbst verschicken." }),
 		h("div", { class: "filter" }, h("label", {}, "Suche", suche), h("label", {}, "Status", status), h("label", {}, "Rolle", rolle)),
 		h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
@@ -351,12 +353,12 @@ async function personSeite(c, name) {
 			if (!confirm(`${m} entfernen? Mit dieser Adresse kommt ${p.name} dann nicht mehr hinein.`)) return;
 			await api("DELETE", `${pfad}/emails/${encodeURIComponent(m)}`); meldung("E-Mail entfernt."); neu();
 		}, "gefahr") : null))),
-		p.status !== "archiviert" ? h("div", { class: "zeile" }, neueMail, knopf("Hinzufügen", async () => {
+		!RAUS(p.status) ? h("div", { class: "zeile" }, neueMail, knopf("Hinzufügen", async () => {
 			await api("POST", pfad + "/emails", { email: neueMail.value }); meldung("E-Mail hinzugefügt – danach Cloudflare-Abgleich am Mac."); neu();
 		})) : null));
 
 	// Rollen
-	if (p.status !== "archiviert") {
+	if (!RAUS(p.status)) {
 		const wahl = rollenWahl(p.rollen, p.notfallAdmin ? ["admin"] : []);
 		c.append(h("h3", { text: "Rollen" }), h("div", { class: "karte" }, wahl.el,
 			h("p", { class: "leise", text: (p.ordner && !p.rollen.includes("entwickler") ? "Hat noch einen Spieleordner (die Spiele bleiben), aber keine Entwickler-Rechte. " : "") + "Entwickler bekommt ein Upload-Konto (Passwort wird einmal angezeigt), ohne Entwickler wird es entfernt – die Spiele bleiben. Tester: sieht auf dem Testserver das Tester-Panel und bekommt eine Glocke, wenn neue Tests anstehen." }),
@@ -376,7 +378,7 @@ async function personSeite(c, name) {
 	const grund = h("input", { placeholder: "Grund (sieht die Person)", maxlength: "500", size: "40" });
 	const bis = h("input", { type: "datetime-local", title: "leer = unbefristet" });
 	const aktionen = [];
-	if (p.status === "eingeladen" || (p.status !== "gesperrt" && p.status !== "archiviert" && !p.erste_anmeldung)) {
+	if (p.status === "eingeladen" || (p.status !== "gesperrt" && !RAUS(p.status) && !p.erste_anmeldung)) {
 		const senden = async (ohnePruefung) => {
 			await api("POST", pfad + "/einladung", { ohnePruefung }); meldung(`Einladung an ${p.emails[0]} verschickt.`); neu();
 		};
@@ -392,17 +394,30 @@ async function personSeite(c, name) {
 		await api("POST", pfad + "/verwarnen", { grund: grund.value }); meldung(`${p.name} verwarnt – die Meldung steht in der Glocke.`); neu();
 	}));
 	if (p.status === "verwarnt") aktionen.push(knopf("Verwarnung aufheben", async () => { await api("POST", pfad + "/verwarnung-aufheben"); meldung("Verwarnung aufgehoben."); neu(); }));
-	if (!p.notfallAdmin && p.status !== "archiviert" && p.status !== "gesperrt") aktionen.push(knopf("Sperren", async () => {
+	if (!p.notfallAdmin && !RAUS(p.status) && p.status !== "gesperrt") aktionen.push(knopf("Sperren", async () => {
 		if (!grund.value.trim()) return meldung("Erst einen Grund eintragen.", true);
 		if (!confirm(`${p.name} sperren? Gilt sofort für Bibliothek und Upload.`)) return;
 		await api("POST", pfad + "/sperren", { grund: grund.value, bis: bis.value ? new Date(bis.value).toISOString() : null }); meldung(`${p.name} gesperrt.`); neu();
 	}, "gefahr"));
 	if (p.status === "gesperrt") aktionen.push(knopf("Entsperren", async () => { await api("POST", pfad + "/entsperren"); meldung("Entsperrt."); neu(); }));
-	if (!p.notfallAdmin && p.status !== "archiviert") aktionen.push(knopf("Archivieren (anonymisieren) …", async () => {
-		const b = prompt(`${p.name} archivieren? Kein Zugang mehr, Name, Geburtstag, E-Mails, Notizen und Rollen werden gelöscht – nur der Benutzername bleibt (an Spielständen und Spielen). Nicht rückgängig zu machen.\n\nZur Bestätigung den Benutzernamen eingeben:`);
-		if (b === null) return;
-		await api("POST", pfad + "/archivieren", { bestaetigung: b }); meldung(`${p.name} archiviert.`); neu();
+	// Archivieren ist rückgängig zu machen (Sebs Test 08.11.2026), endgültig löschen ist ein eigener zweiter Schritt
+	if (!p.notfallAdmin && !RAUS(p.status)) aktionen.push(knopf("Archivieren …", async () => {
+		if (!confirm(`${p.name} archivieren? Kein Zugang mehr (auch kein Upload), die Person verschwindet aus der Liste. Alle Daten bleiben – „Wiederherstellen“ holt sie jederzeit zurück.`)) return;
+		await api("POST", pfad + "/archivieren"); meldung(`${p.name} archiviert – rückgängig mit „Wiederherstellen“.`); neu();
 	}, "gefahr"));
+	if (p.status === "archiviert") {
+		aktionen.push(knopf("Wiederherstellen", async () => {
+			const r = await api("POST", pfad + "/wiederherstellen");
+			await neu();
+			meldung(`${p.name} wiederhergestellt – Status ${STATUS_TEXTE[r.person.status]}.` + (r.passwort ? " Neues Upload-Passwort siehe oben." : ""));
+			if (r.passwort) { $("inhalt").prepend(passwortKarte(p.name, r.passwort)); scrollTo(0, 0); }
+		}, ""));
+		aktionen.push(knopf("Endgültig löschen (anonymisieren) …", async () => {
+			const b = prompt(`${p.name} ENDGÜLTIG löschen? Name, Geburtstag, E-Mails, Notizen und Rollen werden gelöscht – nur der Benutzername bleibt (an Spielständen und Spielen). Das lässt sich NICHT rückgängig machen. Gedacht z. B., wenn die Person die Löschung ihrer Daten verlangt.\n\nZur Bestätigung den Benutzernamen eingeben:`);
+			if (b === null) return;
+			await api("POST", pfad + "/loeschen", { bestaetigung: b }); meldung(`${p.name} endgültig gelöscht.`); neu();
+		}, "gefahr"));
+	}
 	aktionen.push(knopf("Auskunft (Export)", async () => {
 		const daten = await api("GET", pfad + "/export");
 		const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" })), download: `auskunft-${p.name}.json` });

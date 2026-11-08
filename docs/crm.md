@@ -24,8 +24,11 @@ Entscheidungen im Vault: E67 (Cloudflare Access bleibt, nur mit Einladung), E68 
 
 Status: **eingeladen** → bei der ersten Anmeldung **aktiv**. **verwarnt** (Meldung mit Grund in der Glocke, Zugang bleibt),
 **gesperrt** (sofort kein Zugang zu Bibliothek und Upload, optional bis Datum, mit Grund), **archiviert**
-(„löschen“: kein Zugang, Name, Geburtstag, E-Mails, Notizen und Rollen werden gelöscht, nur der Benutzername bleibt an
-Spielständen und Spielen).
+(kein Zugang, Upload-Konto entfernt, aus der normalen Liste – alle Daten bleiben, **„Wiederherstellen“** holt die Person
+zurück, als aktiv bzw. eingeladen, Entwickler bekommen ein neues Upload-Passwort). Erst aus „archiviert“ geht
+**„Endgültig löschen (anonymisieren)“** → **gelöscht**: Name, Geburtstag, E-Mails, Notizen und Rollen weg, nur der
+Benutzername bleibt an Spielständen und Spielen. Nicht rückgängig zu machen (seit 08.11.2026, vorher war Archivieren
+gleich Löschen).
 
 Gesperrte stehen weiter in der Cloudflare-Richtlinie, bis am Mac `python3 scripts/cloudflare.py abgleichen --entfernen`
 läuft – hinein kommen sie trotzdem nicht, die Bibliothek lehnt sie ab („Konto gesperrt: …“).
@@ -58,6 +61,6 @@ Danach `docker compose up -d savesvc`. Das Passwort steht nirgends sonst – nic
 - Alle `/api/admin/personen…`-Endpunkte nur für Admins. Notizen, Verwarnungen, Zeitleiste und Protokoll erscheinen in keiner
   anderen Antwort (Test: `tests/test_crm.py`).
 - Jede Änderung → `crm_protokoll` (wer, was, wann, vorher/nachher), wird nie gelöscht. Admin-Panel → Personen → „Prüfprotokoll“.
-- Niemand kann sich selbst sperren, archivieren oder die Admin-Rolle nehmen.
+- Niemand kann sich selbst sperren, archivieren, löschen oder die Admin-Rolle nehmen.
 - Auskunft (DSGVO Art. 15): auf der Seite der Person „Auskunft (Export)“ – JSON mit allem, was gespeichert ist.
 - Erst einmal nur Erwachsene. Bei Minderjährigen bräuchte es die Einwilligung der Eltern (DSGVO Art. 8) – noch nicht gebaut.
