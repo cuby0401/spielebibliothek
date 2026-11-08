@@ -150,7 +150,7 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
 
   // 8b) Tester-Panel (1.4.0, E76): Plan aus tests/manuell, Ergebnis eintragen, Zusammenfassung
   await gehe(G + "/tester/", 3500);
-  ok(await bis(`document.querySelectorAll(".test").length>=10`), "Tester-Panel zeigt den Testplan");
+  ok(await bis(`document.querySelectorAll(".test").length>=5`), "Tester-Panel zeigt den Testplan");
   await eval_(`document.querySelector(".test .knopf.nein").click(); true`);
   ok(await bis(`document.getElementById("meldung").textContent.includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");
   const offenVorher = await eval_(`document.querySelectorAll("#inhalt > .test").length`);

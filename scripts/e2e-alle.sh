@@ -57,7 +57,8 @@ for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentr
 	# Auf dem Mac aus der Kopie – so stört es nicht, wenn während eines Hintergrundlaufs am Repo weitergearbeitet wird
 	S=scripts; [ "$ORT" = mac ] && S="$REPO/scripts"
 	if [ "$t" = boese ]; then set -- node "$S/e2e-boese.mjs" "$TMP"; else set -- node "$S/e2e-$t.mjs" "$TMP" "$PW"; fi
-	if "$@" > "$TMP/log" 2>&1; then
+	# Höchstens 5 Minuten je Test – ein hängender Test soll die Runde nicht blockieren (1.4.1)
+	if perl -e 'alarm shift; exec @ARGV' 300 "$@" > "$TMP/log" 2>&1; then
 		echo "  ✓ $(grep -c '^✓' "$TMP/log") Prüfpunkte grün"
 	else
 		grep -E "^✗|ABBRUCH" "$TMP/log" | sed 's/^/  /' || tail -5 "$TMP/log" | sed 's/^/  /'
