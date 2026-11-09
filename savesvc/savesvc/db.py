@@ -671,6 +671,16 @@ class Datenbank:
             v.execute("COMMIT")
         return liste
 
+    def aufgaben_der_kopie_leeren(self) -> int:
+        """Testserver (1.4.1, Nachtest 09.11.): Die Probe ist eine Kopie der Live-Daten – samt Aufgaben-Verlauf der
+        Live-Bibliothek und dessen roten Glocken. Im Testserver sah es dadurch ständig so aus, als brächen die
+        Ende-zu-Ende-Tests ab. Einmal je frischer Kopie: Verlauf, Meldungen dazu und Lebenszeichen des NAS-Dienstes weg."""
+        with self.verbindung() as v:
+            n = v.execute("DELETE FROM auftraege").rowcount
+            v.execute("DELETE FROM meldungen WHERE link='/admin/#aufgaben'")
+            v.execute("DELETE FROM dienst_status WHERE name IN ('auftragsdienst', 'mac')")
+        return n
+
     def dienst_setzen(self, name: str, wert: str) -> None:
         with self.verbindung() as v:
             v.execute("INSERT INTO dienst_status (name, wert, zeit) VALUES (?,?,?) ON CONFLICT (name) DO UPDATE SET wert=excluded.wert, zeit=excluded.zeit",

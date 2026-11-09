@@ -115,3 +115,16 @@ def test_mac_uebernimmt_auftraege(client, umgebung):
     db.dienst_setzen("mac", "Mac – bereit")
     m = client.get("/api/admin/auftraege", headers=client.als()).json()["mac"]
     assert m["aktiv"] is True and m["text"] == "Mac – bereit"
+
+
+def test_testserver_leert_aufgaben_der_live_kopie(umgebung):
+    """1.4.1 (Seb, 09.11.): Im Testserver standen die roten Läufe der Live-Bibliothek – sah aus, als brächen die Tests ab."""
+    db = Datenbank(umgebung.db)
+    db.auftrag_anlegen("e2e-tests", "probe", "knopf", "seb")
+    db.melden("seb", "Ende-zu-Ende-Tests fehlgeschlagen: alt", "/admin/#aufgaben", wichtig=True)
+    db.melden("seb", "Neues Spiel", "#/spiel/a/b")
+    db.dienst_setzen("auftragsdienst", "1.4.0")
+    assert db.aufgaben_der_kopie_leeren() == 1
+    assert db.auftraege() == [] and db.dienst("auftragsdienst") is None
+    with db.verbindung() as v:
+        assert [z[0] for z in v.execute("SELECT text FROM meldungen")] == ["Neues Spiel"]

@@ -68,6 +68,15 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     crm_modul.uebernehmen(crm, e.users_file, e.db_path.parent / "backup", e.admins, e.spiele_dir, e.tester)
     crm_modul.dabei_seit_nachholen(crm)
     crm_modul.uebernahme_zuschreiben(crm, e.admins)
+    if e.probe:   # frische Kopie der Live-Daten → deren Aufgaben-Verlauf gehört nicht in den Testserver (1.4.1)
+        kopie, erledigt = e.db_path.parent / "kopie-von", e.db_path.parent / "aufgaben-geleert"
+        try:
+            stand = kopie.read_text().strip()
+            if stand and (not erledigt.is_file() or erledigt.read_text().strip() != stand):
+                db.aufgaben_der_kopie_leeren()
+                erledigt.write_text(stand)
+        except OSError:
+            pass
     benutzerliste = crm_modul.CrmBenutzerliste(e.users_file, crm, e.spiele_dir)
     try:
         benutzerliste.exportieren()

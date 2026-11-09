@@ -200,6 +200,17 @@
       ],
       "erwartet": "Dort steht ein Lauf „Ende-zu-Ende-Tests / Probe“, Auslöser „mac“, der nach etwa 3 Minuten grün wird („Mac · 1.4.1: … Prüfpunkte grün“). Er erscheint im Testserver, nicht in der Live-Bibliothek, weil nur dort sicher der Mac ausführt.",
       "hinweis": "Claude hat den Testserver für diese Version schon so gebaut, der Lauf sollte also schon dastehen."
+    },
+    {
+      "id": "seb-testserver-aufgaben-sauber",
+      "bereich": "Nur Seb (Admin)",
+      "nurAdmin": true,
+      "titel": "Testserver: keine alten roten Läufe aus der Live-Bibliothek",
+      "schritte": [
+        "Admin-Panel des TESTSERVERS → Aufgaben, „Letzte Läufe“ anschauen.",
+        "Oben auf den Reiter „Aufgaben“ (rote Zahl?) und auf die Glocke schauen."
+      ],
+      "erwartet": "In „Letzte Läufe“ stehen nur Läufe, die seit dem Bau dieses Testservers im Testserver gestartet wurden, keine alten von gestern oder aus der Live-Bibliothek. Keine rote Zahl am Reiter und keine „Ende-zu-Ende-Tests fehlgeschlagen“-Meldung in der Glocke, solange nichts im Testserver fehlgeschlagen ist. In der Live-Bibliothek bleibt deren Verlauf vollständig."
     }
   ]
 }

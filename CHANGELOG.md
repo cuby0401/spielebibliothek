@@ -20,7 +20,8 @@ Kleines Update nach dem ersten Testdurchgang mit dem Tester-Panel: Tester-Panel 
 - **Behoben:** Tester-Panel: Hatte der Admin noch Admin-Tests offen, aber für alle Tester war nichts mehr offen, stand unten „null“. Ging beim Eintragen mit Fotos ein Foto schief, entstand beim erneuten Klick derselbe Eintrag mehrfach. Jetzt werden nur die fehlenden Fotos nachgeladen.
 - **Behoben:** Admin-Panel → Aufgaben sprang beim Selbst-Aktualisieren (alle 15 s, solange etwas läuft) nach oben und klappte offene Logs zu. Dazu stapelten sich die Zeitgeber bei jedem Klick. Jetzt bleibt die Stelle, und solange ein Log offen ist, wird nicht neu geladen.
 - **Geändert (schnellere Tests):** Die Ende-zu-Ende-Tests warten nach jedem Seitenwechsel nicht mehr fest 2,5–6,5 s, sondern bis die Seite geladen ist und sich nichts mehr ändert. Die volle Runde braucht auf dem Mac etwa 2:35 Min. (vorher etwa 10 Min. auf der NAS bzw. 5:40 auf dem Mac).
-- **Testplan:** `tests/manuell/1.4.1.json`, 17 Tests (9 nur für Seb). Nach dem ersten Nachtest (09.11.): 3 Tests neu zu testen, 8 neue.
+- **Behoben:** Testserver: Die Kopie der Live-Daten brachte den Aufgaben-Verlauf der Live-Bibliothek samt roter Glocken mit, es sah ständig so aus, als brächen die Ende-zu-Ende-Tests ab. Einmal je frischer Kopie wird dieser Verlauf jetzt geleert.
+- **Testplan:** `tests/manuell/1.4.1.json`, 18 Tests (10 nur für Seb). Nach dem ersten Nachtest (09.11.): 3 Tests neu zu testen, 9 neue.
 
 ## 1.4.0 – 06.11.2026
 
