@@ -105,7 +105,7 @@ def entpacken(tar: Path, ziel: Path) -> None:
         for m in t.getmembers():
             if m.name.startswith("/") or ".." in Path(m.name).parts or not (m.isfile() or m.isdir()):
                 raise RuntimeError(f"Quelle enthält einen unerlaubten Eintrag: {m.name}")
-        t.extractall(ziel)
+        t.extractall(ziel, filter="data")
 
 
 def quelle(ziel: str, tmp: Path) -> tuple[Path, str]:

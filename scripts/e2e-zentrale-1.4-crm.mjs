@@ -180,7 +180,8 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await gehe(G + "/tester/#abgelehnt", 3500);
   ok(await bis(`document.querySelectorAll("#inhalt > details.test").length===1`), "Reiter „Abgelehnt“ zeigt den Test eingeklappt");
   await eval_(`document.querySelector("#inhalt > details.test").open=true; true`);
-  ok(await bis(`(()=>{const i=document.querySelector("details.test .test-ergebnisse img");return !!i && i.complete && i.naturalWidth===8})()`),
+  // Bilder laden „lazy“ – erst ins Bild scrollen, sonst lädt Chrome sie je nach Fenstergröße nicht (wackelte im Mac-Auftrag 09.11.)
+  ok(await bis(`(()=>{const i=document.querySelector("details.test .test-ergebnisse img");i?.scrollIntoView();return !!i && i.complete && i.naturalWidth===8})()`, 15000),
     "Archiv zeigt Verlauf mit Foto");
   await gehe(G + "/tester/#bestanden", 3500);
   ok(await bis(`document.querySelectorAll("#inhalt > details.test").length===1 && document.querySelector(".test-reiter .aktiv").textContent.startsWith("Bestanden")`),
