@@ -211,6 +211,17 @@
         "Oben auf den Reiter „Aufgaben“ (rote Zahl?) und auf die Glocke schauen."
       ],
       "erwartet": "In „Letzte Läufe“ stehen nur Läufe, die seit dem Bau dieses Testservers im Testserver gestartet wurden, keine alten von gestern oder aus der Live-Bibliothek. Keine rote Zahl am Reiter und keine „Ende-zu-Ende-Tests fehlgeschlagen“-Meldung in der Glocke, solange nichts im Testserver fehlgeschlagen ist. In der Live-Bibliothek bleibt deren Verlauf vollständig."
+    },
+    {
+      "id": "seb-nie-angemeldet",
+      "bereich": "Nur Seb (Admin)",
+      "nurAdmin": true,
+      "titel": "Personen: „noch nie angemeldet“ trotz Upload-Konto",
+      "schritte": [
+        "Admin-Panel des Testservers → Personen.",
+        "In der Zeile von Djamal (bzw. Carl, falls er sich bis zum Bau des Testservers noch nicht angemeldet hatte) auf die Spalte „Zuletzt aktiv“ schauen."
+      ],
+      "erwartet": "Dort steht rot „noch nie angemeldet“ statt eines Datums. Vorher zählten auch Dinge, die du als Admin am Upload-Konto machst (Konto anlegen, neues Passwort), als Aktivität der Person. Hochladen, Spielen und Anmelden zählen weiter."
     }
   ]
 }

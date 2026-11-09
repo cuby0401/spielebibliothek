@@ -747,6 +747,8 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     # Personen (CRM, Zentrale 1.4.0) – ersetzt „Benutzer“. „Zuletzt aktiv“ = das Späteste aus Spielständen/Scores,
     # Anmeldungen (auch reines Umsehen) und Upload-Ereignissen (06.11.2026)
+    VOM_ADMIN = {"Upload-Konto angelegt", "neues Passwort", "Upload-Konto gelöscht", "gelöscht (Admin)"}
+
     def aktivitaet() -> dict[str, str]:
         aktiv: dict[str, str] = {}
 
@@ -760,7 +762,9 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             merken(a["player"], a["letzte"])
         try:
             for a in upload("GET", "/intern/ereignisse"):
-                if isinstance(a, dict):
+                # Nur, was die Person selbst getan hat – Konto anlegen, neues Passwort, Löschen macht der Admin
+                # (1.4.1, Seb 09.11.: Carl stand mit Datum statt „noch nie angemeldet“ da, angemeldet hatte er sich nie)
+                if isinstance(a, dict) and a.get("aktion") not in VOM_ADMIN:
                     merken(a.get("player", ""), a.get("zeit"))
         except HTTPException:
             pass

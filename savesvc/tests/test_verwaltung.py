@@ -22,7 +22,10 @@ class FalscherUpload:
         if pfad.endswith("/passwort"):
             return {"name": pfad.split("/")[3], "passwort": "Y" * 20}
         if pfad == "/intern/ereignisse":
-            return [{"zeit": "2026-11-05T10:00:00+00:00", "player": "paul", "aktion": "hochgeladen", "ordner": "snake", "dateien": 3}]
+            return [{"zeit": "2026-11-05T10:00:00+00:00", "player": "paul", "aktion": "hochgeladen", "ordner": "snake", "dateien": 3},
+                    # 1.4.1: vom Admin ausgelöst – zählt nicht als Aktivität der Person
+                    {"zeit": "2026-11-09T12:00:00+00:00", "player": "seb", "aktion": "neues Passwort"},
+                    {"zeit": "2026-11-09T12:00:00+00:00", "player": "seb", "aktion": "Upload-Konto angelegt"}]
         return None
 
 
