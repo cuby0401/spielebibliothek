@@ -300,7 +300,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         """gamesave.js meldet beim Testen eines Entwurfs, ob die Umwandlung eines Spielstands geklappt hat (E36)."""
         ordner = e.spiele_dir / user / game
         basis = game[: -len(versionen.ENTWURF)] if game.endswith(versionen.ENTWURF) else ""
-        darf = player == user or rollen.rolle(e, request, player)["echterAdmin"]
+        darf = identitaet.ordner(player) == user or rollen.rolle(e, request, player)["echterAdmin"]
         if not (basis and darf and games.gueltige_id(user, basis) and ordner.is_dir()):
             raise HTTPException(404, "Entwurf nicht gefunden")
         ok = body.get("ok") is True

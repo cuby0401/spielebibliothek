@@ -92,6 +92,14 @@ async function ausSpiel(m) {
   assert.equal(ablauf, 2);
   assert.deepEqual(JSON.parse(localStorage.getItem("sb-puffer:seb:")).saves[url].body.data, { a: 5 });
 
+  // 5b) 1.5.0: Handle geändert (seb → seb_neu), Konto (Spieleordner) bleibt „seb“ → der Puffer wird weiter gefunden
+  B.sitzungBis = Math.floor(Date.now() / 1000) + 3600;
+  B.spieler = "seb_neu"; B.konto = "seb";
+  assert.equal(await B.nachreichen(), 1, "Puffer nach Handle-Änderung nachgereicht");
+  assert.deepEqual(server.daten.get(url), { a: 5 });
+  assert.equal(localStorage.getItem("sb-puffer:seb:"), null, "Puffer danach leer");
+  B.sitzungBis = Math.floor(Date.now() / 1000) + 30;          // zurück wie in 5) für Test 6
+
   // 6) Lange im Hintergrund bei abgelaufener Sitzung → neu laden (Anmeldung)
   const hidden = () => { ctx.document.visibilityState = "hidden"; docHandler.visibilitychange.forEach((f) => f()); };
   const visible = () => { ctx.document.visibilityState = "visible"; docHandler.visibilitychange.forEach((f) => f()); };

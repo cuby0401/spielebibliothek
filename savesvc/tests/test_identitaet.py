@@ -136,6 +136,7 @@ def test_leere_datenbank(tmp_path):
 
 def _einstellungen(umgebung, **kw):
     from savesvc.config import Einstellungen
+    kw.setdefault("identitaet_uuid", False)        # ohne Angabe: Stand 1.4.1 (ohne Umstellung)
     return Einstellungen(team_domain="t", audience="a", users_file=umgebung.users, spiele_dir=umgebung.spiele,
                          db_path=umgebung.db, dev_user=None, **kw)
 

@@ -35,7 +35,7 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
 from fastapi import Path as P
 
-from . import rollen
+from . import identitaet, rollen
 
 BILDER_MAX = 5                    # Fotos je Ergebnis (1.4.1), je höchstens 2 MB – die Seite verkleinert vorher
 ID_MUSTER = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")
@@ -150,7 +150,9 @@ class Ergebnisse:
             for b in v.execute("SELECT b.id, b.ergebnis FROM bilder b JOIN ergebnisse e ON e.id = b.ergebnis WHERE e.version=? "
                                "ORDER BY b.id", (version,)):
                 bilder.setdefault(b["ergebnis"], []).append(b["id"])
-        return [{"id": z["id"], "test": z["test"], "player": z["player"], "ok": bool(z["ok"]), "text": z["text"] or "",
+        # Gespeichert ist der Spieleordner (1.5.0, ändert sich nie und übersteht Neubauten des Testservers, deren Kopien vor dem
+        # Live-Gang von 1.5.0 jedes Mal neue UUIDs bekämen). Nach außen die UUID → die Antwort-Schicht zeigt das Handle.
+        return [{"id": z["id"], "test": z["test"], "player": identitaet.id_von_ordner(z["player"]), "ok": bool(z["ok"]), "text": z["text"] or "",
                  "zeit": z["zeit"], "commit": z["commit_"], "bilder": bilder.get(z["id"], [])} for z in zeilen]
 
 
@@ -215,7 +217,7 @@ def einrichten(app: FastAPI, e, spieler) -> None:
         text = text.strip()[:2000]
         if not ok and len(text) < 5:
             raise HTTPException(422, "Bitte kurz beschreiben, was falsch lief")
-        return {"id": erg.eintragen(p["version"], commit, test, player, ok, text)}
+        return {"id": erg.eintragen(p["version"], commit, test, identitaet.ordner(player), ok, text)}
 
     def darf_sehen(request: Request, player: str, ergebnis_id: int) -> dict:
         x = erg.ergebnis(ergebnis_id)
@@ -228,7 +230,7 @@ def einrichten(app: FastAPI, e, spieler) -> None:
     def bild_dazu(request: Request, player: str = Depends(spieler), ergebnis_id: int = P(...), body: dict[str, Any] = Body(...)):
         from . import steckbrief
         from .verwaltung import bild_aus_daten_url
-        if darf_sehen(request, player, ergebnis_id)["player"] != player:
+        if darf_sehen(request, player, ergebnis_id)["player"] != identitaet.ordner(player):
             raise HTTPException(403, "Bilder kann nur anfügen, wer das Ergebnis eingetragen hat")
         try:
             art, daten = bild_aus_daten_url(body.get("bild"))

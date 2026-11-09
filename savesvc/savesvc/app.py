@@ -243,7 +243,9 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
                 "sitzungBis": getattr(request.state, "sitzung_bis", None),
                 # 1.4.1: In der Bibliothek (Spiele, Bestenlisten, oben rechts, Profil) steht der Anzeigename, im
                 # Admin-Panel und in Protokollen weiter der Benutzername. Der Anzeigename ist ohnehin öffentlich.
-                "anzeigename": (person or {}).get("anzeigename") or None, "namen": anzeigenamen()}
+                "anzeigename": (person or {}).get("anzeigename") or None, "namen": anzeigenamen(),
+                # 1.5.0: Konto = Spieleordner (erster Name, ändert sich nie) – Schlüssel des Zwischenspeichers im Browser
+                "konto": identitaet.ordner(player)}
 
     @app.get("/api/games")
     def spiele(request: Request, player: str = Depends(spieler)):

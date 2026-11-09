@@ -66,8 +66,8 @@ def umgebung(tmp_path: Path):
 def client(umgebung, rsa_schluessel, token):
     e = Einstellungen(team_domain=TEAM, audience=AUD, users_file=umgebung.users,
                       spiele_dir=umgebung.spiele, db_path=umgebung.db, dev_user=None,
-                      # 1.5.0: TEST_IDENTITAET_UUID=1 fährt die ganze Sammlung mit UUIDs im Hintergrund
-                      identitaet_uuid=os.environ.get("TEST_IDENTITAET_UUID") == "1")
+                      # 1.5.0: standardmäßig mit UUIDs im Hintergrund; TEST_IDENTITAET_UUID=0 = Verhalten von 1.4.1
+                      identitaet_uuid=os.environ.get("TEST_IDENTITAET_UUID", "1") != "0")
     app = erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key()))
     c = TestClient(app)
 

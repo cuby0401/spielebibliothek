@@ -803,6 +803,7 @@ async function start() {
 		ich = wer;
 		einstellungen = einst;
 		Bridge.spieler = ich.player;
+		Bridge.konto = ich.konto;           // 1.5.0: Zwischenspeicher je Konto, bleibt bei Handle-Änderungen
 		Bridge.sitzungBis = ich.sitzungBis;
 		ichSelbst = ich.player;
 		el("benutzer").textContent = anzeige(ich.player);
