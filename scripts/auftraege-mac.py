@@ -26,6 +26,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -59,14 +60,22 @@ if d["was"] == "lebenszeichen":
     db.dienst_setzen("mac", d["wert"][:80])
     print("[]")
 elif d["was"] == "holen":
+    # Immer nur EINEN Auftrag übernehmen (09.11.2026): Wird der Mac mitten im Lauf beendet, kann nur dieser eine
+    # hängen – und genau der ist in laeuft.json vermerkt und wird beim nächsten Start als abgebrochen gemeldet.
     erlaubt = {(a, z) for a, z in d["erlaubt"]}
     with db.verbindung() as v:
         v.execute("BEGIN IMMEDIATE")
+        if d.get("aufraeumen"):   # Testserver: dort räumt kein Auftragsdienst der NAS Hängengebliebene ab
+            from datetime import timedelta
+            grenze = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(timespec="seconds")
+            v.execute("UPDATE auftraege SET status='fehler', ende=?, zusammenfassung='abgebrochen (keine Rückmeldung nach 2 h)' "
+                      "WHERE status='laeuft' AND start < ?", (jetzt, grenze))
         liste = []
         for z in v.execute("SELECT id, art, ziel FROM auftraege WHERE status='wartet' ORDER BY id").fetchall():
             if (z["art"], z["ziel"]) in erlaubt:
                 v.execute("UPDATE auftraege SET status='laeuft', start=?, zusammenfassung='läuft auf dem Mac' WHERE id=? AND status='wartet'", (jetzt, z["id"]))
                 liste.append(dict(z))
+                break
         v.execute("COMMIT")
     print(json.dumps(liste))
 elif d["was"] == "stand":   # Zwischenstand eines laufenden Auftrags (z. B. „Test 3/8: zentrale-1.2“)
@@ -195,65 +204,111 @@ def erlaubt(panel: str) -> list[tuple[str, str]]:
     return liste
 
 
+def lebenszeichen(wert: str) -> None:
+    for panel, container in PANELS.items():
+        try:
+            im_container(container, {"was": "lebenszeichen", "wert": wert})
+        except (RuntimeError, subprocess.TimeoutExpired) as f:
+            if panel == "live":
+                log(f"Lebenszeichen {panel}: {f}")
+
+
+def herzschlag(stopp: threading.Event) -> None:
+    """Während eines Laufs alle 20 s „Mac – beschäftigt“ melden (09.11.2026). launchd startet den Dienst nicht erneut,
+    solange er noch läuft – ohne das galt der Mac nach 90 s als weg, und die NAS übernahm neue Aufträge doch selbst."""
+    while not stopp.wait(20):
+        lebenszeichen("Mac – beschäftigt")
+
+
+def offenes_melden() -> bool:
+    """Steht in laeuft.json noch ein Auftrag, ist er entweder abgebrochen (Dienst beendet) oder sein Ergebnis kam nicht
+    an (NAS nicht erreichbar). Jetzt melden. → False, wenn das wieder nicht ging – dann keinen neuen Auftrag annehmen,
+    sonst würde laeuft.json überschrieben und der alte bliebe ewig auf „läuft“."""
+    if not LAEUFT.is_file():
+        return True
+    try:
+        alt = json.loads(LAEUFT.read_text())
+        container, aid = PANELS[alt["panel"]], int(alt["id"])
+    except (ValueError, KeyError, TypeError) as f:
+        log(f"laeuft.json unlesbar, verworfen: {f}")
+        LAEUFT.unlink(missing_ok=True)
+        return True
+    erg = alt.get("ergebnis")
+    try:
+        if erg:
+            fertig_melden(container, aid, erg["ok"], erg["text"], erg["ausgabe"])
+            log(f"{alt['panel']}: Ergebnis von Auftrag {aid} nachgemeldet")
+        else:
+            fertig_melden(container, aid, False,
+                          "abgebrochen – der Mac-Dienst wurde während des Laufs beendet (Neustart, Ruhezustand oder Mac aus). Bitte neu starten.", "")
+            log(f"{alt['panel']}: Auftrag {aid} als abgebrochen gemeldet")
+    except (RuntimeError, subprocess.TimeoutExpired) as f:
+        log(f"Auftrag {aid} noch nicht gemeldet (nächster Versuch in 20 s): {f}")
+        return False
+    LAEUFT.unlink(missing_ok=True)
+    return True
+
+
+def ausfuehren_auftrag(panel: str, container: str, art: str, ziel: str, aid: int) -> None:
+    log(f"{panel}: Auftrag {aid} {art} ({ziel})")
+    LAEUFT.parent.mkdir(parents=True, exist_ok=True)
+    LAEUFT.write_text(json.dumps({"panel": panel, "id": aid, "pid": os.getpid()}))
+    start = datetime.now(timezone.utc)
+    stopp = threading.Event()
+    threading.Thread(target=herzschlag, args=(stopp,), daemon=True).start()
+    try:
+        with tempfile.TemporaryDirectory(prefix="sb-auftrag-mac-") as tmp:
+            try:
+                repo, version = quelle(ziel, Path(tmp))
+                def melden(text, c=container, i=aid):
+                    try:
+                        im_container(c, {"was": "stand", "id": i, "text": text})
+                    except (RuntimeError, subprocess.TimeoutExpired):
+                        pass
+                ok, zusammenfassung, ausgabe = unit_tests(repo) if art == "unit-tests" else e2e_tests(repo, melden)
+            except Exception as f:   # noqa: BLE001
+                ok, zusammenfassung, ausgabe, version = False, str(f)[:300], str(f), "?"
+    finally:
+        stopp.set()
+    dauer = int((datetime.now(timezone.utc) - start).total_seconds())
+    text = f"Mac · {version}: {zusammenfassung} ({dauer // 60}:{dauer % 60:02d})"
+    log(f"{panel}: Auftrag {aid} {'ok' if ok else 'FEHLER'} – {text}")
+    # Ergebnis erst vermerken, dann melden: Kommt es nicht an (NAS kurz weg), meldet der nächste Lauf es nach (09.11.2026)
+    LAEUFT.write_text(json.dumps({"panel": panel, "id": aid, "pid": os.getpid(),
+                                  "ergebnis": {"ok": ok, "text": text, "ausgabe": ausgabe[-20000:]}}))
+    offenes_melden()
+
+
 def main() -> int:
     if not docker_laeuft():
         return 0                                       # ohne Docker Desktop: kein Lebenszeichen, die NAS übernimmt
     with open(SPERRE, "w") as sperre:
-        beschaeftigt = False
         try:
             fcntl.flock(sperre, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            beschaeftigt = True
-        for panel, container in PANELS.items():
-            try:
-                im_container(container, {"was": "lebenszeichen", "wert": "Mac – beschäftigt" if beschaeftigt else "Mac – bereit"})
-            except (RuntimeError, subprocess.TimeoutExpired) as f:
-                if panel == "live":
-                    log(f"Lebenszeichen {panel}: {f}")
-        if beschaeftigt:
-            return 0                                   # ein Lauf ist noch dran – nie zwei gleichzeitig (Teststand, Ports)
-        if LAEUFT.is_file():                           # wir haben die Sperre, also ist der dort vermerkte Lauf tot
-            try:
-                alt = json.loads(LAEUFT.read_text())
-                fertig_melden(PANELS[alt["panel"]], int(alt["id"]), False,
-                              "abgebrochen – der Mac-Dienst wurde während des Laufs beendet (Neustart, Ruhezustand oder Mac aus). Bitte neu starten.", "")
-                log(f"{alt['panel']}: Auftrag {alt['id']} als abgebrochen gemeldet")
-            except (ValueError, KeyError, RuntimeError, subprocess.TimeoutExpired) as f:
-                log(f"Abgebrochenen Auftrag nicht gemeldet: {f}")
-            LAEUFT.unlink(missing_ok=True)
-        for panel, container in PANELS.items():
-            try:
-                auftraege = im_container(container, {"was": "holen", "erlaubt": erlaubt(panel)})
-            except (RuntimeError, subprocess.TimeoutExpired):
-                continue                               # z. B. Testserver gerade im Umbau
-            for a in auftraege:
-                art, ziel, aid = a.get("art"), a.get("ziel"), a.get("id")
-                if art not in ARTEN or ziel not in ZIELE or not isinstance(aid, int):
-                    continue
-                log(f"{panel}: Auftrag {aid} {art} ({ziel})")
-                LAEUFT.parent.mkdir(parents=True, exist_ok=True)
-                LAEUFT.write_text(json.dumps({"panel": panel, "id": aid, "pid": os.getpid()}))
-                start = datetime.now(timezone.utc)
-                with tempfile.TemporaryDirectory(prefix="sb-auftrag-mac-") as tmp:
-                    try:
-                        repo, version = quelle(ziel, Path(tmp))
-                        def melden(text, c=container, i=aid):
-                            try:
-                                im_container(c, {"was": "stand", "id": i, "text": text})
-                            except (RuntimeError, subprocess.TimeoutExpired):
-                                pass
-                        ok, zusammenfassung, ausgabe = unit_tests(repo) if art == "unit-tests" else e2e_tests(repo, melden)
-                    except Exception as f:   # noqa: BLE001
-                        ok, zusammenfassung, ausgabe, version = False, str(f)[:300], str(f), "?"
-                dauer = int((datetime.now(timezone.utc) - start).total_seconds())
-                text = f"Mac · {version}: {zusammenfassung} ({dauer // 60}:{dauer % 60:02d})"
+        except BlockingIOError:                        # z. B. ein Lauf von Hand – nie zwei gleichzeitig (Teststand, Ports)
+            lebenszeichen("Mac – beschäftigt")
+            return 0
+        lebenszeichen("Mac – bereit")
+        if not offenes_melden():                       # wir haben die Sperre, also läuft der dort vermerkte Auftrag nicht mehr
+            return 0
+        # Einen Auftrag nach dem anderen; nach jedem neu nachsehen (auch im anderen Panel)
+        while True:
+            gefunden = False
+            for panel, container in PANELS.items():
                 try:
-                    fertig_melden(container, aid, ok, text, ausgabe)
-                except (RuntimeError, subprocess.TimeoutExpired) as f:
-                    log(f"Ergebnis {aid} nicht gemeldet: {f}")
-                LAEUFT.unlink(missing_ok=True)
-                log(f"{panel}: Auftrag {aid} {'ok' if ok else 'FEHLER'} – {text}")
-    return 0
+                    auftraege = im_container(container, {"was": "holen", "erlaubt": erlaubt(panel), "aufraeumen": panel == "probe"})
+                except (RuntimeError, subprocess.TimeoutExpired):
+                    continue                           # z. B. Testserver gerade im Umbau
+                for a in auftraege:
+                    art, ziel, aid = a.get("art"), a.get("ziel"), a.get("id")
+                    if art not in ARTEN or ziel not in ZIELE or not isinstance(aid, int):
+                        continue
+                    ausfuehren_auftrag(panel, container, art, ziel, aid)
+                    gefunden = True
+                    if LAEUFT.is_file():               # Ergebnis kam nicht an – erst nachmelden, dann weiter
+                        return 0
+            if not gefunden:
+                return 0
 
 
 if __name__ == "__main__":
