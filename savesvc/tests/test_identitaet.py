@@ -292,3 +292,18 @@ def test_zwischenspeicher_liest_neue_personen_sofort(umgebung):
     reg._karten = (reg._karten[0] if reg._karten else 0, {"handle": {}, "ordner": {}, "id": {}, "nr": {}})   # absichtlich veraltet
     assert reg.nach_aussen({"x": p["name"]}) == {"x": "neu_da"}
     assert reg.id_von("neu_da") == p["name"] and reg.ordner(p["name"]) == "neu_da"
+
+
+def test_users_yaml_nach_dem_start_mit_ordnernamen(umgebung):
+    """Probelauf 09.11.2026: Beim allerersten Start (frischer Prozess, noch kein Register) schrieb die Bibliothek
+    UUIDs in users.yaml – der Upload-Dienst hätte keine Entwickler mehr gekannt. Nach jedem Start: Ordnernamen."""
+    from savesvc.app import erstellen
+    erstellen(_einstellungen(umgebung))                         # Stand 1.4.1
+    identitaet.REGISTER = None                                  # neuer Prozess
+    erstellen(_einstellungen(umgebung, identitaet_uuid=True))   # erster Start von 1.5.0: Umstellung + Export
+    inhalt = umgebung.users.read_text()
+    assert not identitaet.UUID_IN_TEXT.search(inhalt), inhalt
+    assert "seb@example.com: seb" in inhalt.lower() and "paul@example.com: paul" in inhalt.lower()
+    identitaet.REGISTER = None
+    erstellen(_einstellungen(umgebung, identitaet_uuid=True))   # zweiter Start
+    assert not identitaet.UUID_IN_TEXT.search(umgebung.users.read_text())

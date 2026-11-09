@@ -79,6 +79,10 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         logging.getLogger("savesvc").warning("DEV_USER=%s – Anmeldung wird übersprungen (nur lokal!)", e.dev_user)
 
     db = Datenbank(e.db_path)
+    # Register zuerst (1.5.0): CRM, Export der users.yaml und Admin-Liste brauchen es schon beim Start – ohne Register gäbe
+    # ordner() die UUID zurück, und users.yaml (Upload-Dienst!) bekäme UUIDs statt Ordnernamen (Probelauf 09.11.2026)
+    from . import identitaet
+    identitaet.REGISTER = identitaet.Register(e.db_path)
     if e.backup_ziel:
         from . import sicherung
         sicherung.starten(db, e.backup_ziel, e.backup_uhrzeit)
@@ -110,8 +114,6 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     app = FastAPI(title="Spielebibliothek – Speicher-Dienst", docs_url=None, redoc_url=None, openapi_url=None)
 
     # ---------- Identität (1.5.0, E81): innen UUID, außen Handle ----------
-    from . import identitaet
-    identitaet.REGISTER = identitaet.Register(e.db_path)
     PERSON_IM_PFAD = re.compile(r"^(/api/(?:profil|admin/personen|admin/entwickler)/)([^/]+)(.*)$")
 
     zuletzt_protokolliert: dict[tuple, float] = {}
