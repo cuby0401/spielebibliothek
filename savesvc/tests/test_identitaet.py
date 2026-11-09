@@ -1,0 +1,132 @@
+"""Zentrale 1.5.0: Umstellung der Identität auf UUIDs (E81) – nichts darf verloren gehen oder verrutschen."""
+import json
+import sqlite3
+
+import pytest
+
+from savesvc import crm as crm_modul
+from savesvc import identitaet
+from savesvc.db import Datenbank
+
+
+def _stand(pfad):
+    """Alle Tabellen als vergleichbarer Inhalt (ohne die neuen Spalten/Tabellen von 1.5.0)."""
+    v = sqlite3.connect(pfad)
+    try:
+        aus = {}
+        for (t,) in v.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite%' AND name NOT IN ('migrationen','handles')"):
+            spalten = [z[1] for z in v.execute(f"PRAGMA table_info({t})") if not (t == "personen" and z[1] in identitaet.NEUE_SPALTEN)]
+            aus[t] = v.execute(f"SELECT {', '.join(spalten)} FROM {t} ORDER BY rowid").fetchall()
+        return aus
+    finally:
+        v.close()
+
+
+@pytest.fixture
+def daten(tmp_path):
+    pfad = tmp_path / "saves.db"
+    db = Datenbank(pfad)
+    crm = crm_modul.Crm(db, frozenset({"seb"}))
+    crm.anlegen("übernahme", "seb", "seb@example.com", ["admin", "spieler"], status="aktiv", aktion="uebernommen")
+    crm.anlegen("seb", "paul", "paul@example.com", ["entwickler", "spieler"], status="aktiv")
+    db.speichern("seb", "seb/wortjagd", "stand", {"level": 7, "name": "seb"}, 1)     # „seb“ im Spielstand bleibt!
+    db.speichern("seb", "seb/wortjagd", "stand", {"level": 8}, 1)                    # → Verlauf
+    db.speichern("paul", "paul/Dino_Park", "stand", {"dinos": 3}, 1)
+    db.speichern("seb~spieler", "seb/wortjagd", "stand", {"level": 1}, 1)            # „Ansicht als …“
+    db.speichern("altkonto", "seb/wortjagd", "stand", {"level": 2}, 1)               # Konto ohne Person
+    db.score_eintragen("paul", "seb/wortjagd", 1, 120, {"zeit": 30})
+    db.score_eintragen("seb", "seb/wortjagd", 1, 90)
+    db.melden("*", "Neues Spiel")                                                    # an alle – bleibt „*“
+    db.melden("paul", "seb hat dich überholt")
+    db.auftrag_anlegen("e2e-tests", "probe", "deploy", "mac")
+    db.sicherheit_eintragen("notaus", "seb", "Not-Aus ein")
+    return pfad, tmp_path
+
+
+def test_umstellung_ersetzt_namen_durch_uuids_und_sonst_nichts(daten):
+    pfad, tmp = daten
+    vorher = _stand(pfad)
+    bericht = identitaet.umstellen(pfad, tmp / "backup" / "vor-uuid.db")
+    assert bericht["umgestellt"] and bericht["personen"] == 3 and bericht["verwaist"] == ["altkonto"]
+    assert (tmp / "backup" / "vor-uuid.db").stat().st_size > 0                     # Sicherung liegt da
+    assert _stand(tmp / "backup" / "vor-uuid.db") == vorher                         # … und ist der Stand vorher
+
+    v = sqlite3.connect(pfad); v.row_factory = sqlite3.Row
+    p = {z["alt_name"]: dict(z) for z in v.execute("SELECT * FROM personen")}
+    assert all(identitaet.UUID_MUSTER.match(x["id"]) and x["name"] == x["id"] for x in p.values())
+    assert [p[n]["nr"] for n in sorted(p, key=lambda n: p[n]["nr"])] == [1, 2, 3]
+    assert p["seb"]["handle"] == "seb" and p["altkonto"]["status"] == "archiviert"
+    seb, paul = p["seb"]["id"], p["paul"]["id"]
+    # Spielstände: Besitzer ist die UUID, Inhalt Byte für Byte gleich (auch der Name „seb“ im Spielstand selbst)
+    saves = {(z["player"], z["game"]): z["data"] for z in v.execute("SELECT * FROM saves")}
+    assert json.loads(saves[(seb, "seb/wortjagd")]) == {"level": 8}
+    assert (seb + "~spieler", "seb/wortjagd") in saves and (p["altkonto"]["id"], "seb/wortjagd") in saves
+    assert [json.loads(z["data"]) for z in v.execute("SELECT data FROM save_history WHERE player=?", (seb,))] == [{"level": 7, "name": "seb"}]
+    assert {z["player"] for z in v.execute("SELECT player FROM scores")} == {seb, paul}
+    # Sonderwerte bleiben
+    assert {z["an"] for z in v.execute("SELECT an FROM meldungen")} == {"*", paul}
+    assert v.execute("SELECT von FROM auftraege").fetchone()[0] == "mac"
+    assert v.execute("SELECT wer FROM sicherheit").fetchone()[0] == seb
+    assert {z["von"] for z in v.execute("SELECT von FROM crm_protokoll")} == {"übernahme", seb}
+    assert {z["name"] for z in v.execute("SELECT name FROM person_emails")} == {seb, paul}
+    assert {z["handle"] for z in v.execute("SELECT handle FROM handles")} == {"seb", "paul", "altkonto"}
+    # Spiel-IDs (Ordner) bleiben beim alten Namen (E82)
+    assert {z["game"] for z in v.execute("SELECT game FROM saves")} == {"seb/wortjagd", "paul/Dino_Park"}
+    v.close()
+
+
+def test_zweiter_lauf_aendert_nichts(daten):
+    pfad, tmp = daten
+    identitaet.umstellen(pfad, tmp / "b1.db")
+    stand = _stand(pfad)
+    assert identitaet.umstellen(pfad, tmp / "b2.db") == {"umgestellt": False, "grund": "schon umgestellt"}
+    assert _stand(pfad) == stand and not (tmp / "b2.db").exists()
+
+
+def test_rueckweg_ist_exakt_und_erneute_umstellung_behaelt_ids(daten):
+    pfad, tmp = daten
+    vorher = _stand(pfad)
+    identitaet.umstellen(pfad, tmp / "b1.db")
+    ids = dict(sqlite3.connect(pfad).execute("SELECT alt_name, id FROM personen").fetchall())
+    assert identitaet.zurueck(pfad, tmp / "b2.db")["zurueck"]
+    nachher = _stand(pfad)
+    # Die verwaiste Person bleibt als archivierter Eintrag – sonst ist alles wie vor der Umstellung
+    nachher["personen"] = [z for z in nachher["personen"] if z[0] != "altkonto"]
+    assert nachher == vorher
+    assert not identitaet.umgestellt(pfad)
+    # 1.4.1 läuft auf dieser Datenbank (Schema-Anlage und Lesen gehen)
+    db = Datenbank(pfad)
+    assert db.laden("seb", "seb/wortjagd", "stand") is not None
+    # Wieder vorwärts: dieselben UUIDs und Nummern
+    identitaet.umstellen(pfad, tmp / "b3.db")
+    assert dict(sqlite3.connect(pfad).execute("SELECT alt_name, id FROM personen").fetchall()) == ids
+
+
+def test_fehler_mitten_in_der_umstellung_laesst_alles_unveraendert(daten):
+    pfad, tmp = daten
+    vorher = _stand(pfad)
+
+    def kaputt(v):   # simuliert einen Fehler: ein Spielstand ändert sich während der Umstellung
+        v.execute("UPDATE saves SET data='{\"level\": 0}' WHERE game='paul/Dino_Park'")
+
+    with pytest.raises(identitaet.UmstellungFehlgeschlagen, match="saves"):
+        identitaet.umstellen(pfad, tmp / "b.db", _nach_umstellung=kaputt)
+    assert _stand(pfad) == vorher and not identitaet.umgestellt(pfad)
+
+
+def test_fehlende_zuordnung_wird_erkannt(daten):
+    pfad, tmp = daten
+
+    def neuer_name(v):   # ein Spielstand unter einem Namen, der keiner Person gehört
+        v.execute("INSERT INTO saves (player, game, key, data, save_version, updated_at) VALUES ('fremd','x','k','1',1,'2026')")
+
+    with pytest.raises(identitaet.UmstellungFehlgeschlagen):
+        identitaet.umstellen(pfad, tmp / "b.db", _nach_umstellung=neuer_name)
+    assert not identitaet.umgestellt(pfad)
+    assert sqlite3.connect(pfad).execute("SELECT COUNT(*) FROM saves WHERE player='fremd'").fetchone()[0] == 0
+
+
+def test_leere_datenbank(tmp_path):
+    Datenbank(tmp_path / "saves.db")
+    crm_modul.Crm(Datenbank(tmp_path / "saves.db"))
+    assert identitaet.umstellen(tmp_path / "saves.db", tmp_path / "b.db")["personen"] == 0
