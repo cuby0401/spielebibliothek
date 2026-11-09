@@ -88,7 +88,9 @@ class Pruefer:
 
     def __call__(self, request: Request) -> str:
         if self.e.dev_user:
-            return self.e.dev_user
+            # Nur Teststand: DEV_USER nennt einen Benutzernamen → ab 1.5.0 die UUID der Person (im Upload-Dienst bleibt es der Name)
+            from . import identitaet
+            return identitaet.id_von(self.e.dev_user) or self.e.dev_user
         token = request.headers.get("Cf-Access-Jwt-Assertion")
         if not token:
             raise HTTPException(401, "nicht angemeldet")

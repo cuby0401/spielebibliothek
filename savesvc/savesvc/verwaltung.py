@@ -443,7 +443,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         for a in sorted(rollen.admins(e)):
             db.melden(a, f"Neue Anfrage von {player} ({ARTEN[art]}): {kurz}", f"/#/antrag/{aid}", wichtig=True)
         from . import waechter
-        waechter.ha_senden(e, "antrag", f"Neue Anfrage von {player} ({ARTEN[art]}): {kurz}")
+        waechter.ha_senden(e, "antrag", f"Neue Anfrage von {identitaet.handle(player)} ({ARTEN[art]}): {kurz}")
         return {"id": aid, "an": "admin"}
 
     def zustaendig(a: dict) -> str | None:
@@ -673,7 +673,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         grund = body.get("grund") if isinstance(body.get("grund"), str) else ""
         d = notaus.einschalten(e.users_file.parent, db, player, grund)
         log.warning("NOT-AUS ausgelöst von %s: %s", player, d["grund"])
-        ha_senden(e, "notaus", f"Not-Aus der Spielebibliothek ausgelöst von {player}" + (f": {d['grund']}" if d["grund"] else ""))
+        ha_senden(e, "notaus", f"Not-Aus der Spielebibliothek ausgelöst von {identitaet.handle(player)}" + (f": {d['grund']}" if d["grund"] else ""))
         return {**d, "hinweis": "Ab sofort sind alle Daten gesperrt. Der Tunnel geht innerhalb einer Minute aus. "
                                 "Wieder einschalten nur am Mac: scripts/deploy.sh --notaus-aus"}
 

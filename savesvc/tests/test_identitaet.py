@@ -245,3 +245,34 @@ def test_keine_uuid_in_antworten(umgebung, rsa_schluessel, token, monkeypatch):
     assert c.get("/api/me", headers=paul).json()["player"] == "paul"
     assert [x["player"] for x in c.get("/api/leaderboard/seb/zaehler", headers=paul).json()["entries"]] == ["seb", "paul"]
     assert c.get("/api/profil/paul", headers=seb).json()["name"] == "paul"
+
+
+def test_home_assistant_bekommt_handles(umgebung, rsa_schluessel, token, monkeypatch):
+    """Nachrichten an Home Assistant laufen nicht durch die Antwort-Schicht – auch dort Handle statt UUID."""
+    from fastapi.testclient import TestClient
+    from savesvc import waechter
+    from savesvc.app import erstellen
+    from savesvc.config import Einstellungen
+    from .conftest import AUD, TEAM, Schluessel
+    gesendet = []
+    monkeypatch.setattr(waechter, "ha_senden", lambda e, art, text="", **k: gesendet.append(text))
+    e = Einstellungen(team_domain=TEAM, audience=AUD, users_file=umgebung.users, spiele_dir=umgebung.spiele,
+                      db_path=umgebung.db, dev_user=None, identitaet_uuid=True)
+    c = TestClient(erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key())))
+    paul = {"Cf-Access-Jwt-Assertion": token(email="paul@example.com"), "X-Bibliothek": "1"}
+    assert c.post("/api/antraege", json={"art": "wunsch", "text": "Dunkles Design bitte"}, headers=paul).status_code == 201
+    assert gesendet and "von paul" in gesendet[-1] and not identitaet.UUID_IN_TEXT.search(" ".join(gesendet))
+
+
+def test_dev_user_im_teststand_wird_uuid(umgebung):
+    """Teststand (DEV_USER=seb): nach der Umstellung ist man als die Person seb angemeldet, nicht als Name „seb“."""
+    from fastapi.testclient import TestClient
+    from savesvc.app import erstellen
+    c = TestClient(erstellen(_einstellungen(umgebung, identitaet_uuid=True).__class__(
+        **{**_einstellungen(umgebung, identitaet_uuid=True).__dict__, "dev_user": "seb"})))
+    me = c.get("/api/me").json()
+    assert me["player"] == "seb" and me["admin"] is True
+    c.put("/api/save/seb/zaehler/stand", json={"data": 5}, headers={"X-Bibliothek": "1"})
+    reg = identitaet.Register(umgebung.db)
+    v = sqlite3.connect(umgebung.db)
+    assert v.execute("SELECT player FROM saves").fetchone()[0] == reg.id_von("seb")
