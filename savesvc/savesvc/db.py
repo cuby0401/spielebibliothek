@@ -741,6 +741,14 @@ class Datenbank:
             v.execute("INSERT INTO sicherheit (zeit, art, wer, text) VALUES (?,?,?,?)", (jetzt(), art[:40], (wer or "")[:60], text[:1000]))
             v.execute("DELETE FROM sicherheit WHERE zeit < ?", (grenze,))
 
+    def sicherheit_von(self, wer: str, anzahl: int = 100) -> list[dict]:
+        """Sicherheitsprotokoll einer Person (1.5.0): eigene Einträge und getrennte Sitzungen."""
+        with self.verbindung() as v:
+            z = [dict(x) for x in v.execute("SELECT zeit, art, wer, text FROM sicherheit WHERE wer=? ORDER BY id DESC LIMIT ?", (wer, anzahl))]
+            z += [{"zeit": x["zeit"], "art": "getrennt", "wer": wer, "text": f"Anmeldung getrennt (Sitzung {x['sitzung']}) durch {x['von']}"}
+                  for x in v.execute("SELECT * FROM getrennte_sitzungen WHERE player=? ORDER BY zeit DESC LIMIT ?", (wer, anzahl))]
+        return z
+
     def sicherheit_liste(self, anzahl: int = 200) -> list[dict]:
         with self.verbindung() as v:
             return [dict(z) for z in v.execute("SELECT * FROM sicherheit ORDER BY id DESC LIMIT ?", (anzahl,))]

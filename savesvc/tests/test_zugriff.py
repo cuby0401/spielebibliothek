@@ -6,11 +6,15 @@ Handle in Adresse, Formular oder Parameter berechtigt nie zu etwas.
 """
 import re
 
+import os
+
 import pytest
 
 from savesvc import identitaet
 
 from .test_verwaltung import upload  # noqa: F401 (Fixture)
+
+pytestmark = pytest.mark.skipif(os.environ.get("TEST_IDENTITAET_UUID") == "0", reason="setzt UUIDs voraus (1.5.0)")
 
 PAUL = "paul@example.com"
 
@@ -87,3 +91,18 @@ def test_intern_nur_mit_token(client, lage):
     for methode, url in (("GET", "/intern/entwurf/seb/zaehler?seit=2000-01-01"), ("POST", "/intern/meldung")):
         r = client.request(methode, url, headers=lage["paul"], json={"an": "*", "text": "x"})
         assert r.status_code in (401, 403, 404), f"{methode} {url} → {r.status_code}"
+
+
+def test_sicherheitsprotokoll_je_person(client, lage):
+    """Abgelehnte Zugriffe (403) landen im Sicherheitsprotokoll der Person – je Adresse höchstens einmal pro Minute;
+    der Anmeldeversuch einer gesperrten Person ebenso; Admin-Maßnahmen stehen dort auch."""
+    for _ in range(5):
+        client.get("/api/admin/personen", headers=lage["paul"])
+    client.post("/api/admin/personen/paul/sperren", json={"grund": "Test"}, headers=lage["seb"])
+    assert client.get("/api/me", headers=lage["paul"]).status_code == 403
+    s = client.get("/api/admin/personen/paul", headers=lage["seb"]).json()["sicherheit"]
+    abgelehnt = [x for x in s if x["art"] == "abgelehnt"]
+    assert len([x for x in abgelehnt if "/api/admin/personen" in x["text"] and "GET" in x["text"]]) == 1   # gedrosselt
+    assert any(x["art"] == "abgelehnt" and "/api/me" in x["text"] for x in s)                            # gesperrt
+    assert any(x["art"] == "admin-aktion" and "sperren" in x["text"] and "seb" in x["text"] for x in s)
+    assert not identitaet.UUID_IN_TEXT.search(str(s))

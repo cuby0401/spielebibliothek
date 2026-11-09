@@ -213,11 +213,22 @@ class Crm:
         """Für die Fehlermeldung beim Anmelden: Sperrgrund und -ende, falls diese E-Mail gesperrt ist."""
         with self.db.verbindung() as v:
             self._ablaufen_lassen(v)
-            z = v.execute("""SELECT p.status, p.sperrgrund, p.gesperrt_bis FROM person_emails e JOIN personen p ON p.name = e.name
+            z = v.execute("""SELECT p.name, p.status, p.sperrgrund, p.gesperrt_bis FROM person_emails e JOIN personen p ON p.name = e.name
                              WHERE e.email=?""", (email.strip().lower(),)).fetchone()
         if z and z["status"] in ("gesperrt", "archiviert", "geloescht"):
-            return {"status": z["status"], "grund": z["sperrgrund"], "bis": z["gesperrt_bis"]}
+            return {"name": z["name"], "status": z["status"], "grund": z["sperrgrund"], "bis": z["gesperrt_bis"]}
         return None
+
+    def alte_handles(self) -> dict[str, list[str]]:
+        """Frühere Handles je Person (1.5.0) – reserviert, alte Adressen leiten weiter."""
+        if not identitaet.umgestellt(self.db.pfad):
+            return {}
+        with self.db.verbindung() as v:
+            aus: dict[str, list[str]] = {}
+            for z in v.execute("SELECT h.person, h.handle FROM handles h JOIN personen p ON p.name = h.person "
+                               "WHERE h.handle <> p.handle ORDER BY h.seit"):
+                aus.setdefault(z["person"], []).append(z["handle"])
+            return aus
 
     def ereignisse(self, name: str, limit: int = 200) -> list[dict]:
         with self.db.verbindung() as v:

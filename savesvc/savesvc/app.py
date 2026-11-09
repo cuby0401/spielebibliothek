@@ -114,11 +114,33 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     identitaet.REGISTER = identitaet.Register(e.db_path)
     PERSON_IM_PFAD = re.compile(r"^(/api/(?:profil|admin/personen|admin/entwickler)/)([^/]+)(.*)$")
 
+    zuletzt_protokolliert: dict[tuple, float] = {}
+
+    def sicherheit_merken(request, status: int) -> None:
+        """Sicherheitsprotokoll (1.5.0): abgelehnte Zugriffe (403) und Rate-Limits (429) einer angemeldeten Person –
+        je Person, Art und Adresse höchstens einmal pro Minute, damit niemand das Protokoll fluten kann."""
+        person = getattr(request.state, "person", None)
+        if status not in (403, 429) or not person:
+            return
+        art = "abgelehnt" if status == 403 else "rate-limit"
+        schluessel, jetzt_ = (person, art, request.url.path), time.monotonic()
+        if jetzt_ - zuletzt_protokolliert.get(schluessel, -1e9) < 60:
+            return
+        zuletzt_protokolliert[schluessel] = jetzt_
+        if len(zuletzt_protokolliert) > 5000:
+            zuletzt_protokolliert.clear()
+        try:
+            db.sicherheit_eintragen(art, person, f"{request.method} {request.url.path} → {status}")
+        except Exception:      # das Protokoll darf keine Antwort verhindern
+            logging.getLogger("savesvc").exception("Sicherheitsprotokoll nicht geschrieben")
+
     @app.middleware("http")
     async def identitaet_schicht(request, weiter):
         reg = identitaet.REGISTER
         if not reg.aktiv():
-            return await weiter(request)
+            antwort = await weiter(request)
+            sicherheit_merken(request, antwort.status_code)
+            return antwort
         # Herein: Handle (auch ein früheres) in der Adresse → UUID. Unbekannt bleibt es – der Endpunkt meldet dann 404.
         m = PERSON_IM_PFAD.match(request.scope["path"])
         if m:
@@ -133,6 +155,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
                  for k, v in parse_qsl(request.scope["query_string"].decode(), keep_blank_values=True)]
             request.scope["query_string"] = urlencode(q).encode()
         antwort = await weiter(request)
+        sicherheit_merken(request, antwort.status_code)
         # Hinaus: jede Personen-UUID in JSON-Antworten der Bibliothek → aktuelles Handle (auch in Texten)
         if not request.url.path.startswith("/api/") or "application/json" not in antwort.headers.get("content-type", ""):
             return antwort

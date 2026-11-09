@@ -1,9 +1,15 @@
 """Zentrale 1.5.0 (E82): Handle ändern – alle 30 Tage, frühere bleiben reserviert, nichts anderes ändert sich."""
 from datetime import datetime, timedelta, timezone
 
+import os
+
+import pytest
+
 from savesvc.db import Datenbank
 
 from .test_verwaltung import upload  # noqa: F401 (Fixture)
+
+pytestmark = pytest.mark.skipif(os.environ.get("TEST_IDENTITAET_UUID") == "0", reason="setzt UUIDs voraus (1.5.0)")
 
 PAUL = "paul@example.com"
 
@@ -66,3 +72,17 @@ def test_spieler_kann_fremdes_handle_nicht_aendern(client, upload):  # noqa: F81
 def test_simulation_aendert_nichts(client):
     r = client.put("/api/mein/handle", json={"handle": "simuliert"}, headers={**client.als(), "X-Ansicht": "spieler"})
     assert r.status_code == 409
+
+
+def test_personennummer_und_geloeschte_person(client, upload, pid):  # noqa: F811
+    s = client.als()
+    nr = client.get("/api/admin/personen/paul", headers=s).json()["nr"]
+    assert client.get(f"/api/admin/personen/P-{nr:04d}", headers=s).json()["handle"] == "paul"
+    assert client.get("/api/admin/personen/P-9999", headers=s).status_code == 404
+    client.post("/api/score/seb/zaehler", json={"score": 5}, headers=client.als(PAUL))
+    client.post("/api/admin/personen/paul/archivieren", headers=s)
+    assert client.post("/api/admin/personen/paul/loeschen", json={"bestaetigung": "paul"}, headers=s).status_code == 200
+    # überall „gelöschte Person“, die Karte bleibt über die Nummer erreichbar
+    assert [e["player"] for e in client.get("/api/leaderboard/seb/zaehler", headers=s).json()["entries"]] == ["gelöschte Person"]
+    assert client.get(f"/api/admin/personen/P-{nr:04d}", headers=s).json()["status"] == "geloescht"
+    assert client.get("/api/profil/paul", headers=s).status_code == 404

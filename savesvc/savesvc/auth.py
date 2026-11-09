@@ -90,7 +90,8 @@ class Pruefer:
         if self.e.dev_user:
             # Nur Teststand: DEV_USER nennt einen Benutzernamen → ab 1.5.0 die UUID der Person (im Upload-Dienst bleibt es der Name)
             from . import identitaet
-            return identitaet.id_von(self.e.dev_user) or self.e.dev_user
+            request.state.person = identitaet.id_von(self.e.dev_user) or self.e.dev_user
+            return request.state.person
         token = request.headers.get("Cf-Access-Jwt-Assertion")
         if not token:
             raise HTTPException(401, "nicht angemeldet")
@@ -119,11 +120,13 @@ class Pruefer:
             sperre = gesperrt(email) if gesperrt else None
             if sperre and sperre["status"] == "gesperrt":
                 log.info("gesperrte Person abgelehnt")
+                request.state.person = sperre.get("name")          # fürs Sicherheitsprotokoll (1.5.0)
                 raise HTTPException(403, "Konto gesperrt" + (f": {sperre['grund']}" if sperre.get("grund") else "")
                                     + (f" (bis {sperre['bis'][:16].replace('T', ' ')} UTC)" if sperre.get("bis") else ""))
             log.info("unbekannte E-Mail abgelehnt")
             raise HTTPException(403, "kein Konto in der Spielebibliothek")
         # „Verbindung trennen“ (Zentrale 1.2.1): diese Anmeldung gilt nicht mehr – die Seite meldet das Gerät ab
+        request.state.person = name                                 # fürs Sicherheitsprotokoll (1.5.0)
         if (name, int(daten.get("iat") or 0)) in self.getrennt:
             raise HTTPException(401, "Sitzung getrennt")
         return name

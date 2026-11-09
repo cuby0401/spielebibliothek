@@ -316,6 +316,8 @@ def zurueck(pfad: Path, sicherung: Path) -> dict:
 # Solange die Datenbank nicht umgestellt ist (oder im Upload-Dienst, der keine Personen kennt), gibt jede Funktion
 # den Namen unverändert zurück – dann verhält sich alles wie in 1.4.1.
 
+NR_MUSTER = re.compile(r"^P-(\d{1,6})$")
+GELOESCHT = "gelöschte Person"
 UUID_IN_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
 
 
@@ -333,16 +335,20 @@ class Register:
         """Frisch aus der Datenbank – wenige Dutzend Zeilen, kein Zwischenspeicher, der veralten könnte."""
         v = _verbinden(self.pfad)
         try:
-            zu_handle, zu_ordner, zu_id = {}, {}, {}
-            for z in v.execute("SELECT id, handle, alt_name FROM personen WHERE id IS NOT NULL"):
-                zu_handle[z["id"]] = z["handle"]
+            zu_handle, zu_ordner, zu_id, zu_nr = {}, {}, {}, {}
+            for z in v.execute("SELECT id, handle, alt_name, nr, status FROM personen WHERE id IS NOT NULL"):
+                # Gelöschte (anonymisierte) Personen erscheinen überall als „gelöschte Person“ (1.5.0)
+                zu_handle[z["id"]] = GELOESCHT if z["status"] == "geloescht" else z["handle"]
                 zu_ordner[z["id"]] = z["alt_name"]
                 zu_id[z["alt_name"].lower()] = z["id"]
+                if z["nr"] is not None:
+                    zu_nr[int(z["nr"])] = z["id"]
             for z in v.execute("SELECT handle, person FROM handles"):         # frühere Handles leiten weiter
                 zu_id.setdefault(z["handle"].lower(), z["person"])
             for pid, h in zu_handle.items():                                   # aktuelle Handles haben Vorrang
-                zu_id[h.lower()] = pid
-            return {"handle": zu_handle, "ordner": zu_ordner, "id": zu_id}
+                if h != GELOESCHT:
+                    zu_id[h.lower()] = pid
+            return {"handle": zu_handle, "ordner": zu_ordner, "id": zu_id, "nr": zu_nr}
         finally:
             v.close()
 
@@ -350,8 +356,11 @@ class Register:
         """Handle (auch ein früheres), Ordnername oder UUID → UUID der Person. Unbekannt → None."""
         if not name or not self.aktiv():
             return name
-        basis, rest = _teile(name)
         k = self.karten()
+        m = NR_MUSTER.match(name)                       # Personennummer P-0007 (Admin-Bereich)
+        if m:
+            return k["nr"].get(int(m.group(1)))
+        basis, rest = _teile(name)
         if basis in k["handle"]:
             return name
         pid = k["id"].get(str(basis).lower())

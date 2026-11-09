@@ -125,10 +125,11 @@ class Entwickler:
             v.execute("INSERT INTO waechter_probe (id, zeit) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET zeit=excluded.zeit",
                       (datetime.now(timezone.utc).isoformat(timespec="seconds"),))
 
-    def ereignisse(self, limit: int = 25) -> list[dict]:
+    def ereignisse(self, limit: int = 25, player: str | None = None) -> list[dict]:
         with self._v() as v:
             v.row_factory = sqlite3.Row
-            return [dict(z) for z in v.execute("SELECT zeit, player, aktion, ordner, dateien FROM ereignisse ORDER BY id DESC LIMIT ?", (limit,))]
+            sql = "SELECT zeit, player, aktion, ordner, dateien FROM ereignisse" + (" WHERE player=?" if player else "") + " ORDER BY id DESC LIMIT ?"
+            return [dict(z) for z in v.execute(sql, ((player, limit) if player else (limit,)))]
 
 
 def entwickler_anlegen(store: "Entwickler", spiele_dir: Path, name: str, neu: bool = True) -> str:
@@ -275,10 +276,12 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         if not store.vorhanden(player):
             raise HTTPException(403, "kein Upload-Konto – bitte bei Seb melden")
         if store.gesperrt(player):
+            store.ereignis(player, "Upload-Anmeldung gesperrt (zu viele Fehlversuche)")      # Sicherheitsprotokoll (1.5.0)
             raise HTTPException(429, f"zu viele Fehlversuche – in {SPERRE // 60} Minuten wieder versuchen")
         passwort = body.get("passwort")
         if not isinstance(passwort, str) or not store.pruefen(player, passwort):
             store.fehlversuch(player)
+            store.ereignis(player, "Upload-Passwort falsch")                                   # Sicherheitsprotokoll (1.5.0)
             log.info("falsches Upload-Passwort für %s", player)
             raise HTTPException(401, "Passwort falsch")
         store.erfolg(player)
@@ -336,6 +339,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         try:
             ergebnis = zipinstall.installieren(datei.file, entwurf)
         except zipinstall.UngueltigesZip as fehler:
+            store.ereignis(player, f"Upload blockiert: {str(fehler)[:200]}", ordner)          # Sicherheitsprotokoll (1.5.0)
             raise HTTPException(422, str(fehler)) from None
         jetzt_belegt, grenze = belegt(basis), kontingent()
         if jetzt_belegt > grenze:   # Kontingent überschritten → Entwurf wieder entfernen
@@ -613,8 +617,8 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         return {"ok": True}
 
     @app.get("/intern/ereignisse", dependencies=[Depends(intern)])
-    def i_ereignisse():
-        return store.ereignisse()
+    def i_ereignisse(player: str | None = None, limit: int = 25):
+        return store.ereignisse(max(1, min(limit, 200)), player)
 
     return app
 

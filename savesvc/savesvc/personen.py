@@ -59,6 +59,7 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         aktiv = aktivitaet()
         cf, fehlt = cloudflare_stand(konten or set())
         ergebnis = []
+        alte = crm.alte_handles()
         for p in crm.personen():
             # Rollen nur aus dem CRM (1.4.0, Nachtest 08.11.). Früher zählte ein eigener Spieleordner zusätzlich als Entwickler – dann blieb
             # der Haken nach dem Entziehen gesetzt, weil der Ordner (mit den Spielen) bleibt. Wer beim Umstieg aufs CRM
@@ -66,7 +67,8 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
             ordner = (e.spiele_dir / identitaet.ordner(p["name"])).is_dir()
             entw = "entwickler" in p["rollen"]
             ergebnis.append({
-                "name": p["name"], "anzeigename": p["anzeigename"], "vorname": p["vorname"], "nachname": p["nachname"],
+                "name": p["name"], "nr": p.get("nr"), "handle": p.get("handle"), "alteHandles": alte.get(p["name"], []),
+                "anzeigename": p["anzeigename"], "vorname": p["vorname"], "nachname": p["nachname"],
                 "emails": p["emails"], "rollen": p["rollen"], "status": p["status"], "gesperrtBis": p["gesperrt_bis"],
                 "notfallAdmin": p["name"] in rollen.notfall_admins(e), "ordner": ordner,
                 "uploadKonto": None if konten is None else p["name"] in konten,
@@ -92,13 +94,31 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
             pass
         return sorted((x for x in z if x["zeit"]), key=lambda x: x["zeit"], reverse=True)[:150]
 
+    # Admin-Aktionen, die ins Sicherheitsprotokoll einer Person gehören (aus dem Prüfprotokoll)
+    MASSNAHMEN = {"verwarnen", "verwarnung-aufheben", "sperren", "entsperren", "archivieren", "wiederherstellen", "loeschen",
+                  "rollen", "email-weg", "email-dazu", "handle"}
+
+    def sicherheit(name: str) -> list[dict]:
+        """Sicherheitsprotokoll einer Person (1.5.0): abgelehnte Zugriffe, Rate-Limits, gesperrte Anmeldeversuche, getrennte
+        Sitzungen, blockierte Uploads und Upload-Fehlversuche, Admin-Maßnahmen. Neueste zuerst."""
+        z = [{"zeit": x["zeit"], "art": x["art"], "text": x["text"]} for x in db.sicherheit_von(name)]
+        z += [{"zeit": x["zeit"], "art": "admin-aktion", "text": f"{x['aktion']} durch {x['von']}"}
+              for x in crm.protokoll(name, 100) if x["aktion"] in MASSNAHMEN]
+        try:
+            z += [{"zeit": x.get("zeit"), "art": "upload", "text": x.get("aktion", "")}
+                  for x in (upload("GET", f"/intern/ereignisse?player={name}&limit=200") or [])
+                  if isinstance(x, dict) and str(x.get("aktion", "")).startswith(("Upload blockiert", "Upload-Passwort", "Upload-Anmeldung gesperrt"))]
+        except HTTPException:
+            pass
+        return sorted((x for x in z if x["zeit"]), key=lambda x: x["zeit"], reverse=True)[:200]
+
     @app.get("/api/admin/personen/{name}")
     def person(_: str = Depends(admin), name: str = P(...)):
         p = crm.person(name)
         if not p:
             raise HTTPException(404, "Person nicht gefunden")
         konten = upload_konten()
-        return {**p, "notfallAdmin": name in rollen.notfall_admins(e), "ordner": (e.spiele_dir / identitaet.ordner(name)).is_dir(), "uploadKonto": None if konten is None else name in konten,
+        return {**p, "alteHandles": crm.alte_handles().get(name, []), "sicherheit": sicherheit(name), "notfallAdmin": name in rollen.notfall_admins(e), "ordner": (e.spiele_dir / identitaet.ordner(name)).is_dir(), "uploadKonto": None if konten is None else name in konten,
                 "notizen": crm.notizen(name), "zeitleiste": zeitleiste(name), "protokoll": crm.protokoll(name, 100),
                 "anmeldungen": db.anmeldungen(name, 50)}
 
