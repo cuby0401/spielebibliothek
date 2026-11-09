@@ -22,6 +22,9 @@ class Einstellungen:
     ha_webhook: str = ""                    # Home-Assistant-Webhook für Wächter und Anfragen (leer = aus)
     waechter: bool = False                  # Gesundheitsprüfung alle 5 Minuten (im Betrieb an, in Tests aus)
     probe: bool = False                     # Probe-Zentrale (Kopie zum Testen vor dem Live-Gang, E56)
+    # 1.5.0 (E81): Datenbank beim Start auf UUIDs umstellen. Vorerst nur mit IDENTITAET_UUID=1 – fällt weg, sobald
+    # Anmeldung und Ausgaben auf UUID umgestellt sind (sonst sähe man UUIDs statt Namen).
+    identitaet_uuid: bool = False
     zentrale_commit: str = ""
     zentrale_version: str = ""
     # Cloudflare-Abgleich (Zentrale 1.3.0): nur lesen, siehe cloudflare.py und docs/cloudflare-abgleich.md
@@ -60,6 +63,7 @@ def laden() -> Einstellungen:
         ha_webhook=os.environ.get("HA_WEBHOOK_URL", ""),
         waechter=os.environ.get("WAECHTER", "1") != "0",
         probe=os.environ.get("PROBE", "0") == "1",
+        identitaet_uuid=os.environ.get("IDENTITAET_UUID", "0") == "1",
         zentrale_commit=os.environ.get("ZENTRALE_COMMIT", ""),
         zentrale_version=os.environ.get("ZENTRALE_VERSION", ""),
         cloudflare_konto=os.environ.get("CF_ACCOUNT_ID", "").strip(),

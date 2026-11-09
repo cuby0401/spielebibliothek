@@ -150,6 +150,26 @@ if [ -n "$ZURUECK" ]; then
 		ANLASS=vor-zurueck-$ZURUECK
 		$VORHER
 		cd $ZIEL
+		# 1.5.0 (E81): Versionen vor 1.5.0 kennen nur Benutzernamen. Steht die Datenbank auf UUID, erst zurückstellen –
+		# mit dem Abbild der laufenden Version (die alte hat den Befehl nicht), bei gestopptem Dienst. Schlägt es fehl,
+		# ist nichts verändert: Dienste wieder an, Abbruch.
+		if echo '$ZURUECK' | awk -F. '{ exit !(\$1 < 1 || (\$1 == 1 && \$2 < 5)) }' && [ -f compose.yaml ] && grep -q identitaet-zurueck savesvc/savesvc/__main__.py 2>/dev/null; then
+			STATUS=\$(docker compose run --rm --no-deps -T savesvc python -m savesvc identitaet-status 2>/dev/null || echo unbekannt)
+			echo \"  Identität der Datenbank: \$STATUS\"
+			if [ \"\$STATUS\" = umgestellt ]; then
+				docker compose stop savesvc upload
+				if docker compose run --rm --no-deps -T savesvc python -m savesvc identitaet-zurueck /data/backup/vor-deploy/vor-identitaet-zurueck-\$(date +%Y%m%d-%H%M%S).db; then
+					echo '  Datenbank zurück auf Benutzernamen gestellt'
+				else
+					echo '✗ Rückweg der Identität fehlgeschlagen – nichts verändert, Version bleibt.' >&2
+					docker compose start savesvc upload
+					exit 1
+				fi
+			elif [ \"\$STATUS\" != 'nicht umgestellt' ]; then
+				echo '✗ Konnte nicht prüfen, ob die Datenbank auf UUID steht – Abbruch, nichts verändert.' >&2
+				exit 1
+			fi
+		fi
 		tar -tf /tmp/sb-zurueck.tar | sed 's|^\./||' | grep -v '/\$' > .deploy-liste
 		printf '%s\n' .env config/users.yaml >> .deploy-liste
 		tar --no-same-owner -m -xf /tmp/sb-zurueck.tar   # -m: Zeitstempel = jetzt, siehe nas-deploy.sh

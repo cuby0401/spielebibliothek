@@ -130,3 +130,60 @@ def test_leere_datenbank(tmp_path):
     Datenbank(tmp_path / "saves.db")
     crm_modul.Crm(Datenbank(tmp_path / "saves.db"))
     assert identitaet.umstellen(tmp_path / "saves.db", tmp_path / "b.db")["personen"] == 0
+
+
+# ---------- Schritt 1: Umstellung beim Start, Rückweg-Befehle ----------
+
+def _einstellungen(umgebung, **kw):
+    from savesvc.config import Einstellungen
+    return Einstellungen(team_domain="t", audience="a", users_file=umgebung.users, spiele_dir=umgebung.spiele,
+                         db_path=umgebung.db, dev_user=None, **kw)
+
+
+def test_start_ohne_schalter_stellt_nicht_um(umgebung):
+    from savesvc.app import erstellen
+    erstellen(_einstellungen(umgebung))
+    assert not identitaet.umgestellt(umgebung.db)
+    assert not list((umgebung.db.parent / "backup").glob("vor-uuid-*.db"))
+
+
+def test_start_stellt_einmal_um_mit_sicherung(umgebung):
+    from savesvc.app import erstellen
+    erstellen(_einstellungen(umgebung, identitaet_uuid=True))
+    assert identitaet.umgestellt(umgebung.db)
+    sicherungen = list((umgebung.db.parent / "backup").glob("vor-uuid-*.db"))
+    assert len(sicherungen) == 1
+    # Die Sicherung ist der Stand vor der Umstellung: dort stehen noch die Benutzernamen
+    assert {z[0] for z in sqlite3.connect(sicherungen[0]).execute("SELECT name FROM personen")} == {"seb", "paul"}
+    stempel = sicherungen[0].stat().st_mtime
+    erstellen(_einstellungen(umgebung, identitaet_uuid=True))       # zweiter Start: nichts mehr zu tun
+    assert sicherungen[0].stat().st_mtime == stempel
+
+
+def test_start_nach_fehler_verweigert(umgebung, monkeypatch):
+    from savesvc.app import erstellen
+    erstellen(_einstellungen(umgebung))                                # Ausgangsstand 1.4.1
+    vorher = _stand(umgebung.db)
+
+    def kaputt(v):
+        v.execute("DELETE FROM scores")
+        v.execute("INSERT INTO saves (player, game, key, data, save_version, updated_at) VALUES ('x','y','z','1',1,'2026')")
+    echt = identitaet.umstellen
+    monkeypatch.setattr(identitaet, "umstellen", lambda p, s: echt(p, s, _nach_umstellung=kaputt))
+    with pytest.raises(SystemExit, match="UUID"):
+        erstellen(_einstellungen(umgebung, identitaet_uuid=True))
+    assert _stand(umgebung.db) == vorher and not identitaet.umgestellt(umgebung.db)
+
+
+def test_befehle_status_und_zurueck(umgebung, monkeypatch, capsys):
+    from savesvc.__main__ import main
+    from savesvc.app import erstellen
+    erstellen(_einstellungen(umgebung))
+    vorher = _stand(umgebung.db)
+    monkeypatch.setenv("DB_PATH", str(umgebung.db))
+    assert main(["identitaet-status"]) == 0 and capsys.readouterr().out.strip() == "nicht umgestellt"
+    erstellen(_einstellungen(umgebung, identitaet_uuid=True))
+    assert main(["identitaet-status"]) == 0 and capsys.readouterr().out.strip() == "umgestellt"
+    assert main(["identitaet-zurueck", str(umgebung.db.parent / "backup" / "vor-rueckweg.db")]) == 0
+    assert (umgebung.db.parent / "backup" / "vor-rueckweg.db").is_file()
+    assert _stand(umgebung.db) == vorher and not identitaet.umgestellt(umgebung.db)

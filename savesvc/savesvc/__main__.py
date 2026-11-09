@@ -47,6 +47,9 @@ def main(argv=None) -> int:
     en.add_argument("aktion", choices=["anlegen", "passwort", "sperren", "liste"])
     en.add_argument("name", nargs="?")
     sub.add_parser("cloudflare-soll", help="Soll-Stand der Cloudflare-Richtlinien als JSON")
+    sub.add_parser("identitaet-status", help="1.5.0: steht die Datenbank auf UUID? (umgestellt / nicht umgestellt)")
+    iz = sub.add_parser("identitaet-zurueck", help="1.5.0: UUIDs zurück auf Benutzernamen (deploy.sh --zurueck auf < 1.5.0)")
+    iz.add_argument("sicherung", type=Path, help="wohin die Datenbank vorher gesichert wird")
     sub.add_parser("cloudflare-lesetoken", help="Nur-Lese-Schlüssel von stdin hinterlegen")
     ah = sub.add_parser("auftraege-holen", help="für den Auftragsdienst")
     ah.add_argument("--ausser", default="", help="art:ziel,… – bleiben liegen (übernimmt der Mac, 1.4.1)")
@@ -93,6 +96,18 @@ def main(argv=None) -> int:
 
     if a.befehl == "entwickler":
         return entwickler(a.aktion, a.name)
+    if a.befehl in ("identitaet-status", "identitaet-zurueck"):
+        from . import identitaet
+        pfad = laden().db_path
+        if a.befehl == "identitaet-status":
+            print("umgestellt" if identitaet.umgestellt(pfad) else "nicht umgestellt")
+            return 0
+        try:
+            print(identitaet.zurueck(pfad, a.sicherung))
+        except identitaet.UmstellungFehlgeschlagen as f:
+            print(f"Rückweg fehlgeschlagen, nichts verändert: {f}", file=sys.stderr)
+            return 1
+        return 0
     if a.befehl == "cloudflare-soll":
         return cloudflare_soll()
     if a.befehl == "cloudflare-lesetoken":

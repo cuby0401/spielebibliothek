@@ -52,6 +52,24 @@ def pruefe_werte(werte, lb: dict) -> dict:
     return sauber
 
 
+def identitaet_umstellen(e) -> None:
+    """1.5.0 (E81): Datenbank einmalig auf UUIDs umstellen, vorher gesichert. Scheitert eine Prüfung, ist die Datenbank
+    unverändert – dann startet der Dienst NICHT, statt mit halb umgestellten Daten zu laufen. Der Wächter meldet den
+    Ausfall, der Rückweg ist `deploy.sh --zurueck 1.4.1` (die Datenbank ist ja noch im alten Stand)."""
+    from datetime import datetime
+    from . import identitaet
+    # Ein Name je Tag: Startet der Dienst nach einem Fehler immer wieder neu, entsteht nicht bei jedem Versuch eine
+    # neue Kopie (die Datenbank ist nach einem Fehler unverändert, die Kopie also gleich).
+    sicherung = e.db_path.parent / "backup" / f"vor-uuid-{datetime.now():%Y%m%d}.db"
+    try:
+        bericht = identitaet.umstellen(e.db_path, sicherung)
+    except Exception as f:
+        logging.getLogger("savesvc").critical("Umstellung auf UUID fehlgeschlagen, nichts verändert – Dienst startet nicht: %s", f)
+        raise SystemExit(f"Umstellung auf UUID fehlgeschlagen: {f}") from f
+    if bericht.get("umgestellt"):
+        logging.getLogger("savesvc").warning("Datenbank auf UUID umgestellt (Sicherung %s): %s", sicherung.name, bericht)
+
+
 def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None) -> FastAPI:
     e = einstellungen or laden()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -66,6 +84,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     from . import crm as crm_modul
     crm = crm_modul.Crm(db, e.admins)
     crm_modul.uebernehmen(crm, e.users_file, e.db_path.parent / "backup", e.admins, e.spiele_dir, e.tester)
+    if e.identitaet_uuid:
+        identitaet_umstellen(e)
     crm_modul.dabei_seit_nachholen(crm)
     crm_modul.uebernahme_zuschreiben(crm, e.admins)
     if e.probe:   # frische Kopie der Live-Daten → deren Aufgaben-Verlauf gehört nicht in den Testserver (1.4.1)
