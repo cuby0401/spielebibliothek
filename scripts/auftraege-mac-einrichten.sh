@@ -11,6 +11,12 @@ set -eu
 cd "$(dirname "$0")/.."
 NAME=uk.cuby0401.spielebibliothek-auftraege
 PLIST="$HOME/Library/LaunchAgents/$NAME.plist"
+# Neu einrichten beendet den Dienst – samt einer laufenden Testrunde (09.11.2026). Dann lieber später.
+LAEUFT="$HOME/Library/Application Support/spielebibliothek-auftraege/laeuft.json"
+if [ -f "$LAEUFT" ] && [ "${2:-${1:-}}" != "--trotzdem" ] && kill -0 "$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pid"])' "$LAEUFT" 2>/dev/null)" 2>/dev/null; then
+	echo "✗ Gerade läuft ein Auftrag ($(cat "$LAEUFT")). Neu einrichten würde ihn abbrechen – nach dem Ende wiederholen oder mit --trotzdem."
+	exit 1
+fi
 launchctl bootout "gui/$(id -u)/$NAME" 2>/dev/null || true
 if [ "${1:-}" = "--aus" ]; then
 	rm -f "$PLIST"

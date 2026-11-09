@@ -33,6 +33,9 @@ NAS = os.environ.get("NAS", "$NAS")
 REPO = Path(__file__).resolve().parents[1]
 VENV_PY = REPO / ".venv/bin/python"
 SPERRE = Path("/tmp/sb-auftraege-mac.lock")
+# Welcher Auftrag gerade läuft – bleibt nach einem Abbruch (Neustart des Dienstes, Mac aus) liegen und wird beim
+# nächsten Lauf als abgebrochen gemeldet, statt ewig auf „läuft“ zu stehen (09.11.2026)
+LAEUFT = Path.home() / "Library/Application Support/spielebibliothek-auftraege/laeuft.json"
 QUELLE = "/volume1/docker/spielebibliothek-quelle"
 PROBE = "/volume1/docker/spielebibliothek-probe"
 # Wo Aufträge angelegt werden: Admin-Panel der Live-Bibliothek und des Testservers (Probe)
@@ -209,6 +212,15 @@ def main() -> int:
                     log(f"Lebenszeichen {panel}: {f}")
         if beschaeftigt:
             return 0                                   # ein Lauf ist noch dran – nie zwei gleichzeitig (Teststand, Ports)
+        if LAEUFT.is_file():                           # wir haben die Sperre, also ist der dort vermerkte Lauf tot
+            try:
+                alt = json.loads(LAEUFT.read_text())
+                fertig_melden(PANELS[alt["panel"]], int(alt["id"]), False,
+                              "abgebrochen – der Mac-Dienst wurde während des Laufs beendet (Neustart, Ruhezustand oder Mac aus). Bitte neu starten.", "")
+                log(f"{alt['panel']}: Auftrag {alt['id']} als abgebrochen gemeldet")
+            except (ValueError, KeyError, RuntimeError, subprocess.TimeoutExpired) as f:
+                log(f"Abgebrochenen Auftrag nicht gemeldet: {f}")
+            LAEUFT.unlink(missing_ok=True)
         for panel, container in PANELS.items():
             try:
                 auftraege = im_container(container, {"was": "holen", "erlaubt": erlaubt(panel)})
@@ -219,6 +231,8 @@ def main() -> int:
                 if art not in ARTEN or ziel not in ZIELE or not isinstance(aid, int):
                     continue
                 log(f"{panel}: Auftrag {aid} {art} ({ziel})")
+                LAEUFT.parent.mkdir(parents=True, exist_ok=True)
+                LAEUFT.write_text(json.dumps({"panel": panel, "id": aid, "pid": os.getpid()}))
                 start = datetime.now(timezone.utc)
                 with tempfile.TemporaryDirectory(prefix="sb-auftrag-mac-") as tmp:
                     try:
@@ -237,6 +251,7 @@ def main() -> int:
                     fertig_melden(container, aid, ok, text, ausgabe)
                 except (RuntimeError, subprocess.TimeoutExpired) as f:
                     log(f"Ergebnis {aid} nicht gemeldet: {f}")
+                LAEUFT.unlink(missing_ok=True)
                 log(f"{panel}: Auftrag {aid} {'ok' if ok else 'FEHLER'} – {text}")
     return 0
 
