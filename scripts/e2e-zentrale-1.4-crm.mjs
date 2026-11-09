@@ -53,6 +53,9 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
 
   const ZEILE = (name) => `[...document.querySelectorAll("tbody tr")].find(t=>t.querySelector("td strong")?.textContent===${JSON.stringify(name)})`;
+  // Kein leeres „null“ als Text auf der Seite (1.4.1, Nachtest 09.11.: Admin-Panel Personen und Tester-Panel)
+  const OHNE_NULL = `(()=>{const w=document.createTreeWalker(document.getElementById("inhalt"),NodeFilter.SHOW_TEXT);
+    while(w.nextNode()) if(w.currentNode.nodeValue.trim()==="null") return false; return true})()`;
   const KNOPF = (text) => `[...document.querySelectorAll("#inhalt button")].find(b=>b.textContent===${JSON.stringify(text)})`;
 
   // 1) Personen-Liste: übernommen aus users.yaml, alte Adresse #benutzer leitet um
@@ -60,12 +63,14 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await bis(`location.hash==="#personen"`), "#benutzer leitet auf #personen um");
   ok(await bis(`!!(${ZEILE("seb")}) && !!(${ZEILE("paul")})`), "seb und paul aus users.yaml übernommen");
   ok(await eval_(`(${ZEILE("seb")}).textContent.includes("Admin") && (${ZEILE("paul")}).textContent.includes("Entwickler")`), "Rollen übernommen (seb Admin, paul Entwickler)");
+  ok(await eval_(OHNE_NULL), "Personen-Liste ohne „null“");
 
   // 2) Einladen
   await eval_(`{ const f=document.querySelector("details.karte form"); const i=f.querySelectorAll("input");
     i[0].value="lea@example.com"; i[1].value="lea"; i[2].value="Lea"; f.requestSubmit(); } true`);
   ok(await bis(`location.hash==="#person/lea" && document.querySelector("#inhalt h2")?.textContent.includes("eingeladen")`), "lea eingeladen → eigene Seite, Status eingeladen");
   ok(await eval_(`document.body.textContent.includes("lea@example.com")`), "Login-E-Mail steht auf der Seite");
+  ok(await eval_(OHNE_NULL), "Personen-Seite ohne „null“ unter dem Namen");
 
   // 3) Notiz, verwarnen
   await eval_(`document.querySelector("#inhalt textarea").value="E2E: interne Notiz"; (${KNOPF("Notiz speichern")}).click(); true`);
@@ -160,8 +165,7 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   // 8b) Tester-Panel (1.4.0, E76): Plan aus tests/manuell, Ergebnis eintragen, Zusammenfassung
   await gehe(G + "/tester/", 3500);
   ok(await bis(`document.querySelectorAll(".test").length>=5`), "Tester-Panel zeigt den Testplan");
-  ok(await eval_(`(()=>{const w=document.createTreeWalker(document.getElementById("inhalt"),NodeFilter.SHOW_TEXT);
-    while(w.nextNode()) if(w.currentNode.nodeValue.trim()==="null") return false; return true})()`), "Tester-Panel: kein leeres „null“");
+  ok(await eval_(OHNE_NULL), "Tester-Panel: kein leeres „null“");
   await eval_(`document.querySelector(".test .knopf.nein").click(); true`);
   ok(await bis(`document.getElementById("meldung").textContent.includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");
   const offenVorher = await eval_(`document.querySelectorAll("#inhalt > .test").length`);

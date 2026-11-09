@@ -26,6 +26,17 @@ else
 	}
 fi
 trap aufraeumen EXIT
+if [ "$ORT" = mac ]; then
+	# Nie zwei Runden gleichzeitig auf dem Mac – sie teilen sich Teststand und Ports (1.4.1). Die zweite wartet.
+	SPERRE=/tmp/sb-e2e-mac.sperre
+	until mkdir "$SPERRE" 2>/dev/null; do
+		kill -0 "$(cat "$SPERRE/pid" 2>/dev/null)" 2>/dev/null || { rm -rf "$SPERRE"; continue; }
+		[ -n "${GEWARTET:-}" ] || { echo "  Warte, bis die laufende Runde fertig ist …"; GEWARTET=1; }
+		sleep 5
+	done
+	echo $$ > "$SPERRE/pid"
+	trap 'aufraeumen; rm -rf "$SPERRE"' EXIT
+fi
 echo "  Teststand auf: $ORT"
 
 python3 -I scripts/e2e-vorbereiten.py "$TMP"

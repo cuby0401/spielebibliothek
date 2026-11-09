@@ -33,7 +33,8 @@ cat > "$PLIST" <<EOF
 	</array>
 	<key>StartInterval</key><integer>20</integer>
 	<key>RunAtLoad</key><true/>
-	<key>ProcessType</key><string>Background</string>
+	<!-- Nicht „Background“: macOS bremst solche Prozesse stark (Ende-zu-Ende 9–40 statt 3 Min., 09.11.2026) -->
+	<key>ProcessType</key><string>Standard</string>
 	<key>EnvironmentVariables</key>
 	<dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
 	<key>StandardOutPath</key><string>$HOME/Library/Logs/spielebibliothek-auftraege.log</string>

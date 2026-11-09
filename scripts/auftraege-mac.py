@@ -66,6 +66,10 @@ elif d["was"] == "holen":
                 liste.append(dict(z))
         v.execute("COMMIT")
     print(json.dumps(liste))
+elif d["was"] == "stand":   # Zwischenstand eines laufenden Auftrags (z. B. „Test 3/8: zentrale-1.2“)
+    with db.verbindung() as v:
+        v.execute("UPDATE auftraege SET zusammenfassung=? WHERE id=? AND status='laeuft'", (d["text"][:200], d["id"]))
+    print("[]")
 """
 
 
@@ -140,18 +144,44 @@ def unit_tests(repo: Path) -> tuple[bool, str, str]:
                     zeilen[-1] if zeilen else "keine Ausgabe"), ausgabe
 
 
-def e2e_tests(repo: Path) -> tuple[bool, str, str]:
-    ok, ausgabe = ausfuehren(["sh", str(repo / "scripts/e2e-alle.sh")], ZEITLIMIT["e2e-tests"],
-                             env={**os.environ, "E2E_ORT": "mac"})
+def e2e_tests(repo: Path, melden=lambda text: None) -> tuple[bool, str, str]:
+    skript = repo / "scripts/e2e-alle.sh"
+    auf_dem_mac = "E2E_ORT" in skript.read_text(encoding="utf-8", errors="replace")
+    if not auf_dem_mac:
+        # Stand vor 1.4.1 (z. B. Live 1.4.0): Teststand auf der NAS wie früher; das alte Skript braucht ein Git-Repo
+        subprocess.run(["git", "init", "-q"], cwd=repo, capture_output=True)
+    liste = re.search(r"E2E_TESTS:-([^}]*)\}", skript.read_text(encoding="utf-8", errors="replace"))
+    gesamt = len(liste.group(1).split()) if liste else "?"
+    zeilen, nr, ende = [], 0, datetime.now(timezone.utc).timestamp() + ZEITLIMIT["e2e-tests"]
+    p = subprocess.Popen(["sh", str(skript)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                         env={**os.environ, "E2E_ORT": "mac"} if auf_dem_mac else None, start_new_session=True)
+    try:
+        for zeile in p.stdout:
+            zeilen.append(zeile)
+            m = re.match(r"→ Ende-zu-Ende: (\S+)", zeile)
+            if m:
+                nr += 1
+                melden(f"läuft {'auf dem Mac' if auf_dem_mac else '(Teststand auf der NAS)'} – Test {nr}/{gesamt}: {m.group(1)}")
+            if datetime.now(timezone.utc).timestamp() > ende:
+                raise subprocess.TimeoutExpired(skript, ZEITLIMIT["e2e-tests"])
+        ok = p.wait() == 0
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, 15)
+        zeilen.append(f"\nAbgebrochen nach {ZEITLIMIT['e2e-tests'] // 60} Minuten")
+        ok = False
+    ausgabe = "".join(zeilen)
     gruen = sum(int(m) for m in re.findall(r"✓ (\d+) Prüfpunkte grün", ausgabe))
     rot = re.findall(r"^\s*✗ (.+)$", ausgabe, re.M)
     return ok, f"{gruen} Prüfpunkte grün" + (f", rot: {rot[0][:120]}" if rot else ""), ausgabe
 
 
-def erlaubt() -> list[tuple[str, str]]:
-    """Was der Mac übernimmt. Ende-zu-Ende nur, wenn der Stand des Ziels schon auf dem Mac laufen kann (ab 1.4.1) –
-    ältere Live-Stände bleiben beim Auftragsdienst auf der NAS."""
+def erlaubt(panel: str) -> list[tuple[str, str]]:
+    """Was der Mac übernimmt. Ende-zu-Ende in der Live-Bibliothek nur, wenn der Stand des Ziels schon auf dem Mac laufen
+    kann (ab 1.4.1) – ältere bleiben dort beim Auftragsdienst der NAS. Im Testserver führt sonst niemand aus, also
+    übernimmt der Mac dort alles (ältere Stände mit Teststand auf der NAS, wie früher)."""
     liste = [("unit-tests", "live"), ("unit-tests", "probe")]
+    if panel == "probe":
+        return liste + [("e2e-tests", "live"), ("e2e-tests", "probe")]
     for ziel, pruefen in (("live", f"grep -q E2E_ORT {QUELLE}/scripts/e2e-alle.sh"),
                           ("probe", f"tar -xOf {PROBE}/release.tar scripts/e2e-alle.sh | grep -q E2E_ORT")):
         try:
@@ -179,13 +209,9 @@ def main() -> int:
                     log(f"Lebenszeichen {panel}: {f}")
         if beschaeftigt:
             return 0                                   # ein Lauf ist noch dran – nie zwei gleichzeitig (Teststand, Ports)
-        try:
-            frei = erlaubt()
-        except (RuntimeError, subprocess.TimeoutExpired):
-            return 0
         for panel, container in PANELS.items():
             try:
-                auftraege = im_container(container, {"was": "holen", "erlaubt": frei})
+                auftraege = im_container(container, {"was": "holen", "erlaubt": erlaubt(panel)})
             except (RuntimeError, subprocess.TimeoutExpired):
                 continue                               # z. B. Testserver gerade im Umbau
             for a in auftraege:
@@ -197,7 +223,12 @@ def main() -> int:
                 with tempfile.TemporaryDirectory(prefix="sb-auftrag-mac-") as tmp:
                     try:
                         repo, version = quelle(ziel, Path(tmp))
-                        ok, zusammenfassung, ausgabe = (unit_tests if art == "unit-tests" else e2e_tests)(repo)
+                        def melden(text, c=container, i=aid):
+                            try:
+                                im_container(c, {"was": "stand", "id": i, "text": text})
+                            except (RuntimeError, subprocess.TimeoutExpired):
+                                pass
+                        ok, zusammenfassung, ausgabe = unit_tests(repo) if art == "unit-tests" else e2e_tests(repo, melden)
                     except Exception as f:   # noqa: BLE001
                         ok, zusammenfassung, ausgabe, version = False, str(f)[:300], str(f), "?"
                 dauer = int((datetime.now(timezone.utc) - start).total_seconds())

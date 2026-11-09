@@ -22,7 +22,8 @@ Kleines Update nach dem ersten Testdurchgang mit dem Tester-Panel: Tester-Panel 
 - **Geändert (schnellere Tests):** Die Ende-zu-Ende-Tests warten nach jedem Seitenwechsel nicht mehr fest 2,5–6,5 s, sondern bis die Seite geladen ist und sich nichts mehr ändert. Die volle Runde braucht auf dem Mac etwa 2:35 Min. (vorher etwa 10 Min. auf der NAS bzw. 5:40 auf dem Mac).
 - **Behoben:** Testserver: Die Kopie der Live-Daten brachte den Aufgaben-Verlauf der Live-Bibliothek samt roter Glocken mit, es sah ständig so aus, als brächen die Ende-zu-Ende-Tests ab. Einmal je frischer Kopie wird dieser Verlauf jetzt geleert.
 - **Behoben:** Personen-Liste: „Zuletzt aktiv“ zählte auch Upload-Ereignisse, die der Admin auslöst (Upload-Konto angelegt, neues Passwort, gelöscht). Wer sich nie angemeldet hatte, stand dann mit Datum statt „noch nie angemeldet“ da (Carl).
-- **Testplan:** `tests/manuell/1.4.1.json`, 19 Tests (11 nur für Seb). Nach dem ersten Nachtest (09.11.): 3 Tests neu zu testen, 10 neue.
+- **Behoben (zweiter Nachtest 09.11.):** Admin-Panel: „null“ in der Personen-Liste und unter dem Namen einer Person. Aufgaben-Reiter flackerte beim Selbst-Aktualisieren, jetzt wird nur die Tabelle „Letzte Läufe“ erneuert und nur bei Änderungen, mit Fortschritt des laufenden Ende-zu-Ende-Laufs („Test 3/8“). Aufträge auf dem Mac liefen als gedrosselter Hintergrundprozess (bis 40 statt 3 Minuten), jetzt als normaler Prozess (Einrichtung neu ausführen). „Ende-zu-Ende / Live-Stand“ im Testserver blieb auf „wartet“, jetzt übernimmt der Mac auch ältere Stände (Teststand dann auf der NAS). Zwei Ende-zu-Ende-Runden auf dem Mac warten aufeinander.
+- **Testplan:** `tests/manuell/1.4.1.json`, 20 Tests (12 nur für Seb). Nach den Nachtests (09.11.): 5 Tests neu zu testen, 11 neue.
 
 ## 1.4.0 – 06.11.2026
 

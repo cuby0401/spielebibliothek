@@ -578,10 +578,31 @@ async function aufgabenSeite(c) {
 		h("p", { class: "leise", text: "Auf dem Mac: Unit-Tests ca. 15 Sekunden, Ende-zu-Ende-Tests ca. 3 Minuten. Auf der NAS: ca. 8 bzw. 10 Minuten. Ende-zu-Ende läuft im Teststand, die echte Bibliothek wird nicht angefasst. „Live-Stand“ = was gerade live läuft, „Probe“ = was in der Probe zum Testen liegt. Bei Fehlern: rote Glocke und Home Assistant." }),
 		tabelle(["Aufgabe", "Ziel", "", "Zeitplan (täglich)"], zeilen));
 
-	// Verlauf
-	c.append(h("h2", { text: "Letzte Läufe" }));
-	if (!d.laeufe.length) return c.append(h("p", { class: "leise", text: "Noch keine." }));
-	c.append(tabelle(["Aufgabe", "Ziel", "Auslöser", "Gestartet", "Dauer", "Status", "Ergebnis", ""], d.laeufe.map((l) => {
+	// Verlauf – aktualisiert sich selbst, solange etwas läuft: nur diese Tabelle und nur bei Änderungen (1.4.1, Nachtest
+	// 09.11.: vorher wurde die ganze Seite alle 15 s neu aufgebaut, sie sprang nach oben und flackerte)
+	c.append(h("h2", { text: "Letzte Läufe" }), h("div", { id: "laeufe" }, laeufeTabelle(d)));
+	if (laufend(d)) laeufeBeobachten(JSON.stringify(d.laeufe));
+}
+
+const laufend = (d) => d.laeufe.some((l) => l.status === "wartet" || l.status === "laeuft");
+let neuLadenZeit;
+function laeufeBeobachten(alt) {
+	clearTimeout(neuLadenZeit);
+	neuLadenZeit = setTimeout(async () => {
+		const box = $("laeufe");
+		if (location.hash !== "#aufgaben" || !box) return;
+		if (box.querySelector("pre.log")) return laeufeBeobachten(alt);       // offenes Log nicht zuklappen
+		let d;
+		try { d = await api("GET", "/auftraege"); } catch { return laeufeBeobachten(alt); }
+		const neu = JSON.stringify(d.laeufe);
+		if (neu !== alt && $("laeufe") === box && !box.querySelector("pre.log")) box.replaceChildren(laeufeTabelle(d));
+		if (laufend(d)) laeufeBeobachten(neu);
+	}, 10000);
+}
+
+function laeufeTabelle(d) {
+	if (!d.laeufe.length) return h("p", { class: "leise", text: "Noch keine." });
+	return tabelle(["Aufgabe", "Ziel", "Auslöser", "Gestartet", "Dauer", "Status", "Ergebnis", ""], d.laeufe.map((l) => {
 		const dauer = l.start && l.ende ? Math.max(1, Math.round((new Date(l.ende) - new Date(l.start)) / 1000)) : null;
 		const zelle = h("div", {});
 		return h("tr", {}, h("td", { text: d.anzeige[l.art] || l.art }), h("td", { text: d.ziele[l.ziel] || l.ziel }),
@@ -592,17 +613,16 @@ async function aufgabenSeite(c) {
 				const voll = await api("GET", "/auftraege/" + l.id);
 				zelle.replaceChildren(h("pre", { class: "log", text: voll.log || "(leer)" }));
 			}) : null, zelle));
-	})));
-	if (d.laeufe.some((l) => l.status === "wartet" || l.status === "laeuft")) stillNeuLaden(["#aufgaben"], 15000);
+	}));
 }
 
 // Selbst aktualisieren, solange etwas läuft (1.4.1): nur EIN Zeitgeber (vorher stapelten sich bei jedem Klick weitere),
 // Scrollposition bleibt, und nicht, solange ein Log offen ist oder gerade etwas eingegeben wird – sonst sprang die Seite
 // „einfach so“ nach oben.
-let neuLadenZeit;
+let uebersichtZeit;
 function stillNeuLaden(hashes, ms) {
-	clearTimeout(neuLadenZeit);
-	neuLadenZeit = setTimeout(async () => {
+	clearTimeout(uebersichtZeit);
+	uebersichtZeit = setTimeout(async () => {
 		if (!hashes.includes(location.hash)) return;
 		const c = $("inhalt");
 		if (c.querySelector("pre.log") || (document.activeElement && c.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)))
@@ -613,6 +633,13 @@ function stillNeuLaden(hashes, ms) {
 		c.style.minHeight = "";
 		scrollTo(0, y);
 	}, ms);
+}
+
+// Leere Teile (null/false) nie als Text „null“ einfügen – viele Seiten hängen bedingte Teile direkt an #inhalt an
+// (1.4.1, Nachtest 09.11.: „null“ unter dem Namen einer Person und in der Personen-Liste)
+for (const m of ["append", "prepend", "replaceChildren"]) {
+	const el = $("inhalt"), orig = el[m].bind(el);
+	el[m] = (...kinder) => orig(...kinder.filter((k) => k !== null && k !== undefined && k !== false));
 }
 
 const SEITEN = { uebersicht, spiele: spieleSeite, personen: personenSeite, protokoll: protokollSeite, spielstaende: spielstaendeSeite, antraege: antraegeSeite, aufgaben: aufgabenSeite };
