@@ -258,17 +258,18 @@ if [ "$PROBE" = 1 ]; then
 	fi
 	# Ende-zu-Ende-Tests NICHT abwarten (08.11.2026): Der Testserver ist sofort da, die Tests laufen parallel im Teststand
 	# auf der NAS (Auftragsdienst, Ziel „probe“ = genau dieser Stand). Ergebnis: Admin-Panel → Aufgaben, rot = rote Glocke.
-	# Seit 1.4.1 (NAS entlasten): Läuft Docker Desktop auf dem Mac, laufen sie dort (ca. 3 Min.) und die NAS rechnet nichts.
-	if [ "$TESTS" = 1 ] && docker info >/dev/null 2>&1; then
-		# eigene Sitzung: läuft weiter, auch wenn das Terminal bzw. die aufrufende Shell endet (nohup allein reicht nicht)
-		python3 -I -c 'import subprocess; subprocess.Popen(["sh", "scripts/e2e-mac-hintergrund.sh"], start_new_session=True,
-    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)'
-		echo "  Ende-zu-Ende-Tests laufen jetzt im Hintergrund auf dem Mac (ca. 3 Min., Log ~/Library/Logs/spielebibliothek-e2e.log) – Ergebnis: Admin-Panel → Aufgaben, bei Rot eine rote Glocke"
-	elif [ "$TESTS" = 1 ]; then
-		AID=$(ssh -o LogLevel=ERROR "$NAS" "docker exec spielebibliothek-savesvc python -c 'from pathlib import Path; from savesvc.db import Datenbank; print(Datenbank(Path(\"/data/saves.db\")).auftrag_anlegen(\"e2e-tests\", \"probe\", \"deploy\", \"mac\"))'" 2>/dev/null || true)
+	# Seit 1.4.1: immer als Auftrag – meldet sich der Mac (scripts/auftraege-mac.py, Docker Desktop läuft), holt er ihn
+	# und die Tests laufen dort (ca. 3 Min.), sonst übernimmt der Auftragsdienst auf der NAS (ca. 10 Min.).
+	# Ist der Mac bereit, landet der Auftrag im Testserver-Panel (dort führt nur der Mac aus), sonst im Live-Panel (NAS).
+	if [ "$TESTS" = 1 ]; then
+		C=spielebibliothek-savesvc; WO="auf der NAS, ca. 10 Min. – Admin-Panel der Live-Bibliothek → Aufgaben"
+		if [ -f "$HOME/Library/LaunchAgents/uk.cuby0401.spielebibliothek-auftraege.plist" ] && docker info >/dev/null 2>&1; then
+			C=sbprobe-savesvc; WO="auf dem Mac, ca. 3 Min. – Admin-Panel des Testservers → Aufgaben, Log ~/Library/Logs/spielebibliothek-auftraege.log"
+		fi
+		AID=$(ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -c 'from pathlib import Path; from savesvc.db import Datenbank; print(Datenbank(Path(\"/data/saves.db\")).auftrag_anlegen(\"e2e-tests\", \"probe\", \"deploy\", \"mac\"))'" 2>/dev/null || true)
 		case "$AID" in
 			''|None) echo "  (Ende-zu-Ende-Tests nicht angestoßen – läuft schon einer? Sonst im Admin-Panel → Aufgaben starten)" ;;
-			*) echo "  Ende-zu-Ende-Tests laufen jetzt im Hintergrund auf der NAS (Auftrag $AID, ca. 10 Min.) – Ergebnis: Admin-Panel → Aufgaben, bei Rot eine rote Glocke" ;;
+			*) echo "  Ende-zu-Ende-Tests laufen jetzt im Hintergrund $WO (Auftrag $AID), bei Rot eine rote Glocke" ;;
 		esac
 	fi
 	echo "  Testen, dann dort Admin-Panel → „Für Live freigeben“ – der Auftragsdienst spielt dann innerhalb einer Minute live ein."

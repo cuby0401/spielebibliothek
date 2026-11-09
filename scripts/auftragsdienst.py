@@ -205,8 +205,34 @@ def e2e_tests(repo: Path) -> tuple[bool, str, str]:
     return ok, zusammenfassung, ausgabe
 
 
+def mac_uebernimmt() -> list[str]:
+    """1.4.1: Meldet sich der Mac (scripts/auftraege-mac.py, Docker Desktop läuft), bleiben seine Aufträge liegen – er holt
+    sie selbst und die NAS rechnet nichts. Ende-zu-Ende nur, wenn der Stand des Ziels schon auf dem Mac laufen kann."""
+    r = subprocess.run(["docker", "exec", LIVE_C, "python", "-c",
+                        "from pathlib import Path; from savesvc.db import Datenbank; z = Datenbank(Path('/data/saves.db')).dienst('mac'); "
+                        "print(z['zeit'] if z else '')"], capture_output=True, text=True, timeout=60)
+    try:
+        alt = time.time() - datetime.fromisoformat(r.stdout.strip()).timestamp()
+    except ValueError:
+        return []
+    if alt > 90:
+        return []
+    liste = ["unit-tests:live", "unit-tests:probe"]
+    if "E2E_ORT" in (QUELLE / "scripts/e2e-alle.sh").read_text(encoding="utf-8", errors="replace") if (QUELLE / "scripts/e2e-alle.sh").is_file() else False:
+        liste.append("e2e-tests:live")
+    try:
+        with tarfile.open(PROBE / "release.tar") as t:
+            m = t.extractfile("scripts/e2e-alle.sh")
+            if m and b"E2E_ORT" in m.read():
+                liste.append("e2e-tests:probe")
+    except (OSError, KeyError, tarfile.TarError):
+        pass
+    return liste
+
+
 def auftraege() -> None:
-    for a in json.loads(dienst(LIVE_C, "auftraege-holen") or "[]"):
+    mac = mac_uebernimmt()
+    for a in json.loads(dienst(LIVE_C, "auftraege-holen", *(["--ausser", ",".join(mac)] if mac else [])) or "[]"):
         art, ziel, aid = a.get("art"), a.get("ziel"), a.get("id")
         if art not in ARTEN or ziel not in ZIELE or not isinstance(aid, int):
             dienst(LIVE_C, "auftrag-fertig", eingabe={"id": aid if isinstance(aid, int) else None, "status": "fehler",

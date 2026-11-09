@@ -122,7 +122,7 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
 
     @app.patch("/api/admin/personen/{name}")
     def stammdaten(admin_name: str = Depends(admin), name: str = P(...), body: dict[str, Any] = Body(...)):
-        return ausfuehren(crm.stammdaten, admin_name, name, {k: body[k] for k in ("anzeigename", "vorname", "nachname", "geburtstag") if k in body})
+        return ausfuehren(crm.stammdaten, admin_name, name, {k: body[k] for k in ("anzeigename", "vorname", "nachname", "geburtstag", "angelegt") if k in body})
 
     @app.put("/api/admin/personen/{name}/rollen")
     def rollen_setzen(admin_name: str = Depends(admin), name: str = P(...), body: dict[str, Any] = Body(...)):

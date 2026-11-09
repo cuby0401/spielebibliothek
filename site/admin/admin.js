@@ -173,10 +173,10 @@ async function probeZeigen(c) {
 function liveStatus(p) {
 	const l = p.live && p.live.commit === p.commit ? p.live : null;
 	if (!l) {
-		setTimeout(() => { if (!location.hash || location.hash === "#uebersicht") zeigen(); }, 10000);
+		stillNeuLaden(["", "#uebersicht"], 10000);
 		return h("p", { class: "leise", text: "Wartet auf den Auftragsdienst (spätestens nach einer Minute) … Ohne eingerichteten Auftragsdienst: auf dem Mac scripts/deploy.sh" });
 	}
-	if (l.status === "laeuft") setTimeout(() => { if (!location.hash || location.hash === "#uebersicht") zeigen(); }, 10000);
+	if (l.status === "laeuft") stillNeuLaden(["", "#uebersicht"], 10000);
 	return h("div", { class: l.status === "fehler" ? "hinweis-box" : "karte" },
 		h("strong", { text: l.status === "ok" ? `✓ Live eingespielt (${datumZeit(l.zeit)})` : l.status === "fehler" ? "✗ Live-Deploy fehlgeschlagen – die bisherige Version läuft weiter" : "Wird gerade live eingespielt …" }),
 		l.status === "fehler" ? h("p", { class: "leise", text: "Neuer Versuch: „Freigabe zurücknehmen“ und erneut freigeben." }) : null,
@@ -340,9 +340,15 @@ async function personSeite(c, name) {
 	const f = {};
 	for (const k of ["anzeigename", "vorname", "nachname"]) f[k] = h("input", { value: p[k] || "", maxlength: k === "anzeigename" ? "40" : "60" });
 	f.geburtstag = h("input", { type: "date", value: p.geburtstag || "", min: "1900-01-01", max: new Date().toISOString().slice(0, 10) });
+	// 1.4.1: „Angelegt am“ korrigierbar – bei Personen ohne Aktivität kennt die Bibliothek nur den Tag der Umstellung
+	const tag = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+	f.angelegt = h("input", { type: "date", value: p.angelegt ? tag(p.angelegt) : "", min: "2020-01-01", max: tag(new Date().toISOString()) });
 	c.append(h("h3", { text: "Stammdaten" }), h("form", { class: "karte", onsubmit: (e) => { e.preventDefault();
-		tun(() => api("PATCH", pfad, { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value, geburtstag: f.geburtstag.value || null }), "Gespeichert."); } },
-		h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag)),
+		const daten = { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value, geburtstag: f.geburtstag.value || null };
+		if (f.angelegt.value && f.angelegt.value !== tag(p.angelegt)) daten.angelegt = f.angelegt.value;
+		tun(() => api("PATCH", pfad, daten), "Gespeichert."); } },
+		h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag),
+			h("label", { title: "Wann das Konto angelegt wurde – „dabei seit“ im Profil. Korrigieren, wenn du es besser weißt." }, "Angelegt am ", f.angelegt)),
 		h("p", { class: "leise", text: `Angelegt ${datumZeit(p.angelegt)}${p.eingeladen_von ? " von " + p.eingeladen_von : ""} · erste Anmeldung ${datumZeit(p.erste_anmeldung)} · Datenschutzhinweis ${p.datenschutz_bestaetigt ? "bestätigt " + datumZeit(p.datenschutz_bestaetigt) : "noch nicht bestätigt"} · 2FA: kommt in einer späteren Version` }),
 		h("div", {}, h("button", { type: "submit", class: "knopf klein", text: "Speichern" }))));
 
@@ -545,10 +551,16 @@ async function aufgabenSeite(c) {
 	const d = await api("GET", "/auftraege");
 	const dienst = d.dienst;
 	c.append(h("h2", { text: "Auftragsdienst" }),
-		h("p", { class: dienst.aktiv ? "leise" : "hinweis-box", text: !dienst.eingerichtet
+		d.probe ? h("p", { class: "leise", text: "Testserver: Der Auftragsdienst der NAS bedient nur die Live-Bibliothek – hier führt der Mac die Aufgaben aus." })
+		: h("p", { class: dienst.aktiv ? "leise" : "hinweis-box", text: !dienst.eingerichtet
 			? "Noch nicht eingerichtet – Aufträge bleiben liegen. Einmalig am Mac: sh scripts/auftragsdienst-einrichten.sh (Cron-Job auf der NAS, jede Minute)."
 			: dienst.aktiv ? `✓ läuft – zuletzt gemeldet ${datumZeit(dienst.zuletzt)} (Live-Stand ${dienst.version})`
 				: `✗ meldet sich nicht mehr seit ${datumZeit(dienst.zuletzt)} – Cron-Job auf der NAS prüfen (crontab -l), Log: /tmp/sb-auftragsdienst.log` }),
+		// 1.4.1: Tests laufen auf dem Mac, wenn er bereit ist (Docker Desktop, scripts/auftraege-mac.py) – im Testserver nur dort
+		h("p", { class: d.mac.aktiv ? "leise" : d.probe ? "hinweis-box" : "leise", text: d.mac.aktiv
+			? `✓ Mac bereit (${d.mac.text || "Docker Desktop läuft"}, zuletzt ${datumZeit(d.mac.zuletzt)}) – Unit- und Ende-zu-Ende-Tests laufen dort, die NAS rechnet nichts.`
+			: d.probe ? "✗ Der Mac meldet sich gerade nicht (Docker Desktop aus oder Mac im Ruhezustand). Im Testserver laufen Aufgaben nur auf dem Mac – sie warten, bis er wieder da ist."
+				: `Mac nicht bereit${d.mac.zuletzt ? " (zuletzt " + datumZeit(d.mac.zuletzt) + ")" : ""} – Tests laufen auf der NAS. Auf den Mac: Docker Desktop starten (einmalig: sh scripts/auftraege-mac-einrichten.sh).` }),
 		h("p", { class: "leise", text: "Der Dienst führt nur fest eingebaute Aufgaben aus. Live-Deploy passiert ausschließlich nach „Für Live freigeben“ in der Probe – nicht von hier." }));
 
 	// Jetzt starten + Zeitplan
@@ -563,7 +575,7 @@ async function aufgabenSeite(c) {
 				plan(art, ziel) ? knopf("Aus", () => sicher(async () => { await api("PUT", "/zeitplan", { art, ziel, uhrzeit: null }); meldung("Zeitplan entfernt."); zeigen(); }), "gefahr") : null))));
 	}
 	c.append(h("h2", { text: "Aufgaben" }),
-		h("p", { class: "leise", text: "Unit-Tests ca. 4 Minuten, Ende-zu-Ende-Tests ca. 10 Minuten (im Teststand, die echte Bibliothek wird nicht angefasst). „Live-Stand“ = was gerade live läuft, „Probe“ = was in der Probe zum Testen liegt. Bei Fehlern: rote Glocke und Home Assistant." }),
+		h("p", { class: "leise", text: "Auf dem Mac: Unit-Tests ca. 15 Sekunden, Ende-zu-Ende-Tests ca. 3 Minuten. Auf der NAS: ca. 8 bzw. 10 Minuten. Ende-zu-Ende läuft im Teststand, die echte Bibliothek wird nicht angefasst. „Live-Stand“ = was gerade live läuft, „Probe“ = was in der Probe zum Testen liegt. Bei Fehlern: rote Glocke und Home Assistant." }),
 		tabelle(["Aufgabe", "Ziel", "", "Zeitplan (täglich)"], zeilen));
 
 	// Verlauf
@@ -581,7 +593,26 @@ async function aufgabenSeite(c) {
 				zelle.replaceChildren(h("pre", { class: "log", text: voll.log || "(leer)" }));
 			}) : null, zelle));
 	})));
-	if (d.laeufe.some((l) => l.status === "wartet" || l.status === "laeuft")) setTimeout(() => { if (location.hash === "#aufgaben") zeigen(); }, 15000);
+	if (d.laeufe.some((l) => l.status === "wartet" || l.status === "laeuft")) stillNeuLaden(["#aufgaben"], 15000);
+}
+
+// Selbst aktualisieren, solange etwas läuft (1.4.1): nur EIN Zeitgeber (vorher stapelten sich bei jedem Klick weitere),
+// Scrollposition bleibt, und nicht, solange ein Log offen ist oder gerade etwas eingegeben wird – sonst sprang die Seite
+// „einfach so“ nach oben.
+let neuLadenZeit;
+function stillNeuLaden(hashes, ms) {
+	clearTimeout(neuLadenZeit);
+	neuLadenZeit = setTimeout(async () => {
+		if (!hashes.includes(location.hash)) return;
+		const c = $("inhalt");
+		if (c.querySelector("pre.log") || (document.activeElement && c.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)))
+			return stillNeuLaden(hashes, ms);
+		const y = scrollY;
+		c.style.minHeight = c.offsetHeight + "px";   // beim Neuaufbau nicht kurz schrumpfen
+		await zeigen();
+		c.style.minHeight = "";
+		scrollTo(0, y);
+	}, ms);
 }
 
 const SEITEN = { uebersicht, spiele: spieleSeite, personen: personenSeite, protokoll: protokollSeite, spielstaende: spielstaendeSeite, antraege: antraegeSeite, aufgaben: aufgabenSeite };
@@ -607,7 +638,7 @@ async function zeigen() {
 		const auf = await api("GET", "/auftraege");
 		const neueste = new Map();
 		for (const l of auf.laeufe) if (!neueste.has(l.art + l.ziel)) neueste.set(l.art + l.ziel, l);
-		const rot = [...neueste.values()].filter((l) => l.status === "fehler").length + (auf.dienst.eingerichtet && !auf.dienst.aktiv ? 1 : 0);
+		const rot = [...neueste.values()].filter((l) => l.status === "fehler").length + (auf.dienst.eingerichtet && !auf.dienst.aktiv && !auf.probe ? 1 : 0);
 		$("aufgaben-zahl").textContent = String(rot); $("aufgaben-zahl").hidden = !rot;
 	});
 }

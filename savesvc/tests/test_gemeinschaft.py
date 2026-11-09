@@ -70,6 +70,10 @@ def test_erfolge_und_profil(client, umgebung):
     spielzeit(client, p, 60)
     pr = client.get("/api/profil/paul", headers=client.als()).json()
     assert pr["erfolge"] == 1 and pr["sekunden"] == 60 and pr["spiele"][0]["erfolgeGesamt"] == 2 and pr["ich"] is False
+    # 1.4.1: gespielte Spiele mit Entwickler – paul hat seb/zaehler gespielt, gehört ihm aber nicht
+    eigene = sum(1 for g in client.get("/api/games", headers=p).json() if g["author"] == "paul")
+    assert pr["spiele"][0]["author"] == "seb" and pr["eigene"] == eigene
+    assert client.get("/api/profil/seb", headers=client.als()).json()["eigene"] >= 1
     assert client.get("/api/profil/niemand", headers=p).status_code == 404
 
 

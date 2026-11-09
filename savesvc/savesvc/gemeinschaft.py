@@ -128,7 +128,7 @@ def registrieren(app: FastAPI, e, db, spieler, spiel, ich_daten, benutzerliste, 
                 for eintrag in db.bestenliste(sid, aktuelle_season(sid), s["leaderboard"]["order"] == "asc", 1000):
                     if eintrag["player"] == name:
                         platz = eintrag["rank"]; break
-            spiele.append({"id": sid, "title": s["title"], "sekunden": zeit.get(sid, {}).get("sekunden", 0),
+            spiele.append({"id": sid, "title": s["title"], "author": s["author"], "sekunden": zeit.get(sid, {}).get("sekunden", 0),
                            "platz": platz, "erfolgeGesamt": len(definiert),
                            "erfolge": [{**definiert[x["erfolg"]], "zeit": x["zeit"]} for x in erf.get(sid, []) if x["erfolg"] in definiert]})
         spiele.sort(key=lambda x: -x["sekunden"])
@@ -138,6 +138,7 @@ def registrieren(app: FastAPI, e, db, spieler, spiel, ich_daten, benutzerliste, 
                 "rollen": [r for r in ("admin", "entwickler", "tester", "spieler") if r in (person.get("rollen") or [])],
                 "dabeiSeit": person.get("angelegt")} if person else {"anzeigename": None, "rollen": [], "dabeiSeit": None}
         return {"name": name, "sekunden": sum(x["sekunden"] for x in spiele), "spiele": spiele,
+                "eigene": sum(1 for s in sichtbar.values() if s["author"] == name),
                 "erfolge": sum(len(x["erfolge"]) for x in spiele), "ich": name == rollen.daten_id(e, request, player), **kopf}
 
     # ---------- Spiel der Woche ----------

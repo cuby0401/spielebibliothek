@@ -29,10 +29,12 @@ trap aufraeumen EXIT
 echo "  Teststand auf: $ORT"
 
 python3 -I scripts/e2e-vorbereiten.py "$TMP"
+# Dateiliste: im Git-Repo alle versionierten und neuen Dateien, sonst (Release-Stand beim Auftrag auf dem Mac, 1.4.1) alles
+dateien() { if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git ls-files -co --exclude-standard; else find . -type f ! -path './.git/*' ! -name '.DS_Store'; fi; }
 if [ "$ORT" = mac ]; then
-	mkdir -p "$REPO" && git ls-files -co --exclude-standard | tar --no-mac-metadata --no-xattrs -cf - -T - | tar -xf - -C "$REPO"
+	mkdir -p "$REPO" && dateien | tar --no-mac-metadata --no-xattrs -cf - -T - | tar -xf - -C "$REPO"
 else
-	git ls-files -co --exclude-standard | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$NAS" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
+	dateien | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$NAS" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
 fi
 
 # Teststand frisch aufbauen, Spiel von „paul“ anlegen, Upload-Passwort zurückgeben (gemeinsam mit dem Auftragsdienst)

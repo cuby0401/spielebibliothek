@@ -124,3 +124,11 @@ Die Probe-Zentrale ist zugleich der Testserver für die Tester:
 - **Tester benachrichtigen:** `deploy.sh --probe` schickt allen mit der CRM-Rolle „Tester“ eine Glocke (ab 1.4.0 live).
 - **Neuen Tester aufnehmen:** E-Mail in die Richtlinie „Tester“ der Access-Anwendung, Rolle „Tester“ im CRM (für Link und Glocke).
 
+
+## Aufträge auf dem Mac (Zentrale 1.4.1, NAS entlasten)
+
+- Einmalig einrichten: `sh scripts/auftraege-mac-einrichten.sh` (launchd-Agent `uk.cuby0401.spielebibliothek-auftraege`, alle 20 s). Austragen: `--aus`.
+- Läuft Docker Desktop, meldet der Mac „bereit“ an die Live-Bibliothek und den Testserver (Admin-Panel → Aufgaben zeigt es an) und holt dort wartende Unit- und Ende-zu-Ende-Aufträge ab. Quelle ist wie auf der NAS genau der Stand des Ziels (Probe: `release.tar`, Live: `spielebibliothek-quelle`). Unit-Tests laufen mit der `.venv` des Repos, Ende-zu-Ende mit `E2E_ORT=mac`.
+- Solange das Lebenszeichen jünger als 90 s ist, lässt der Auftragsdienst der NAS diese Aufträge liegen (`auftraege-holen --ausser`). Ende-zu-Ende nur, wenn der Stand des Ziels schon auf dem Mac laufen kann (ab 1.4.1). Ältere Live-Stände bleiben bei der NAS.
+- Im Testserver führt nur der Mac aus. Ist er aus, bleiben Aufträge dort auf „wartet“, bis er wieder da ist.
+- Nie zwei Läufe gleichzeitig (Sperre `/tmp/sb-auftraege-mac.lock`). Log: `~/Library/Logs/spielebibliothek-auftraege.log`.

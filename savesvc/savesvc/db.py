@@ -609,15 +609,18 @@ class Datenbank:
             v.execute("COMMIT")
             return aid
 
-    def auftraege_holen(self) -> list[dict]:
-        """Für den Auftragsdienst: wartende Aufträge übernehmen (→ läuft). Hängengebliebene werden abgeschlossen."""
+    def auftraege_holen(self, ausser: set[tuple[str, str]] | None = None) -> list[dict]:
+        """Für den Auftragsdienst: wartende Aufträge übernehmen (→ läuft). Hängengebliebene werden abgeschlossen.
+        ausser (1.4.1): (art, ziel), die liegen bleiben – die übernimmt der Mac (scripts/auftraege-mac.py)."""
         grenze = (datetime.now(timezone.utc) - self.AUFTRAG_MAX_LAUFZEIT).isoformat(timespec="seconds")
         with self.verbindung() as v:
             v.execute("BEGIN IMMEDIATE")
             v.execute("UPDATE auftraege SET status='fehler', ende=?, zusammenfassung='abgebrochen (keine Rückmeldung nach 2 h)' "
                       "WHERE status='laeuft' AND start < ?", (jetzt(), grenze))
-            liste = [dict(z) for z in v.execute("SELECT id, art, ziel FROM auftraege WHERE status='wartet' ORDER BY id")]
-            v.execute("UPDATE auftraege SET status='laeuft', start=? WHERE status='wartet'", (jetzt(),))
+            liste = [dict(z) for z in v.execute("SELECT id, art, ziel FROM auftraege WHERE status='wartet' ORDER BY id")
+                     if (z["art"], z["ziel"]) not in (ausser or set())]
+            for z in liste:
+                v.execute("UPDATE auftraege SET status='laeuft', start=? WHERE id=?", (jetzt(), z["id"]))
             v.execute("COMMIT")
         return liste
 

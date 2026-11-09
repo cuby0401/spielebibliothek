@@ -24,6 +24,7 @@ import shutil
 import threading
 from datetime import date, datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -87,6 +88,18 @@ def geburtstag_pruefen(wert) -> str | None:
     if not date(1900, 1, 1) <= d <= date.today():
         raise Ungueltig("Geburtstag liegt außerhalb des gültigen Bereichs")
     return d.isoformat()
+
+
+def angelegt_pruefen(wert) -> str:
+    """„Angelegt am“ (1.4.1): Seb kann das Datum korrigieren, wenn er es besser weiß als die Aufzeichnungen (bei Personen
+    ohne jede Aktivität kennt die Bibliothek nur den Tag der Übernahme ins CRM). Gespeichert als Mitternacht in Berlin."""
+    try:
+        d = date.fromisoformat(str(wert)[:10])
+    except ValueError:
+        raise Ungueltig("Angelegt: JJJJ-MM-TT") from None
+    if not date(2020, 1, 1) <= d <= date.today():
+        raise Ungueltig("Angelegt liegt außerhalb des gültigen Bereichs")
+    return datetime(d.year, d.month, d.day, tzinfo=ZoneInfo("Europe/Berlin")).astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
 def text_pruefen(feld: str, wert) -> str | None:
@@ -253,6 +266,8 @@ class Crm:
                 neu[f] = text_pruefen(f, daten[f])
         if "geburtstag" in daten:
             neu["geburtstag"] = geburtstag_pruefen(daten["geburtstag"])
+        if daten.get("angelegt"):                      # nur aus dem Admin-Panel (personen.py), nie über „Mein Profil“
+            neu["angelegt"] = angelegt_pruefen(daten["angelegt"])
         if not neu:
             return self.person(name)
         with self.db.verbindung() as v:
@@ -576,6 +591,9 @@ def dabei_seit_nachholen(crm: Crm) -> int:
                 if _utc(z):
                     zeiten.append(_utc(z))
             anm = _utc(v.execute("SELECT MIN(erste) FROM anmeldungen WHERE player=?", (p["name"],)).fetchone()[0])
+            # Wer spielt, war angemeldet – die Anmeldungen werden erst seit dem 05.11.2026 abends aufgezeichnet (1.4.1)
+            if zeiten and (not anm or min(zeiten) < anm):
+                anm = min(zeiten)
             neu = {}
             frueh, alt = (min(zeiten) if zeiten else None), _utc(p["angelegt"])
             if frueh and (not alt or frueh < alt):
@@ -587,4 +605,17 @@ def dabei_seit_nachholen(crm: Crm) -> int:
                 n += 1
     if n:
         log.info("CRM: „Dabei seit“ bei %d übernommenen Personen auf die früheste Aktivität gesetzt", n)
+    return n
+
+
+def uebernahme_zuschreiben(crm: Crm, admins) -> int:
+    """1.4.1: Alle Konten vor dem CRM hat Seb selbst angelegt (users.yaml) – „angelegt von übernahme“ war irreführend.
+    Läuft bei jedem Start nach dabei_seit_nachholen() und schreibt übernommene Personen dem Admin zu. → Anzahl."""
+    admin = next(iter(sorted(n for n in admins if BENUTZER_MUSTER.match(n))), None)
+    if not admin:
+        return 0
+    with crm.db.verbindung() as v:
+        n = v.execute("UPDATE personen SET eingeladen_von=? WHERE eingeladen_von='übernahme'", (admin,)).rowcount
+    if n:
+        log.info("CRM: %d übernommene Personen %s zugeschrieben", n, admin)
     return n

@@ -57,12 +57,21 @@ function formular(t, d) {
 	if (meins && meins.text) text.value = meins.text;
 	const auswahl = bildAuswahl(5, text);
 	const knoepfe = [];
+	// Ist das Ergebnis schon gespeichert und nur ein Foto schiefgegangen, beim nächsten Klick nur die restlichen Fotos
+	// hochladen – sonst entstünde derselbe Eintrag mehrfach (1.4.1-Nachtest: dreimal „Hat nicht geklappt“).
+	let gespeichert = null, hochgeladen = 0;
 	const senden = async (ok) => {
 		knoepfe.forEach((k) => { k.disabled = true; });
 		try {
-			const { id } = await Bridge.json("POST", "/api/tester/ergebnis", { test: t.id, ok, text: text.value });
+			if (!gespeichert || gespeichert.ok !== ok) {
+				gespeichert = { ok, ...(await Bridge.json("POST", "/api/tester/ergebnis", { test: t.id, ok, text: text.value })) };
+				hochgeladen = 0;
+			}
 			const bilder = auswahl.bilder();
-			for (const bild of bilder) await Bridge.json("POST", `/api/tester/ergebnis/${id}/bilder`, { bild });
+			for (; hochgeladen < bilder.length; hochgeladen++) {
+				try { await Bridge.json("POST", `/api/tester/ergebnis/${gespeichert.id}/bilder`, { bild: bilder[hochgeladen] }); }
+				catch (e) { if (e instanceof Bridge.SitzungAbgelaufen) throw e; throw new Error(`Eintrag gespeichert, aber Foto ${hochgeladen + 1} ging nicht: ${e.message}. Nochmal klicken lädt nur die fehlenden Fotos hoch.`); }
+			}
 			meldung(`„${t.titel}“: als ${ok ? "bestanden" : "fehlgeschlagen"} eingetragen` + (bilder.length ? ` (mit ${bilder.length} ${bilder.length === 1 ? "Foto" : "Fotos"})` : "") + ". Danke!");
 			laden();
 		} catch (e) {
@@ -105,7 +114,8 @@ function gruppen(tests, d) {
 	const admin = tests.filter((t) => t.nurAdmin), alle = tests.filter((t) => !t.nurAdmin);
 	if (!admin.length) return alle.map((t) => testKarte(t, d));
 	return [h("h2", { class: "test-gruppe", text: `Nur für dich als Admin (${admin.length})` }), ...admin.map((t) => testKarte(t, d)),
-		alle.length ? h("h2", { class: "test-gruppe", text: `Für alle Tester (${alle.length})` }) : null, ...alle.map((t) => testKarte(t, d))];
+		h("h2", { class: "test-gruppe", text: `Für alle Tester (${alle.length})` }),
+		...(alle.length ? alle.map((t) => testKarte(t, d)) : [h("p", { class: "leise", text: "Hier ist nichts mehr offen." })])];
 }
 
 const LEER = { offen: "Alles getestet – danke! Abgelehnte und bestandene Tests findest du in den anderen Reitern.",
@@ -122,7 +132,8 @@ async function laden() {
 	const jetzt = reiter();
 	const je = { offen: [], abgelehnt: [], bestanden: [] };
 	for (const t of d.tests) je[zustandVon(t, d)].push(t);
-	c.replaceChildren(
+	// Leere Teile (null) weglassen – replaceChildren schreibt sie sonst als Text „null“ hin (1.4.1, Nachtest 09.11.)
+	c.replaceChildren(...[
 		h("h1", { text: `Tests für Version ${d.version}` }),
 		h("p", { class: "leise", text: `Commit ${d.commit} · angemeldet als ${d.ich}. Der Testserver ist eine Kopie der echten Bibliothek – was du hier tust, landet nicht im Live-System.` }),
 		d.hinweis ? h("p", { class: "hinweis-box", text: d.hinweis }) : null,
@@ -131,7 +142,7 @@ async function laden() {
 			h("a", { href: "#" + k, class: k === jetzt ? "aktiv" : "", text: `${name} (${je[k].length})` }))),
 		jetzt === "offen" ? h("p", { class: "leise", text: "Öffne den Testserver in einem zweiten Tab („Testserver öffnen ↗“ oben rechts), geh die Schritte durch und trag hier ein, ob es geklappt hat. Bei „Hat nicht geklappt“ kannst du Fotos oder Screenshots anhängen (auch mit Strg/⌘+V). Eingetragene Tests wandern in „Abgelehnt“ bzw. „Bestanden“." })
 			: h("p", { class: "leise", text: "Archiv: Klick auf einen Test zeigt, wer ihn wann geprüft hat, mit Begründung und Fotos. Du kannst dort auch neu eintragen." }),
-		...(je[jetzt].length ? gruppen(je[jetzt], d) : [h("p", { class: "meldung", text: LEER[jetzt] })]));
+		...(je[jetzt].length ? gruppen(je[jetzt], d) : [h("p", { class: "meldung", text: LEER[jetzt] })])].filter(Boolean));
 }
 
 laden();

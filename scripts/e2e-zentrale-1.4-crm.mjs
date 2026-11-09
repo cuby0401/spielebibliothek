@@ -140,6 +140,15 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await eval_(`fetch("/api/mein/konto").then(r=>r.text()).then(t=>!t.includes("Notiz") && !t.includes("protokoll"))`), "Mein Konto ohne Admin-Felder");
 
   ok(await eval_(`document.querySelector(".profil-kopf strong").textContent==="Seb E2E"`), "Profilkopf zeigt den Anzeigenamen");
+  // 1.4.1, Nachtest 09.11. (Seb): Anzeigename oben rechts, „dabei seit“ mit Tag, „gespielt“ statt „Spiele“
+  ok(await eval_(`document.getElementById("benutzer").textContent==="Seb E2E" && document.getElementById("benutzer").title==="@seb"`), "Oben rechts steht der Anzeigename");
+  ok(await eval_(`/dabei seit \\d\\d\\.\\d\\d\\.\\d{4}/.test(document.querySelector(".profil-kopf").textContent)`), "„dabei seit“ mit vollem Datum");
+  ok(await eval_(`[...document.querySelectorAll(".profil-zahlen div")].some(d=>d.textContent.endsWith("gespielt"))`), "Profil: „gespielt“ statt „Spiele“");
+  ok(await eval_(`fetch("/api/me").then(r=>r.json()).then(m=>m.anzeigename==="Seb E2E" && m.namen.seb==="Seb E2E")`), "/api/me liefert die Anzeigenamen");
+  // CRM: übernommene Personen „von seb“, „Angelegt am“ nur durch den Admin korrigierbar
+  ok(await eval_(`fetch("/api/admin/personen/paul").then(r=>r.json()).then(p=>p.eingeladen_von==="seb")`), "Übernommene Person: angelegt von seb");
+  ok(await eval_(`fetch("/api/admin/personen/paul",{method:"PATCH",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({angelegt:"2026-10-20"})})
+    .then(r=>r.json()).then(p=>p.angelegt==="2026-10-19T22:00:00+00:00")`), "„Angelegt am“ korrigiert");
 
   // 8) Fehler der Bibliothek (1.4.0): Bericht mit Nummer, ganz oben in der Admin-Übersicht
   const nr = await eval_(`fetch("/api/fehler-zentrale",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},
@@ -151,6 +160,8 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   // 8b) Tester-Panel (1.4.0, E76): Plan aus tests/manuell, Ergebnis eintragen, Zusammenfassung
   await gehe(G + "/tester/", 3500);
   ok(await bis(`document.querySelectorAll(".test").length>=5`), "Tester-Panel zeigt den Testplan");
+  ok(await eval_(`(()=>{const w=document.createTreeWalker(document.getElementById("inhalt"),NodeFilter.SHOW_TEXT);
+    while(w.nextNode()) if(w.currentNode.nodeValue.trim()==="null") return false; return true})()`), "Tester-Panel: kein leeres „null“");
   await eval_(`document.querySelector(".test .knopf.nein").click(); true`);
   ok(await bis(`document.getElementById("meldung").textContent.includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");
   const offenVorher = await eval_(`document.querySelectorAll("#inhalt > .test").length`);

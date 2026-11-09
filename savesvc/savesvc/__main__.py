@@ -48,7 +48,8 @@ def main(argv=None) -> int:
     en.add_argument("name", nargs="?")
     sub.add_parser("cloudflare-soll", help="Soll-Stand der Cloudflare-Richtlinien als JSON")
     sub.add_parser("cloudflare-lesetoken", help="Nur-Lese-Schlüssel von stdin hinterlegen")
-    sub.add_parser("auftraege-holen", help="für den Auftragsdienst")
+    ah = sub.add_parser("auftraege-holen", help="für den Auftragsdienst")
+    ah.add_argument("--ausser", default="", help="art:ziel,… – bleiben liegen (übernimmt der Mac, 1.4.1)")
     sub.add_parser("auftrag-fertig", help="für den Auftragsdienst")
     lz = sub.add_parser("lebenszeichen", help="für den Auftragsdienst")
     lz.add_argument("version")
@@ -161,7 +162,8 @@ def auftragsdienst(a, eingabe) -> int:
     e = laden()
     db = Datenbank(e.db_path)
     if a.befehl == "auftraege-holen":
-        print(json.dumps(db.auftraege_holen()))
+        ausser = {tuple(x.split(":", 1)) for x in a.ausser.split(",") if ":" in x}
+        print(json.dumps(db.auftraege_holen(ausser)))
     elif a.befehl == "lebenszeichen":
         db.dienst_setzen("auftragsdienst", a.version[:40])
     elif a.befehl == "live-status":

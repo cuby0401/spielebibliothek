@@ -102,3 +102,16 @@ def test_waechter_merkt_stehengebliebenen_auftragsdienst(umgebung, monkeypatch):
     with db.verbindung() as v:
         v.execute("UPDATE dienst_status SET zeit='2020-01-01T00:00:00+00:00'")
     assert any("Auftragsdienst" in p for p in waechter.pruefen(e, db, lambda *a: {"ok": True}))
+
+
+def test_mac_uebernimmt_auftraege(client, umgebung):
+    """1.4.1: Meldet sich der Mac, lässt der Auftragsdienst der NAS seine Aufträge liegen (--ausser), der Mac holt sie."""
+    db = Datenbank(umgebung.db)
+    u = db.auftrag_anlegen("unit-tests", "probe", "knopf", "seb")
+    e2e = db.auftrag_anlegen("e2e-tests", "live", "knopf", "seb")
+    assert [a["id"] for a in db.auftraege_holen({("unit-tests", "probe")})] == [e2e]
+    assert db.auftrag(u)["status"] == "wartet" and db.auftrag(e2e)["status"] == "laeuft"
+    assert client.get("/api/admin/auftraege", headers=client.als()).json()["mac"] == {"eingerichtet": False, "aktiv": False, "zuletzt": None, "text": None}
+    db.dienst_setzen("mac", "Mac – bereit")
+    m = client.get("/api/admin/auftraege", headers=client.als()).json()["mac"]
+    assert m["aktiv"] is True and m["text"] == "Mac – bereit"

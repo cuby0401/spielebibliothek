@@ -67,6 +67,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     crm = crm_modul.Crm(db, e.admins)
     crm_modul.uebernehmen(crm, e.users_file, e.db_path.parent / "backup", e.admins, e.spiele_dir, e.tester)
     crm_modul.dabei_seit_nachholen(crm)
+    crm_modul.uebernahme_zuschreiben(crm, e.admins)
     benutzerliste = crm_modul.CrmBenutzerliste(e.users_file, crm, e.spiele_dir)
     try:
         benutzerliste.exportieren()
@@ -154,6 +155,10 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
                             headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
                                      "Content-Security-Policy": "default-src 'none'; sandbox"})
 
+    def anzeigenamen() -> dict[str, str]:
+        return {p["name"]: p["anzeigename"].strip() for p in crm.personen()
+                if (p.get("anzeigename") or "").strip() and p.get("status") != "geloescht"}
+
     @app.get("/api/me")
     def me(request: Request, player: str = Depends(spieler)):
         # Entwickler = hat einen eigenen Spielordner (wird beim Anlegen des Upload-Kontos erzeugt).
@@ -161,11 +166,15 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         r = rollen.rolle(e, request, player)
         anmeldung_merken(request, player)
         crm.angemeldet(player)          # eingeladen → aktiv bei der ersten Anmeldung (CRM)
+        person = crm.person(player)
         return {"player": player, "uploader": r["uploader"], "admin": r["admin"], "probe": e.probe,
                 # Tester (1.4.0): Link „Tester-Panel“ in der Konto-Leiste; der Testserver selbst prüft über Cloudflare Access
                 "tester": not r["ansicht"] and "tester" in rollen.crm_rollen(player),
                 "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"],
-                "sitzungBis": getattr(request.state, "sitzung_bis", None)}
+                "sitzungBis": getattr(request.state, "sitzung_bis", None),
+                # 1.4.1: In der Bibliothek (Spiele, Bestenlisten, oben rechts, Profil) steht der Anzeigename, im
+                # Admin-Panel und in Protokollen weiter der Benutzername. Der Anzeigename ist ohnehin öffentlich.
+                "anzeigename": (person or {}).get("anzeigename") or None, "namen": anzeigenamen()}
 
     @app.get("/api/games")
     def spiele(request: Request, player: str = Depends(spieler)):

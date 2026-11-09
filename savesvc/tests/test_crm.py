@@ -197,7 +197,8 @@ def test_dabei_seit_frueheste_aktivitaet(tmp_path, umgebung):
     c.anlegen("seb", "neu", "neu@example.com", ["spieler"])    # Eingeladene bleiben unberührt
     assert crm_modul.dabei_seit_nachholen(c) == 1
     p = c.person("paul")
-    assert p["angelegt"] == "2026-11-03T10:00:00+00:00" and p["erste_anmeldung"] == "2026-11-05T08:00:00+00:00"
+    # Wer spielt, war angemeldet (1.4.1): erste Anmeldung = früheste Aktivität, auch vor der ersten aufgezeichneten Anmeldung
+    assert p["angelegt"] == "2026-11-03T10:00:00+00:00" and p["erste_anmeldung"] == "2026-11-03T10:00:00+00:00"
     assert c.person("seb")["angelegt"] > "2026-11-07" and crm_modul.dabei_seit_nachholen(c) == 0   # ohne Aktivität / zweiter Lauf
 
 
@@ -211,3 +212,30 @@ def test_nie_angemeldet_bleibt_eingeladen(client, upload):  # noqa: F811
     assert client.post("/api/admin/personen/neu/verwarnung-aufheben", headers=h).json()["status"] == "eingeladen"
     client.post("/api/admin/personen/neu/archivieren", headers=h)
     assert client.post("/api/admin/personen/neu/wiederherstellen", headers=h).json()["person"]["status"] == "eingeladen"
+
+
+def test_uebernahme_seb_zugeschrieben_und_angelegt_korrigierbar(client, umgebung):
+    """1.4.1: „angelegt von übernahme“ stimmte nicht – alle Konten vor dem CRM hat Seb angelegt. „Angelegt am“ kann nur
+    der Admin korrigieren (Personen ohne Aktivität haben sonst den Tag der Umstellung)."""
+    db = Datenbank(umgebung.db)
+    c = crm_modul.Crm(db, frozenset({"seb"}))
+    with db.verbindung() as v:
+        v.execute("UPDATE personen SET eingeladen_von='übernahme'")
+    assert crm_modul.uebernahme_zuschreiben(c, frozenset({"seb"})) == 2 and crm_modul.uebernahme_zuschreiben(c, frozenset({"seb"})) == 0
+    assert {p["eingeladen_von"] for p in c.personen()} == {"seb"}
+    h = client.als()
+    r = client.patch("/api/admin/personen/paul", json={"angelegt": "2026-10-20"}, headers=h)
+    assert r.status_code == 200 and r.json()["angelegt"] == "2026-10-19T22:00:00+00:00"          # Mitternacht in Berlin
+    assert client.patch("/api/admin/personen/paul", json={"angelegt": "2019-01-01"}, headers=h).status_code == 422
+    assert client.patch("/api/admin/personen/paul", json={"angelegt": "2999-01-01"}, headers=h).status_code == 422
+    client.patch("/api/mein/konto", json={"angelegt": "2020-01-01", "anzeigename": "Phil"}, headers=client.als(PAUL))
+    p = c.person("paul")
+    assert p["angelegt"] == "2026-10-19T22:00:00+00:00" and p["anzeigename"] == "Phil"           # selbst nicht änderbar
+
+
+def test_anzeigenamen_in_der_bibliothek(client):
+    """1.4.1: Die Bibliothek zeigt den Anzeigenamen (oben rechts, Spiele, Bestenlisten), /api/me liefert die Zuordnung."""
+    client.patch("/api/admin/personen/paul", json={"anzeigename": "Phil P."}, headers=client.als())
+    me = client.get("/api/me", headers=client.als(PAUL)).json()
+    assert me["anzeigename"] == "Phil P." and me["namen"] == {"paul": "Phil P."}
+    assert client.get("/api/me", headers=client.als()).json()["anzeigename"] is None

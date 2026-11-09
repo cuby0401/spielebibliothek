@@ -11,7 +11,8 @@
         "Klick oben rechts auf deinen Namen, „Mein Profil“ öffnet sich.",
         "Schau in der Karte oben auf „dabei seit …“."
       ],
-      "erwartet": "Dort steht der Tag, an dem du zum ersten Mal in der Bibliothek aktiv warst (erste Anmeldung oder erster Spielstand), also vor dem 08.11.2026. Bisher stand bei allen der 08.11.2026, der Tag der Umstellung auf das CRM."
+      "erwartet": "Dort steht das volle Datum (Tag.Monat.Jahr, z. B. „dabei seit 05.11.2026“), nicht nur Monat und Jahr. Es ist der Tag, an dem du zum ersten Mal in der Bibliothek aktiv warst, also vor dem 08.11.2026 (Tag der Umstellung auf das CRM).",
+      "neuAb": "2026-11-09T12:46:59+00:00"
     },
     {
       "id": "tester-reiter-offen",
@@ -72,14 +73,16 @@
     {
       "id": "seb-dabei-seit-crm",
       "bereich": "Nur Seb (Admin)",
-      "titel": "CRM: „Angelegt“ und „erste Anmeldung“ korrigiert",
+      "titel": "CRM: „Angelegt … von seb“ und erste Anmeldung",
       "schritte": [
-        "Admin-Panel → Personen → Paul öffnen.",
-        "Unter den Stammdaten die Zeile „Angelegt … · erste Anmeldung …“ anschauen.",
-        "Dasselbe bei Emil."
+        "Admin-Panel des Testservers → Personen → Paul öffnen.",
+        "Unter den Stammdaten die Zeile „Angelegt … von … · erste Anmeldung …“ anschauen.",
+        "Dasselbe bei Emil, Eli und dir."
       ],
-      "erwartet": "„Angelegt“ ist nicht mehr der 08.11.2026 (Umstellung auf das CRM), sondern der Tag der ersten Aktivität, bei Paul und Emil der 06.11.2026, bei dir der 05.11.2026 (früher reichen die Aufzeichnungen nicht zurück). „Erste Anmeldung“ ist die früheste bekannte Anmeldung. Personen, die nach der Umstellung eingeladen wurden, behalten ihr Datum.",
-      "nurAdmin": true
+      "erwartet": "Überall steht „von seb“, nicht mehr „von übernahme“. Angelegt: Paul und Emil 06.11.2026, Eli 05.11.2026, du 05.11.2026 (der Tag der ersten Aktivität, früher reichen die Aufzeichnungen nicht). „Erste Anmeldung“ ist nie später als die erste Aktivität. Bei Eli steht jetzt auch eine erste Anmeldung (vorher leer).",
+      "nurAdmin": true,
+      "neuAb": "2026-11-09T12:46:59+00:00",
+      "hinweis": "Carl und Djamal haben in der Bibliothek noch nie etwas getan, deshalb kennt die Bibliothek für sie nur den 08.11.2026. Das korrigierst du im nächsten Test selbst."
     },
     {
       "id": "seb-fotos-admin-tests",
@@ -95,14 +98,108 @@
     {
       "id": "seb-e2e-mac",
       "bereich": "Nur Seb (Admin)",
-      "titel": "Ende-zu-Ende-Tests laufen auf dem Mac",
+      "titel": "„Jetzt starten“ im Testserver: Tests laufen auf dem Mac",
       "schritte": [
-        "Nach dem Bau des Testservers (macht Claude mit scripts/deploy.sh --probe) im Admin-Panel der LIVE-Bibliothek → „Aufgaben“ schauen.",
-        "Nach etwa 3 Minuten neu laden."
+        "Docker Desktop auf dem Mac muss laufen.",
+        "Admin-Panel des TESTSERVERS → „Aufgaben“.",
+        "Oben unter „Auftragsdienst“ steht „✓ Mac bereit …“.",
+        "Bei „Unit-Tests / Probe“ auf „Jetzt starten“ klicken, etwa 30 Sekunden warten (die Seite aktualisiert sich selbst).",
+        "Danach bei „Ende-zu-Ende-Tests / Probe“ auf „Jetzt starten“ klicken und etwa 3 Minuten warten."
       ],
-      "erwartet": "Zuerst steht dort ein Lauf „Ende-zu-Ende-Tests“ (Probe) mit „läuft auf dem Mac“. Nach etwa 3 Minuten wechselt er auf grün mit „Mac: ✓ Alle Ende-zu-Ende-Tests grün“, das Protokoll lässt sich öffnen. Die NAS hat dabei nichts gerechnet (vorher etwa 10 Minuten Last auf der NAS).",
-      "hinweis": "Voraussetzung: Docker Desktop läuft auf dem Mac. Läuft es nicht, laufen die Tests wie bisher auf der NAS.",
-      "nurAdmin": true
+      "erwartet": "Beide Läufe stehen in „Letzte Läufe“: erst „läuft auf dem Mac“, dann grün mit „Mac · 1.4.1: … passed (0:1x)“ bzw. „Mac · 1.4.1: … Prüfpunkte grün (2:xx)“. Unit-Tests brauchen unter einer Minute statt ca. 8, Ende-zu-Ende ca. 3 statt 10 Minuten. Nichts bleibt auf „wartet“ stehen. Mit „Log“ lässt sich die Ausgabe öffnen.",
+      "hinweis": "Vorher gab es im Testserver niemanden, der die Aufträge ausführt, deshalb blieben sie auf „wartet“. In der Live-Bibliothek übernimmt der Mac erst, wenn 1.4.1 live ist. Bis dahin rechnet dort weiter die NAS.",
+      "nurAdmin": true,
+      "neuAb": "2026-11-09T12:46:59+00:00"
+    },
+    {
+      "id": "tester-null-weg",
+      "bereich": "Nur Seb (Admin)",
+      "nurAdmin": true,
+      "titel": "Tester-Panel: kein „null“ mehr unter den Admin-Tests",
+      "schritte": [
+        "Tester-Panel, Reiter „Offen“.",
+        "Ganz nach unten scrollen, unter die Gruppe „Nur für dich als Admin“."
+      ],
+      "erwartet": "Unter der Überschrift „Für alle Tester (…)“ stehen die offenen Tests für alle oder, wenn dort nichts mehr offen ist, „Hier ist nichts mehr offen.“. Nirgends steht „null“."
+    },
+    {
+      "id": "profil-gespielt",
+      "bereich": "Konto",
+      "titel": "Profil: „gespielt“ statt „Spiele“, mit Entwickler",
+      "schritte": [
+        "Testserver → oben rechts auf deinen Namen → Mein Profil.",
+        "Oben rechts in der Karte auf die Zahlen schauen.",
+        "Nach unten zur Tabelle „Gespielte Spiele mit Plätzen und Erfolgen“."
+      ],
+      "erwartet": "In der Karte steht „… gespielt“ (die Spiele, die du schon gespielt hast, egal von wem). Wer selbst Spiele hochgeladen hat, sieht daneben „… eigene Spiele“ mit der Zahl seiner eigenen Spiele. In der Tabelle zeigt die neue Spalte „von“, wem das Spiel gehört (bei deinen eigenen „dir“)."
+    },
+    {
+      "id": "anzeigename-oben",
+      "bereich": "Anzeigename",
+      "titel": "Anzeigename oben rechts",
+      "schritte": [
+        "Testserver → Mein Profil → bei „Anzeigename“ etwas eintragen (z. B. deinen Spitznamen) → Speichern.",
+        "Seite neu laden.",
+        "Oben rechts neben deinem Bild schauen."
+      ],
+      "erwartet": "Oben rechts steht dein Anzeigename statt des Benutzernamens, auch die Buchstaben im runden Bild kommen vom Anzeigenamen. Fährst du mit der Maus darüber, steht „@benutzername“ als Hinweis. Ohne Anzeigenamen steht wie bisher der Benutzername."
+    },
+    {
+      "id": "anzeigename-spiele",
+      "bereich": "Anzeigename",
+      "titel": "Anzeigename an den Spielen und in Bestenlisten",
+      "schritte": [
+        "Mit gesetztem Anzeigenamen (vorheriger Test): Übersicht der Bibliothek.",
+        "Bei den Kacheln auf „von …“ schauen (bei Entwicklern mit Anzeigenamen).",
+        "Ein Spiel mit Bestenliste öffnen, in dem du einen Eintrag hast, und auf die Bestenliste rechts schauen."
+      ],
+      "erwartet": "Unter den Spielen steht „von <Anzeigename>“, sofern der Entwickler einen gesetzt hat, sonst der Benutzername. In der Bestenliste steht bei dir und allen anderen der Anzeigename. Ein Klick auf einen Namen öffnet weiterhin dessen Profil. Die Suche findet Spiele auch über den Anzeigenamen des Entwicklers."
+    },
+    {
+      "id": "seb-anzeigename-admin",
+      "bereich": "Nur Seb (Admin)",
+      "nurAdmin": true,
+      "titel": "Admin-Panel bleibt beim Benutzernamen",
+      "schritte": [
+        "Mit gesetztem Anzeigenamen: Admin-Panel → Personen, Protokoll, Spielstände, Aufgaben anschauen."
+      ],
+      "erwartet": "Im Admin-Panel und im Protokoll stehen weiter die Benutzernamen (seb, paul, …), nicht die Anzeigenamen. Der Anzeigename steht nur in den Stammdaten der Person."
+    },
+    {
+      "id": "seb-angelegt-korrigieren",
+      "bereich": "Nur Seb (Admin)",
+      "nurAdmin": true,
+      "titel": "CRM: „Angelegt am“ selbst korrigieren",
+      "schritte": [
+        "Admin-Panel des Testservers → Personen → Carl öffnen.",
+        "In den Stammdaten bei „Angelegt am“ den Tag eintragen, an dem du sein Konto wirklich angelegt hast → Speichern.",
+        "Unten bei Carl ins Protokoll schauen, danach „Mein Profil“ öffnen."
+      ],
+      "erwartet": "Nach dem Speichern steht in der Zeile darunter „Angelegt <dein Datum>, 00:00 von seb“. Ein Datum in der Zukunft oder vor 2020 wird mit einer Fehlermeldung abgelehnt. Im Protokoll steht die Änderung mit altem und neuem Wert. In „Mein Profil“ kann man das Datum nicht ändern."
+    },
+    {
+      "id": "seb-aufgaben-springt-nicht",
+      "bereich": "Nur Seb (Admin)",
+      "nurAdmin": true,
+      "titel": "Aufgaben-Reiter springt nicht mehr nach oben",
+      "schritte": [
+        "Admin-Panel des Testservers → Aufgaben.",
+        "Einen Lauf starten (z. B. Ende-zu-Ende-Tests / Probe), damit einer „läuft“.",
+        "Nach unten zu „Letzte Läufe“ scrollen und dort 1–2 Minuten bleiben.",
+        "Bei einem älteren Lauf auf „Log“ klicken und lesen."
+      ],
+      "erwartet": "Die Liste aktualisiert sich etwa alle 15 Sekunden, die Seite bleibt dabei an derselben Stelle stehen. Solange ein Log offen ist, wird gar nicht neu geladen, das Log klappt also nicht von selbst zu."
+    },
+    {
+      "id": "seb-deploy-mac",
+      "bereich": "Nur Seb (Admin)",
+      "nurAdmin": true,
+      "titel": "Nach dem Bau des Testservers: Tests auf dem Mac",
+      "schritte": [
+        "Nach dem nächsten Bau des Testservers durch Claude (scripts/deploy.sh --probe): Admin-Panel des TESTSERVERS → Aufgaben."
+      ],
+      "erwartet": "Dort steht ein Lauf „Ende-zu-Ende-Tests / Probe“, Auslöser „mac“, der nach etwa 3 Minuten grün wird („Mac · 1.4.1: … Prüfpunkte grün“). Er erscheint im Testserver, nicht in der Live-Bibliothek, weil nur dort sicher der Mac ausführt.",
+      "hinweis": "Claude hat den Testserver für diese Version schon so gebaut, der Lauf sollte also schon dastehen."
     }
   ]
 }

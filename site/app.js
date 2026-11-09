@@ -22,6 +22,8 @@ let antragNr = null;                // für #/antrag/<id> (Zentrale 1.3.1)
 let antragZurueck = "#/";           // Zurück-Pfeil in der Anfrage: dorthin, wo man herkam (Anfragen, Meine Spiele, Spiel)
 let bisherigeRoute = "";
 const idPfad = (id) => id.split("/").map(encodeURIComponent).join("/");
+// 1.4.1: In der Bibliothek steht der Anzeigename (falls gesetzt), Links und Admin-Panel bleiben beim Benutzernamen
+const anzeige = (name) => (ich.namen && ich.namen[name]) || name;
 
 async function einstellungenSpeichern(aenderung) {
 	Object.assign(einstellungen, aenderung);
@@ -94,8 +96,8 @@ async function bestenlisteZeigen(spiel, season) {
 		const li = document.createElement("li");
 		if (e.player === ichSelbst) li.className = "ich";
 		const platz = document.createElement("span"); platz.className = "platz"; platz.textContent = e.rank + ".";
-		const name = document.createElement(e.player.includes("~") ? "span" : "a"); name.className = "name"; name.textContent = e.player;
-		if (!e.player.includes("~")) { name.href = "#/profil/" + encodeURIComponent(e.player); name.title = "Profil von " + e.player; }
+		const name = document.createElement(e.player.includes("~") ? "span" : "a"); name.className = "name"; name.textContent = anzeige(e.player);
+		if (!e.player.includes("~")) { name.href = "#/profil/" + encodeURIComponent(e.player); name.title = "Profil von " + anzeige(e.player); }
 		li.append(platz, name);
 		const werte = document.createElement("span"); werte.className = "werte";
 		for (const s of spalten) {
@@ -250,7 +252,7 @@ function kachelnZeigen() {
 	tagFilterZeigen(sichtbar);
 	const q = suche.trim().toLowerCase();
 	const treffer = sichtbar.filter((s) => (!tagFilter || (s.tags || []).includes(tagFilter)) &&
-		(!q || [s.title, s.description, s.author, ...(s.tags || [])].join(" ").toLowerCase().includes(q)));
+		(!q || [s.title, s.description, s.author, anzeige(s.author), ...(s.tags || [])].join(" ").toLowerCase().includes(q)));
 	el("kacheln").replaceChildren(...sortiert(treffer).map(kachel));
 	if (sichtbar.length && !treffer.length) {
 		const leer = document.createElement("p");
@@ -317,7 +319,7 @@ function kachel(spiel) {
 	h.textContent = spiel.title;
 	const autor = document.createElement("span");
 	autor.className = "autor";
-	autor.textContent = "von " + spiel.author + (spiel.meineSpielzeit >= 60 ? " · du: " + dauer(spiel.meineSpielzeit) : "");
+	autor.textContent = "von " + anzeige(spiel.author) + (spiel.meineSpielzeit >= 60 ? " · du: " + dauer(spiel.meineSpielzeit) : "");
 	const text = document.createElement("p");
 	text.className = "beschreibung";
 	text.textContent = spiel.description;
@@ -612,7 +614,7 @@ function menueEinrichten() {
 	// Zentrale 1.4.0: kein Aufklappmenü mehr – der Name führt ins Konto (Profil), Admins haben zusätzlich „Admin“ oben
 	const knopf = el("menue-knopf");
 	knopf.hidden = false;
-	avatarFuellen(el("avatar"), ich.player);
+	avatarFuellen(el("avatar"), ich.player, ich.anzeigename);
 	el("admin-link").hidden = !ich.admin;
 	// Band oben, solange eine Rolle simuliert wird (gestartet im Admin-Panel → Übersicht)
 	if (ich.ansicht) {
@@ -752,7 +754,7 @@ async function sdwZeigen() {
 	const top = document.createElement("ol");
 	for (const e of d.bestenliste.slice(0, 3)) {
 		const li = document.createElement("li");
-		li.textContent = `${e.player} – ${formatieren(e.score, d.format)}`;
+		li.textContent = `${anzeige(e.player)} – ${formatieren(e.score, d.format)}`;
 		top.append(li);
 	}
 	if (!d.bestenliste.length) top.append(Object.assign(document.createElement("li"), { className: "leise", textContent: "Noch keine Einträge diese Woche." }));
@@ -803,7 +805,8 @@ async function start() {
 		Bridge.spieler = ich.player;
 		Bridge.sitzungBis = ich.sitzungBis;
 		ichSelbst = ich.player;
-		el("benutzer").textContent = ich.player;
+		el("benutzer").textContent = anzeige(ich.player);
+		el("benutzer").title = "@" + ich.player;
 		el("upload-link").hidden = !ich.uploader;
 		el("probe-band").hidden = !ich.probe;
 		if (ich.probe) document.title = "🧪 " + document.title;

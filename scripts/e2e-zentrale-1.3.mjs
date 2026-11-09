@@ -80,8 +80,10 @@ const dialoge = [];
   ok(leiste === "Profil|Meine Spiele|Meine Spielstände|Anfragen|Einstellungen|Sicherheit|Admin-Panel|Abmelden", "Konto-Leiste (1.4.0): " + leiste);
   ok(await eval_(`document.querySelector(".konto-leiste a.aktiv").textContent==="Profil" && !!document.querySelector(".profil-kopf .avatar.gross")`), "Profil aktiv, Kopf mit Bild");
   const h2 = await eval_(`[...document.querySelectorAll("#seite h2")].map(h=>h.textContent).join("|")`);
-  ok(h2 === "Meine Angaben|Meine Spiele mit Plätzen und Erfolgen", "Profil: Meine Angaben, Spiele: " + h2);
+  ok(h2 === "Meine Angaben|Gespielte Spiele mit Plätzen und Erfolgen", "Profil: Meine Angaben, gespielte Spiele: " + h2);
   ok(await eval_(`!document.querySelector("#seite table").textContent.includes("Sandbox-Spike")`), "Profil: Testspiel Spike zählt nicht");
+  ok(await eval_(`[...document.querySelectorAll("#seite table thead th")].map(t=>t.textContent).join("|")==="Spiel|von|Spielzeit|Platz (aktuelle Season)|Erfolge"
+    && [...document.querySelectorAll("#seite table tbody td:nth-child(2)")].some(t=>t.textContent==="dir")`), "Profil (1.4.1): Spalte „von“, eigene Spiele „dir“");
   await gehe(G + "/#/spielstaende", 3000);
   ok(await eval_(`document.querySelector("#spielstaende").textContent.includes("Zähler") && document.querySelector(".konto-leiste a.aktiv").textContent==="Meine Spielstände"`), "Meine Spielstände: Zähler");
   await gehe(G + "/#/sicherheit", 3000);

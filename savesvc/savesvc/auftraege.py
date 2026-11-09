@@ -23,6 +23,7 @@ ARTEN = {"unit-tests": "Unit-Tests", "e2e-tests": "Ende-zu-Ende-Tests"}
 ZIELE = {"live": "Live-Stand", "probe": "Probe"}
 ANZEIGE = {**ARTEN, "live-deploy": "Live-Deploy nach Freigabe"}
 LEBENSZEICHEN_MAX = timedelta(minutes=10)
+MAC_MAX = timedelta(seconds=90)          # der Mac meldet sich alle 20 s (scripts/auftraege-mac.py, 1.4.1)
 ZONE = ZoneInfo("Europe/Berlin")
 
 
@@ -33,6 +34,15 @@ def dienst_zustand(db) -> dict:
         return {"eingerichtet": False, "aktiv": False, "zuletzt": None}
     alt = datetime.now(timezone.utc) - datetime.fromisoformat(z["zeit"])
     return {"eingerichtet": True, "aktiv": alt < LEBENSZEICHEN_MAX, "zuletzt": z["zeit"], "version": z["wert"]}
+
+
+def mac_zustand(db) -> dict:
+    """Ist der Mac bereit (Docker Desktop läuft, scripts/auftraege-mac.py eingerichtet)? Dann laufen die Tests dort."""
+    z = db.dienst("mac")
+    if not z:
+        return {"eingerichtet": False, "aktiv": False, "zuletzt": None, "text": None}
+    alt = datetime.now(timezone.utc) - datetime.fromisoformat(z["zeit"])
+    return {"eingerichtet": True, "aktiv": alt < MAC_MAX, "zuletzt": z["zeit"], "text": z["wert"]}
 
 
 def planen(db, jetzt: datetime | None = None) -> list[int]:
@@ -65,7 +75,7 @@ def registrieren(app: FastAPI, e, db, admin) -> None:
 
     @app.get("/api/admin/auftraege")
     def uebersicht(_: str = Depends(admin)):
-        return {"dienst": dienst_zustand(db), "arten": ARTEN, "ziele": ZIELE, "anzeige": ANZEIGE,
+        return {"dienst": dienst_zustand(db), "mac": mac_zustand(db), "probe": e.probe, "arten": ARTEN, "ziele": ZIELE, "anzeige": ANZEIGE,
                 "zeitplan": db.zeitplan(), "laeufe": db.auftraege(30)}
 
     @app.post("/api/admin/auftraege", status_code=201)

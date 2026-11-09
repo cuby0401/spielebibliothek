@@ -192,6 +192,7 @@ def test_ansicht_als_spieler(client, upload):
     h = {**client.als(), "X-Ansicht": "spieler"}
     me = client.get("/api/me", headers=h).json()
     assert isinstance(me.pop("sitzungBis"), int) and me.pop("probe") is False
+    me.pop("anzeigename"); me.pop("namen")
     assert me == {"player": "seb", "uploader": False, "admin": False, "ansicht": "spieler", "echterAdmin": True, "tester": False}
     assert "paul/snake" not in {s["id"] for s in client.get("/api/games", headers=h).json()}
     r = client.get("/api/admin/uebersicht", headers=h)

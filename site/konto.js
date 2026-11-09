@@ -225,19 +225,19 @@ function antraegeProSpiel(c, antraege) {
 	const proSpiel = new Map();
 	for (const a of antraege) { if (!proSpiel.has(a.spiel)) proSpiel.set(a.spiel, []); proSpiel.get(a.spiel).push(a); }
 	const karte = (a) => {
-		const antwort = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Antwort an " + a.player });
+		const antwort = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Antwort an " + anzeige(a.player) });
 		antwort.value = a.antwort || "";
 		const setzen = async (status) => {
 			try {
 				await Bridge.json("PATCH", "/api/entwickler/antraege/" + a.id, { status, antwort: antwort.value || null });
-				meldung(`Anfrage von ${a.player}: ${status}.`);
+				meldung(`Anfrage von ${anzeige(a.player)}: ${status}.`);
 				c.replaceChildren(); SEITEN_REG["meine-spiele"](c);
 			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message, "fehler"); }
 		};
 		const k = (text, fn, art = "leise") => h("button", { type: "button", class: "knopf klein " + art, text, onclick: fn });
 		return h("div", { class: "karte" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
-				h("span", { class: "leise", text: ` · von ${a.player} · ${datumZeit(a.erstellt)}` }), " ", oeffnen(a)),
+				h("span", { class: "leise", text: ` · von ${anzeige(a.player)} · ${datumZeit(a.erstellt)}` }), " ", oeffnen(a)),
 			h("div", { class: "antrag-text", text: a.text }), antwort,
 			h("div", { class: "zeile" }, k("Erledigt", () => setzen("erledigt"), ""), k("Ablehnen", () => setzen("abgelehnt"), "gefahr"),
 				a.status !== "offen" ? k("Wieder öffnen", () => setzen("offen")) : null));
@@ -269,7 +269,7 @@ SEITEN_REG["antraege"] = async (c) => {
 			for (const bild of auswahl.bilder()) await Bridge.json("POST", `/api/antraege/${r.id}/bilder`, { bild }).catch((f) => { if (f instanceof Bridge.SitzungAbgelaufen) throw f; fehlt++; });
 			if (fehlt) alert(`${fehlt} Bild(er) konnten nicht angefügt werden. Du kannst sie in der Anfrage (Öffnen) noch einmal anfügen.`);
 			meldung(r.an && r.an !== "admin"
-				? `Anfrage verschickt – er geht an ${r.an === ich.player ? "dich als Entwickler (unter „Meine Spiele“)" : r.an + ", den Entwickler des Spiels"}. Antwort und Status erscheinen hier.`
+				? `Anfrage verschickt – er geht an ${r.an === ich.player ? "dich als Entwickler (unter „Meine Spiele“)" : anzeige(r.an) + ", den Entwickler des Spiels"}. Antwort und Status erscheinen hier.`
 				: "Anfrage verschickt – Seb bekommt ihn. Antwort und Status erscheinen hier.");
 			c.replaceChildren(); SEITEN_REG["antraege"](c);
 		} catch (f) { senden.disabled = false; if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message, "fehler"); }
@@ -287,7 +287,7 @@ SEITEN_REG["antraege"] = async (c) => {
 		formular.before(h("div", { class: "karte antraege-an-mich" },
 			h("h2", { text: `An dich – Anfragen zu deinen Spielen (${offen.length} offen)` }),
 			offen.length ? h("ul", { class: "antrag-liste" }, offen.map((a) => h("li", {},
-				h("a", { href: "#/antrag/" + a.id }, h("strong", { text: a.title || a.spiel }), ` · ${a.artText} von ${a.player} · ${datumZeit(a.erstellt)}${bildText(a.bilder)}`),
+				h("a", { href: "#/antrag/" + a.id }, h("strong", { text: a.title || a.spiel }), ` · ${a.artText} von ${anzeige(a.player)} · ${datumZeit(a.erstellt)}${bildText(a.bilder)}`),
 				h("div", { class: "leise", text: a.text.length > 140 ? a.text.slice(0, 140) + " …" : a.text }))))
 				: h("p", { class: "leise", text: "Alles erledigt. 🎉" }),
 			h("p", {}, h("a", { href: "#/meine-spiele", text: `Alle ${fremde.length} Anfragen pro Spiel → Meine Spiele` }))));
@@ -299,7 +299,7 @@ SEITEN_REG["antraege"] = async (c) => {
 			h("strong", { text: arten[a.art] || a.art }), a.spiel ? h("span", { class: "leise", text: " · " + titelVon(a.spiel) }) : null,
 			h("span", { class: "leise", text: " · " + datumZeit(a.erstellt) }), " ", oeffnen(a)),
 		h("div", { class: "antrag-text", text: a.text }),
-		h("div", { class: "leise", text: a.zustaendig && a.zustaendig !== "admin" ? "geht an " + a.zustaendig + " (Entwickler)" : "geht an Seb" }),
+		h("div", { class: "leise", text: a.zustaendig && a.zustaendig !== "admin" ? "geht an " + anzeige(a.zustaendig) + " (Entwickler)" : "geht an Seb" }),
 		a.antwort ? h("div", { class: "antwort" }, h("strong", { text: `Antwort von ${a.beantwortet_von || "Seb"}: ` }), a.antwort) : null)));
 };
 
@@ -308,19 +308,19 @@ SEITEN_REG["antrag"] = async (c) => {
 	const id = antragNr;
 	const a = await Bridge.json("GET", "/api/antraege/" + id);
 	const neu = () => zeigeSeite("antrag");   // ganz neu aufbauen – mit Zurück-Pfeil
-	const an = a.zustaendig === "admin" ? "Seb (Bibliothek)" : a.zustaendig === ich.player ? "dich (Entwickler)" : a.zustaendig + " (Entwickler)";
+	const an = a.zustaendig === "admin" ? "Seb (Bibliothek)" : a.zustaendig === ich.player ? "dich (Entwickler)" : anzeige(a.zustaendig) + " (Entwickler)";
 	c.append(h("h1", { text: `Anfrage #${a.id}` }),
 		h("div", { class: "karte antrag-ticket" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
 				a.spiel ? h("span", {}, " · ", h("a", { href: "#/spiel/" + a.spiel, text: a.title || a.spiel })) : null),
-			h("div", { class: "leise", text: `von ${a.eigener ? "dir" : a.player} · ${datumZeit(a.erstellt)} · geht an ${an}` +
+			h("div", { class: "leise", text: `von ${a.eigener ? "dir" : anzeige(a.player)} · ${datumZeit(a.erstellt)} · geht an ${an}` +
 				(a.geaendert !== a.erstellt ? ` · zuletzt geändert ${datumZeit(a.geaendert)}` : "") }),
 			h("div", { class: "antrag-text", text: a.text })));
 	// Bilder: Klick öffnet groß in neuem Tab
 	const galerie = h("div", { class: "antrag-bilder" }, a.bilder.map((b) => h("figure", {},
 		h("a", { href: `/api/antraege/${a.id}/bilder/${b.id}`, target: "_blank", rel: "noopener" },
-			h("img", { src: `/api/antraege/${a.id}/bilder/${b.id}`, alt: "Bild von " + b.von, loading: "lazy" })),
-		h("figcaption", { class: "leise", text: `${b.von === ich.player ? "von dir" : "von " + b.von} · ${groesse(b.bytes)}` },
+			h("img", { src: `/api/antraege/${a.id}/bilder/${b.id}`, alt: "Bild von " + anzeige(b.von), loading: "lazy" })),
+		h("figcaption", { class: "leise", text: `${b.von === ich.player ? "von dir" : "von " + anzeige(b.von)} · ${groesse(b.bytes)}` },
 			b.von === ich.player || ich.admin ? h("button", { type: "button", class: "knopf klein leise", text: "Entfernen", onclick: async () => {
 				if (!confirm("Bild entfernen?")) return;
 				await Bridge.json("DELETE", `/api/antraege/${a.id}/bilder/${b.id}`); neu();
@@ -340,12 +340,12 @@ SEITEN_REG["antrag"] = async (c) => {
 	if (a.antwort) c.append(h("div", { class: "antwort antrag-text" }, h("strong", { text: `${a.beantwortet_von || "Seb"}: ` }), a.antwort));
 	else if (!a.darfAntworten) c.append(h("p", { class: "leise", text: "Noch keine Antwort." }));
 	if (a.darfAntworten) {
-		const antwort = h("textarea", { rows: "4", maxlength: "4000", placeholder: "Antwort an " + a.player });
+		const antwort = h("textarea", { rows: "4", maxlength: "4000", placeholder: "Antwort an " + anzeige(a.player) });
 		antwort.value = a.antwort || "";
 		const setzen = async (status) => {
 			try {
 				await Bridge.json("PATCH", "/api/antraege/" + a.id, { status, antwort: antwort.value || null });
-				meldung(`Anfrage #${a.id}: ${status}.` + (a.player !== ich.player && status !== "offen" ? ` ${a.player} bekommt eine Nachricht.` : ""));
+				meldung(`Anfrage #${a.id}: ${status}.` + (a.player !== ich.player && status !== "offen" ? ` ${anzeige(a.player)} bekommt eine Nachricht.` : ""));
 				neu();
 			} catch (f) { if (!(f instanceof Bridge.SitzungAbgelaufen)) meldung(f.message, "fehler"); }
 		};
@@ -366,11 +366,13 @@ SEITEN_REG["profil"] = async (c) => {
 			avatarFuellen(h("span", { class: "avatar gross", "aria-hidden": "true" }), d.name, d.anzeigename),
 			h("div", { class: "profil-name" },
 				h("strong", { text: d.anzeigename || d.name }),
-				h("div", { class: "leise", text: "@" + d.name + (d.dabeiSeit ? " · dabei seit " + new Date(d.dabeiSeit).toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "") }),
+				h("div", { class: "leise", text: "@" + d.name + (d.dabeiSeit ? " · dabei seit " + new Date(d.dabeiSeit).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "") }),
 				rollen.length ? h("div", { class: "rollen" }, ...rollen.map((r) => h("span", { class: "rolle " + r, text: ROLLEN_NAMEN[r] || r }))) : null),
 			h("div", { class: "profil-zahlen" },
 				h("div", {}, h("b", { text: dauer(d.sekunden) }), "Spielzeit"),
-				h("div", {}, h("b", { text: String(d.spiele.length) }), "Spiele"),
+				// 1.4.1: „gespielt“ statt „Spiele“ – Admins gehören nicht alle Spiele, eigene Spiele zählen extra
+				h("div", { title: "Spiele, die du schon gespielt hast – egal von wem" }, h("b", { text: String(d.spiele.length) }), "gespielt"),
+				d.eigene ? h("div", { title: "Selbst hochgeladene Spiele" }, h("b", { text: String(d.eigene) }), "eigene Spiele") : null,
 				h("div", {}, h("b", { text: String(d.erfolge) }), "Erfolge"))));
 	// Nur im eigenen Profil: Meine Angaben (privat)
 	if (d.ich) {
@@ -380,12 +382,13 @@ SEITEN_REG["profil"] = async (c) => {
 		c.append(angaben);
 		await angabenAbschnitt(gInhalt);
 	}
-	c.append(h("h2", { text: d.ich ? "Meine Spiele mit Plätzen und Erfolgen" : "Spiele" }));
+	c.append(h("h2", { text: d.ich ? "Gespielte Spiele mit Plätzen und Erfolgen" : "Gespielte Spiele" }));
 	if (!d.spiele.length) c.append(h("p", { class: "leise", text: "Noch nichts gespielt." }));
 	else c.append(h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-		h("thead", {}, h("tr", {}, ...["Spiel", "Spielzeit", "Platz (aktuelle Season)", "Erfolge"].map((t) => h("th", { text: t })))),
+		h("thead", {}, h("tr", {}, ...["Spiel", "von", "Spielzeit", "Platz (aktuelle Season)", "Erfolge"].map((t) => h("th", { text: t })))),
 		h("tbody", {}, d.spiele.map((s) => h("tr", {},
 			h("td", {}, h("a", { href: "#/spiel/" + s.id, text: s.title })),
+			h("td", { text: s.author === d.name ? (d.ich ? "dir" : anzeige(s.author)) : anzeige(s.author) }),
 			h("td", { text: dauer(s.sekunden) }),
 			h("td", { text: s.platz ? s.platz + "." : "–" }),
 			h("td", {}, s.erfolgeGesamt ? `${s.erfolge.length}/${s.erfolgeGesamt}` : "–",
@@ -454,7 +457,7 @@ function anmeldeTabelle(liste, mitSpieler, trennen) {
 	return h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
 		h("thead", {}, h("tr", {}, ...[...(mitSpieler ? ["Spieler"] : []), "Gerät", "Ort", "IP", "Angemeldet", "Zuletzt aktiv", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((a) => h("tr", {},
-			mitSpieler ? h("td", { text: a.player }) : null,
+			mitSpieler ? h("td", { text: anzeige(a.player) }) : null,
 			h("td", {}, a.geraet, a.aktuell ? h("span", { class: "status erledigt", text: " dieses Gerät " }) : null),
 			h("td", { text: a.ort || "–" }),
 			h("td", { text: a.ip || "–" }),
