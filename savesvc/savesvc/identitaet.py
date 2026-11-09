@@ -322,9 +322,19 @@ UUID_IN_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{
 
 
 class Register:
+    GUELTIG = 2.0          # Sekunden – Änderungen im CRM verwerfen den Zwischenspeicher sofort (invalidieren)
+
     def __init__(self, pfad: Path):
         self.pfad = pfad
         self._aktiv = False
+        self._karten: tuple[float, dict] | None = None
+
+    def invalidieren(self) -> None:
+        self._karten = None
+
+    def _frisch(self) -> dict:
+        self._karten = None
+        return self.karten()
 
     def aktiv(self) -> bool:
         if not self._aktiv:      # einmal umgestellt, bleibt es (der Rückweg läuft nur bei gestopptem Dienst)
@@ -332,7 +342,16 @@ class Register:
         return self._aktiv
 
     def karten(self) -> dict:
-        """Frisch aus der Datenbank – wenige Dutzend Zeilen, kein Zwischenspeicher, der veralten könnte."""
+        """Zuordnungen aus der Datenbank – höchstens GUELTIG Sekunden zwischengespeichert (die Spieleliste fragt je Spiel)."""
+        import time
+        jetzt_ = time.monotonic()
+        if self._karten and jetzt_ - self._karten[0] < self.GUELTIG:
+            return self._karten[1]
+        k = self._karten_lesen()
+        self._karten = (jetzt_, k)
+        return k
+
+    def _karten_lesen(self) -> dict:
         v = _verbinden(self.pfad)
         try:
             zu_handle, zu_ordner, zu_id, zu_nr = {}, {}, {}, {}
@@ -361,6 +380,8 @@ class Register:
         if m:
             return k["nr"].get(int(m.group(1)))
         basis, rest = _teile(name)
+        if basis not in k["handle"] and str(basis).lower() not in k["id"] and self._karten:
+            k = self._frisch()                          # gerade angelegt/geändert? Nicht auf den Zwischenspeicher verlassen
         if basis in k["handle"]:
             return name
         pid = k["id"].get(str(basis).lower())
@@ -370,7 +391,7 @@ class Register:
         if not pid or not self.aktiv():
             return pid
         basis, rest = _teile(pid)
-        h = self.karten()["handle"].get(basis)
+        h = self.karten()["handle"].get(basis) or self._frisch()["handle"].get(basis)
         return h + rest if h else pid
 
     def ordner(self, pid: str) -> str:
@@ -378,7 +399,7 @@ class Register:
         if not pid or not self.aktiv():
             return pid
         basis, rest = _teile(pid)
-        o = self.karten()["ordner"].get(basis)
+        o = self.karten()["ordner"].get(basis) or self._frisch()["ordner"].get(basis)
         return o + rest if o else pid
 
     def id_von_ordner(self, ordner: str) -> str:
@@ -395,11 +416,18 @@ class Register:
         if not self.aktiv():
             return wert
         k = (karten or self.karten())["handle"]
-        if not k:
-            return wert
+        nachgeladen = []
+
+        def ersetzen(m):
+            nonlocal k
+            u = m.group(0)
+            if u not in k and not nachgeladen:          # neue Person? einmal frisch lesen statt eine UUID zu zeigen
+                nachgeladen.append(True)
+                k = self._frisch()["handle"]
+            return k.get(u, u)
 
         def text(s: str) -> str:
-            return UUID_IN_TEXT.sub(lambda m: k.get(m.group(0), m.group(0)), s) if "-" in s else s
+            return UUID_IN_TEXT.sub(ersetzen, s) if "-" in s else s
 
         def gehen(w):
             if isinstance(w, str):
@@ -417,6 +445,12 @@ REGISTER: Register | None = None      # setzt app.erstellen; im Upload-Dienst bl
 
 def id_von(name):
     return REGISTER.id_von(name) if REGISTER else name
+
+
+def invalidieren() -> None:
+    """Nach jeder Änderung an Personen (Handle, neue Person, Löschen …) – crm.Crm._protokoll ruft das auf."""
+    if REGISTER:
+        REGISTER.invalidieren()
 
 
 def handle(pid):

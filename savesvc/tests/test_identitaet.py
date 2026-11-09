@@ -277,3 +277,18 @@ def test_dev_user_im_teststand_wird_uuid(umgebung):
     reg = identitaet.Register(umgebung.db)
     v = sqlite3.connect(umgebung.db)
     assert v.execute("SELECT player FROM saves").fetchone()[0] == reg.id_von("seb")
+
+
+def test_zwischenspeicher_liest_neue_personen_sofort(umgebung):
+    """Der kurze Zwischenspeicher des Registers darf nie dazu führen, dass eine UUID nach außen geht oder eine neue
+    Person unbekannt ist – fehlt etwas, wird sofort frisch gelesen."""
+    from savesvc import crm as crm_modul
+    from savesvc.app import erstellen
+    erstellen(_einstellungen(umgebung, identitaet_uuid=True))
+    reg = identitaet.REGISTER
+    reg.karten()                                        # Zwischenspeicher gefüllt
+    c = crm_modul.Crm(Datenbank(umgebung.db))
+    p = c.anlegen("seb", "neu_da", "neu@example.com", ["spieler"])
+    reg._karten = (reg._karten[0] if reg._karten else 0, {"handle": {}, "ordner": {}, "id": {}, "nr": {}})   # absichtlich veraltet
+    assert reg.nach_aussen({"x": p["name"]}) == {"x": "neu_da"}
+    assert reg.id_von("neu_da") == p["name"] and reg.ordner(p["name"]) == "neu_da"

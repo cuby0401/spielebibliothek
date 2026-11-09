@@ -246,6 +246,7 @@ class Crm:
     # ---------- schreiben (immer mit Protokoll) ----------
 
     def _protokoll(self, v, von: str, aktion: str, ziel: str | None, vorher=None, nachher=None) -> None:
+        identitaet.invalidieren()        # Zuordnungen UUID ↔ Handle sofort neu lesen (1.5.0)
         v.execute("INSERT INTO crm_protokoll (zeit, von, aktion, ziel, vorher, nachher) VALUES (?,?,?,?,?,?)",
                   (jetzt(), von, aktion, ziel,
                    json.dumps(vorher, ensure_ascii=False, sort_keys=True) if vorher is not None else None,
