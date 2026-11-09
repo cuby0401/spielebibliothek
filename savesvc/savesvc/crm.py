@@ -22,12 +22,14 @@ import json
 import logging
 import shutil
 import threading
+import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import yaml
 
+from . import identitaet
 from .auth import BENUTZER_MUSTER, Benutzerliste
 
 log = logging.getLogger("savesvc.crm")
@@ -118,9 +120,18 @@ class Crm:
 
     def __init__(self, db, admins: frozenset = frozenset()):
         self.db = db
-        self.admins = admins
+        self._admin_namen = admins
         with db.verbindung() as v:
             v.executescript(SCHEMA)
+
+    @property
+    def admins(self) -> set[str]:
+        """Notfall-Admins (ADMINS nennt Benutzernamen) – ab 1.5.0 als UUID der Person."""
+        return {identitaet.id_von(n) or n for n in self._admin_namen}
+
+    @admins.setter
+    def admins(self, namen) -> None:
+        self._admin_namen = frozenset(namen)
 
     # ---------- lesen ----------
 
@@ -231,12 +242,24 @@ class Crm:
             try:
                 if v.execute("SELECT 1 FROM personen WHERE name=?", (name,)).fetchone():
                     raise Konflikt("Benutzername ist vergeben")
+                # 1.5.0 (E81): Neue Personen bekommen eine UUID, der gewählte Name wird Handle und Ordnername. Vergeben ist
+                # ein Name auch, wenn er früher einmal Handle oder Ordner war (reserviert, E82).
+                handle = name
+                if identitaet.umgestellt(self.db.pfad):     # die eigene Datenbank fragen, nicht ein globales Register
+                    if v.execute("SELECT 1 FROM handles WHERE handle=? COLLATE NOCASE", (handle,)).fetchone() or \
+                            v.execute("SELECT 1 FROM personen WHERE alt_name=? COLLATE NOCASE OR handle=? COLLATE NOCASE", (handle, handle)).fetchone():
+                        raise Konflikt("Benutzername ist vergeben")
+                    name = str(uuid.uuid4())
                 z = v.execute("SELECT name FROM person_emails WHERE email=?", (email,)).fetchone()
                 if z:
                     raise Konflikt(f"E-Mail ist schon {z['name']!r} zugeordnet")
                 v.execute("""INSERT INTO personen (name, anzeigename, vorname, nachname, geburtstag, status, eingeladen_von, angelegt, geaendert)
                              VALUES (?,?,?,?,?,?,?,?,?)""",
                           (name, felder["anzeigename"], felder["vorname"], felder["nachname"], geb, status, von, jetzt(), jetzt()))
+                if name != handle:
+                    nr = (v.execute("SELECT MAX(nr) FROM personen").fetchone()[0] or 0) + 1
+                    v.execute("UPDATE personen SET id=?, alt_name=?, handle=?, handle_seit=?, nr=? WHERE name=?", (name, handle, handle, jetzt(), nr, name))
+                    v.execute("INSERT INTO handles (handle, person, seit) VALUES (?,?,?)", (handle, name, jetzt()))
                 v.execute("INSERT INTO person_emails (email, name, angelegt) VALUES (?,?,?)", (email, name, jetzt()))
                 for r in rollen:
                     v.execute("INSERT INTO person_rollen (name, rolle) VALUES (?,?)", (name, r))
@@ -496,8 +519,9 @@ class CrmBenutzerliste(Benutzerliste):
             if email in bekannt or not BENUTZER_MUSTER.match(name):
                 continue
             try:
-                if name in namen:
-                    self.crm.email_dazu("users.yaml", name, email)
+                pid = identitaet.id_von(name)            # 1.5.0: Name in users.yaml = Ordner/Handle → UUID
+                if pid in namen:
+                    self.crm.email_dazu("users.yaml", pid, email)
                 else:
                     rollen = ["spieler"] + (["entwickler"] if self.spiele_dir and (self.spiele_dir / name).is_dir() else [])
                     self.crm.anlegen("users.yaml", name, email, rollen, status="aktiv", aktion="uebernommen")
@@ -523,7 +547,8 @@ class CrmBenutzerliste(Benutzerliste):
     def exportieren(self) -> None:
         """users.yaml = alle, die gerade hinein dürfen (für den Upload-Dienst und als Notfall-Rückweg)."""
         with self._crm_sperre:
-            soll = self.crm.zuordnung()
+            # 1.5.0: Der Upload-Dienst (und der Rückweg auf 1.4.1) kennt Personen beim Ordnernamen, nicht bei der UUID
+            soll = {mail: identitaet.ordner(pid) for mail, pid in self.crm.zuordnung().items()}
             if Benutzerliste(self.pfad).alle() == soll and self.pfad.exists():
                 return                                   # unverändert – Datei (und Kommentare) nicht anfassen
             Benutzerliste.speichern(self, soll)
@@ -615,7 +640,7 @@ def uebernahme_zuschreiben(crm: Crm, admins) -> int:
     if not admin:
         return 0
     with crm.db.verbindung() as v:
-        n = v.execute("UPDATE personen SET eingeladen_von=? WHERE eingeladen_von='übernahme'", (admin,)).rowcount
+        n = v.execute("UPDATE personen SET eingeladen_von=? WHERE eingeladen_von='übernahme'", (identitaet.id_von(admin) or admin,)).rowcount
     if n:
         log.info("CRM: %d übernommene Personen %s zugeschrieben", n, admin)
     return n

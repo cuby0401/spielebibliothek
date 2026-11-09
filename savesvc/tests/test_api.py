@@ -123,13 +123,13 @@ def test_key_limit_413(client):
     assert client.put(f"{SEB}/k0", json={"data": "neu"}, headers=h).status_code == 200
 
 
-def test_verlauf_auf_5_gekuerzt(client, umgebung):
+def test_verlauf_auf_5_gekuerzt(client, umgebung, pid):
     h = client.als()
     for i in range(8):
         client.put(f"{SEB}/stand", json={"data": i}, headers=h)
     client.delete(f"{SEB}/stand", headers=h)
     v = sqlite3.connect(umgebung.db)
-    zeilen = v.execute("SELECT data FROM save_history WHERE player='seb' AND key='stand' ORDER BY id").fetchall()
+    zeilen = v.execute("SELECT data FROM save_history WHERE player=? AND key='stand' ORDER BY id", (pid("seb"),)).fetchall()
     assert [z[0] for z in zeilen] == ["3", "4", "5", "6", "7"]
 
 

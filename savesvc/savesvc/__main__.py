@@ -114,6 +114,9 @@ def main(argv=None) -> int:
         return cloudflare_lesetoken(sys.stdin.read())
 
     db = Datenbank(laden().db_path)
+    if a.befehl in ("history", "restore") and getattr(a, "player", None):
+        from . import identitaet           # 1.5.0: Handle (oder früheres) → UUID der Person
+        a.player = identitaet.Register(laden().db_path).id_von(a.player) or a.player
     if a.befehl == "history":
         zeilen = db.verlauf(a.player, a.game, a.key)
         if not zeilen:
@@ -201,8 +204,10 @@ def auftragsdienst(a, eingabe) -> int:
         if status == "fehler":
             from .waechter import ha_senden
             text = f"{auftraege.ANZEIGE.get(art or (db.auftrag(aid) or {}).get('art'), 'Aufgabe')} fehlgeschlagen: {str(d.get('zusammenfassung', ''))[:150]}"
+            from . import identitaet
+            reg = identitaet.Register(e.db_path)     # ADMINS nennt Benutzernamen → ab 1.5.0 die UUID
             for admin_name in sorted(n for n in e.admins if BENUTZER_MUSTER.match(n)):
-                db.melden(admin_name, text, "/admin/#aufgaben", wichtig=True)
+                db.melden(reg.id_von(admin_name) or admin_name, text, "/admin/#aufgaben", wichtig=True)
             ha_senden(e, "problem", "Spielebibliothek: " + text)
         print(json.dumps({"id": aid}))
     return 0

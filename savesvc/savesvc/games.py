@@ -5,6 +5,8 @@ import logging
 import re
 from pathlib import Path
 
+from . import identitaet
+
 from .auth import BENUTZER_MUSTER
 
 log = logging.getLogger("savesvc.games")
@@ -169,7 +171,9 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         bild = None
     ergebnis = {
         "id": f"{benutzer}/{ordner_name}",
-        "author": benutzer,                       # immer aus dem Ordner, nie aus game.json
+        # immer aus dem Ordner, nie aus game.json. Ab 1.5.0 die UUID des Besitzers (nach außen: sein aktuelles Handle);
+        # der Ordner heißt weiter nach dem ersten Benutzernamen (E82). Im Upload-Dienst bleibt es der Ordnername.
+        "author": identitaet.id_von_ordner(benutzer),
         "title": _text(daten.get("title"), 80) or ordner_name,
         "description": _text(daten.get("description"), 300) or "",
         "thumbnail": bild,

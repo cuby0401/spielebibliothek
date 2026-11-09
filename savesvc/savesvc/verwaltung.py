@@ -19,7 +19,7 @@ from typing import Any
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 from fastapi.responses import Response
 
-from . import games, rollen, steckbrief, versionen
+from . import games, identitaet, rollen, steckbrief, versionen
 from .auth import BENUTZER_MUSTER, Benutzerliste
 
 log = logging.getLogger("savesvc.verwaltung")
@@ -55,6 +55,15 @@ def bild_aus_daten_url(wert) -> tuple[str, bytes]:
         raise steckbrief.UngueltigesBild("Bild zu groß (max. 2 MB)")
     return steckbrief.art_von(daten), daten
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _player_herein(w):
+    """Antworten des Upload-Dienstes: „player“ ist dort der Spieleordner → UUID der Person (1.5.0)."""
+    if isinstance(w, list):
+        return [_player_herein(x) for x in w]
+    if isinstance(w, dict):
+        return {k: (identitaet.id_von_ordner(v) if k == "player" and isinstance(v, str) else _player_herein(v)) for k, v in w.items()}
+    return w
 
 
 class UploadDienst:
@@ -94,7 +103,15 @@ def browser_von(ua: str) -> str:
 
 
 def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, aktuelle_season, upload: UploadDienst | None = None):
-    upload = upload or UploadDienst(e.upload_url, e.intern_token)
+    roher_upload = upload or UploadDienst(e.upload_url, e.intern_token)
+
+    def upload(methode: str, pfad: str, body: dict | None = None):
+        """Grenze zum Upload-Dienst (1.5.0): Er kennt Entwickler nur unter ihrem Spieleordner (ändert sich nie). Hinaus
+        UUID → Ordner, herein „player“ (Ordner) → UUID."""
+        pfad = identitaet.UUID_IN_TEXT.sub(lambda m: identitaet.ordner(m.group(0)), pfad)
+        if isinstance(body, dict):
+            body = {k: (identitaet.ordner(w) if isinstance(w, str) and identitaet.UUID_MUSTER.match(w) else w) for k, w in body.items()}
+        return _player_herein(roher_upload(methode, pfad, body))
     from . import auftraege, cloudflare
     cf_pruefung = cloudflare.Pruefung(e.cloudflare_schluessel, e.cloudflare_konto,
                                       {"kollegen": e.richtlinie_kollegen, "entwickler": e.richtlinie_entwickler})
@@ -108,7 +125,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         waechter.starten(e, db, upload, waechter_zustand)
 
     def ist_entwickler(player: str) -> bool:
-        return (e.spiele_dir / player).is_dir()
+        return (e.spiele_dir / identitaet.ordner(player)).is_dir()
 
     def admin(request: Request, player: str = Depends(spieler)) -> str:
         r = rollen.rolle(e, request, player)
@@ -203,7 +220,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     def eigene_spiele(player: str) -> list[str]:
         """Ordnernamen der Spiele eines Entwicklers – live oder nur als Entwurf."""
-        basis = e.spiele_dir / player
+        basis = e.spiele_dir / identitaet.ordner(player)
         namen = set()
         if basis.is_dir():
             for p in basis.iterdir():
@@ -219,15 +236,15 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         daumen = db.daumen_zahlen()
         einst = db.spiel_einstellungen()
         fehler = db.fehler_zahlen()
-        basis = e.spiele_dir / player
+        basis = e.spiele_dir / identitaet.ordner(player)
         ergebnis = []
         for name in eigene_spiele(player):
-            sid = f"{player}/{name}"
+            sid = f"{identitaet.ordner(player)}/{name}"
             if einst.get(sid, {}).get("testspiel"):
                 continue   # Testspiele (E38) sind keine Spiele – Verwaltung nur im Admin-Panel
             live = (basis / name).is_dir()
             try:
-                s = games.beschreibung(e.spiele_dir, player, name if live else name + versionen.ENTWURF)
+                s = games.beschreibung(e.spiele_dir, identitaet.ordner(player), name if live else name + versionen.ENTWURF)
                 entw = versionen.entwurf_info(basis, name)
             except OSError as fehler:   # unlesbarer Ordner: überspringen statt alles abbrechen
                 log.warning("Spiel %s nicht lesbar: %s", sid, fehler)
@@ -249,7 +266,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                        body: dict[str, Any] = Body(...)):
         """Eigenes Spiel vorübergehend offline nehmen, z. B. bei vielen Fehlern (E40). Wirkt wie „ausblenden“,
         aber der Entwickler entscheidet selbst; Admins dürfen es für jedes Spiel."""
-        if user != player and not rollen.rolle(e, request, player)["admin"]:
+        if user != identitaet.ordner(player) and not rollen.rolle(e, request, player)["admin"]:
             raise HTTPException(403, "nur für eigene Spiele")
         sid, _o = spiel_id(user, game)
         an = body.get("offline")
@@ -264,7 +281,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.post("/api/entwickler/entwurf/{user}/{game}")
     def entwurf_starten(request: Request, player: str = Depends(spieler), user: str = P(...), game: str = P(...)):
         """Entwurf zum Testen öffnen: Beschreibung liefern und beim ersten Mal den eigenen Spielstand hineinkopieren."""
-        if user != player and not rollen.rolle(e, request, player)["echterAdmin"]:
+        if user != identitaet.ordner(player) and not rollen.rolle(e, request, player)["echterAdmin"]:
             raise HTTPException(404, "Entwurf nicht gefunden")
         ordner = e.spiele_dir / user / (game + versionen.ENTWURF)
         if not (games.gueltige_id(user, game) and ordner.is_dir()):
@@ -319,8 +336,8 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         neu = db.fehler_melden(sid, meldung, text("quelle", 200), zahl("zeile"), zahl("spalte"),
                                text("stack", 1500) or None, browser_von(request.headers.get("user-agent", "")))
         # Glocke des Entwicklers: neue Fehlerart in einem veröffentlichten Spiel – höchstens eine Meldung je Spiel und Stunde
-        if neu and not game.endswith(versionen.ENTWURF) and not db.wichtig_kuerzlich(user, f"#/meine-spiele?{sid}"):
-            db.melden(user, f"Neuer Fehler in „{titel_von(sid)}“: {meldung[:120]}" + (f" (Zeile {zahl('zeile')})" if zahl("zeile") else ""),
+        if neu and not game.endswith(versionen.ENTWURF) and not db.wichtig_kuerzlich(identitaet.id_von_ordner(user), f"#/meine-spiele?{sid}"):
+            db.melden(identitaet.id_von_ordner(user), f"Neuer Fehler in „{titel_von(sid)}“: {meldung[:120]}" + (f" (Zeile {zahl('zeile')})" if zahl("zeile") else ""),
                       f"#/meine-spiele?{sid}", wichtig=True)
 
     # ---------- Fehler der Bibliothek selbst (Zentrale 1.4.0) ----------
@@ -367,7 +384,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         else:
             ids = []
             for name in eigene_spiele(player):
-                ids += [f"{player}/{name}", f"{player}/{name}{versionen.ENTWURF}"]
+                ids += [f"{identitaet.ordner(player)}/{name}", f"{identitaet.ordner(player)}/{name}{versionen.ENTWURF}"]
             liste = db.fehler_liste(ids)
         return [{**f, "entwurf": f["game"].endswith(versionen.ENTWURF), "zentrale": f["game"] == ZENTRALE,
                  "title": "Bibliothek (Zentrale)" if f["game"] == ZENTRALE else titel_von(f["game"].removesuffix(versionen.ENTWURF))}
@@ -376,14 +393,14 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
     @app.delete("/api/entwickler/fehler/{fehler_id}", status_code=204)
     def fehler_erledigt(request: Request, player: str = Depends(entwickler), fehler_id: int = P(...)):
         f = db.fehler_eintrag(fehler_id)
-        eigen = f is not None and f["game"] != ZENTRALE and f["game"].split("/")[0] == player
+        eigen = f is not None and f["game"] != ZENTRALE and f["game"].split("/")[0] == identitaet.ordner(player)
         if not f or (not eigen and not rollen.rolle(e, request, player)["admin"]):
             raise HTTPException(404, "Fehlerbericht nicht gefunden")
         db.fehler_loeschen(fehler_id)
 
     @app.post("/api/entwickler/season/{user}/{game}")
     def neue_season(player: str = Depends(entwickler), user: str = P(...), game: str = P(...)):
-        if user != player and player not in rollen.admins(e):
+        if user != identitaet.ordner(player) and player not in rollen.admins(e):
             raise HTTPException(403, "nur für eigene Spiele")
         sid, _ = spiel_id(user, game)
         neu = aktuelle_season(sid) + 1
@@ -438,7 +455,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         if not (games.spielordner(e.spiele_dir, besitzer, ordner) or
                 games.spielordner(e.spiele_dir, besitzer, ordner + versionen.ENTWURF)):
             return None
-        return besitzer
+        return identitaet.id_von_ordner(besitzer)      # 1.5.0: Besitzer als UUID (Ordner heißt nach dem ersten Namen)
 
     def mit_infos(a: dict, bildzahlen: dict | None = None) -> dict:
         z = zustaendig(a)
@@ -584,7 +601,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     @app.post("/api/admin/anmeldungen/trennen", status_code=204)
     def admin_trennen(player: str = Depends(admin), body: dict[str, Any] = Body(...)):
-        wer = body.get("player")
+        wer = identitaet.id_von(body.get("player")) if isinstance(body.get("player"), str) else None   # Handle → UUID (1.5.0)
         if not isinstance(wer, str) or not any(a["sitzung"] == body.get("sitzung") for a in db.anmeldungen(wer, 100)):
             raise HTTPException(404, "Anmeldung nicht gefunden")
         trennen(wer, body.get("sitzung"), player)

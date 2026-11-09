@@ -94,7 +94,8 @@ up)
 	docker build -q -t spielebibliothek-savesvc:$N "$T/repo/savesvc" >/dev/null
 	mkdir -p "$TESTERGEBNISSE" 2>/dev/null || docker run --rm -v "$(dirname "$TESTERGEBNISSE")":/t caddy:2 mkdir -p "/t/$(basename "$TESTERGEBNISSE")"
 	docker run --rm -v "$TESTERGEBNISSE":/z caddy:2 chmod a+rwX /z
-	docker run -d --name $N-savesvc --network $N $ANMELDUNG -e WAECHTER=0 \
+	# IDENTITAET_UUID=1 (1.5.0, bis der Schalter wegfällt): Teststand bzw. Probe mit UUIDs im Hintergrund
+	docker run -d --name $N-savesvc --network $N $ANMELDUNG -e WAECHTER=0 -e IDENTITAET_UUID=${IDENTITAET_UUID:-0} \
 		-e TESTPLAN_DIR=/testplan -e TESTERGEBNISSE=/tests/ergebnisse.db -v "$T/repo/tests/manuell:/testplan:ro" -v "$TESTERGEBNISSE:/tests" \
 		-e ADMINS=seb -e TESTER=emil -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://$N-upload:8000 \
 		-e PROBE="$( [ "$ART" = probe ] && echo 1 || echo 0 )" -e ZENTRALE_COMMIT="${ZENTRALE_COMMIT:-}" -e ZENTRALE_VERSION="${ZENTRALE_VERSION:-}" \

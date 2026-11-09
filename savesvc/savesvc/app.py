@@ -4,15 +4,17 @@ Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Speicher-Dien
 {user}/{game} in der URL ist die Spiel-ID, der Spieler kommt immer aus dem JWT.
 """
 
+import json
 import re
 import logging
 import math
 import threading
 import time
 from typing import Any
+from urllib.parse import quote, unquote
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from . import games, notaus, rollen, steckbrief, versionen
 from .auth import Benutzerliste, Pruefer
@@ -107,11 +109,49 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     spieler.getrennt = db.getrennte_sitzungen()
     app = FastAPI(title="Spielebibliothek – Speicher-Dienst", docs_url=None, redoc_url=None, openapi_url=None)
 
+    # ---------- Identität (1.5.0, E81): innen UUID, außen Handle ----------
+    from . import identitaet
+    identitaet.REGISTER = identitaet.Register(e.db_path)
+    PERSON_IM_PFAD = re.compile(r"^(/api/(?:profil|admin/personen|admin/entwickler)/)([^/]+)(.*)$")
+
+    @app.middleware("http")
+    async def identitaet_schicht(request, weiter):
+        reg = identitaet.REGISTER
+        if not reg.aktiv():
+            return await weiter(request)
+        # Herein: Handle (auch ein früheres) in der Adresse → UUID. Unbekannt bleibt es – der Endpunkt meldet dann 404.
+        m = PERSON_IM_PFAD.match(request.scope["path"])
+        if m:
+            pid = reg.id_von(unquote(m.group(2)))
+            if pid:
+                neu = m.group(1) + quote(pid, safe="~") + m.group(3)
+                request.scope["path"], request.scope["raw_path"] = unquote(neu), neu.encode()
+        # Herein: ?player=<handle> (Admin-Panel → Spielstände) → UUID
+        if b"player=" in request.scope.get("query_string", b""):
+            from urllib.parse import parse_qsl, urlencode
+            q = [(k, (reg.id_von(v) or "\u2205unbekannt") if k == "player" and v else v)
+                 for k, v in parse_qsl(request.scope["query_string"].decode(), keep_blank_values=True)]
+            request.scope["query_string"] = urlencode(q).encode()
+        antwort = await weiter(request)
+        # Hinaus: jede Personen-UUID in JSON-Antworten der Bibliothek → aktuelles Handle (auch in Texten)
+        if not request.url.path.startswith("/api/") or "application/json" not in antwort.headers.get("content-type", ""):
+            return antwort
+        roh = b"".join([teil async for teil in antwort.body_iterator])
+        try:
+            daten = json.loads(roh) if roh else None
+        except ValueError:
+            daten = None
+        koepfe = {k: v for k, v in antwort.headers.items() if k.lower() != "content-length"}
+        if daten is None:
+            return Response(roh, status_code=antwort.status_code, headers=koepfe)
+        return Response(json.dumps(reg.nach_aussen(daten), ensure_ascii=False, separators=(",", ":")).encode(),
+                        status_code=antwort.status_code, headers=koepfe, media_type="application/json")
+
     def spiel(request: Request, user: str = P(...), game: str = P(...), player: str = Depends(spieler)):
         # Entwürfe (<ordner>~entwurf) nur für den Entwickler selbst und echte Admins
         if game.endswith(versionen.ENTWURF):
             basis = game[: -len(versionen.ENTWURF)]
-            darf = player == user or rollen.rolle(e, request, player)["echterAdmin"]
+            darf = identitaet.ordner(player) == user or rollen.rolle(e, request, player)["echterAdmin"]
             ordner = e.spiele_dir / user / game
             gueltig = games.gueltige_id(user, basis) and ordner.is_dir() and not ordner.is_symlink()
             if not (darf and gueltig):
@@ -310,7 +350,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
             raise HTTPException(409, "In der Ansicht als Spieler/Entwickler wird nicht bewertet")
         if sp[0].endswith(versionen.ENTWURF):
             raise HTTPException(409, "Entwürfe werden nicht bewertet")
-        if sp[0].split("/")[0] == player:
+        if sp[0].split("/")[0] == identitaet.ordner(player):
             raise HTTPException(409, "Eigene Spiele kann man nicht bewerten")
         an = body.get("an")
         if not isinstance(an, bool):

@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Request
 
-from . import crm as crm_modul, mail, rollen
+from . import crm as crm_modul, identitaet, mail, rollen
 
 log = logging.getLogger("savesvc.personen")
 
@@ -62,12 +62,12 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
             # Rollen nur aus dem CRM (1.4.0, Nachtest 08.11.). Früher zählte ein eigener Spieleordner zusätzlich als Entwickler – dann blieb
             # der Haken nach dem Entziehen gesetzt, weil der Ordner (mit den Spielen) bleibt. Wer beim Umstieg aufs CRM
             # einen Ordner hatte, hat die Rolle bei der Übernahme bekommen (crm.uebernehmen).
-            ordner = (e.spiele_dir / p["name"]).is_dir()
+            ordner = (e.spiele_dir / identitaet.ordner(p["name"])).is_dir()
             entw = "entwickler" in p["rollen"]
             ergebnis.append({
                 "name": p["name"], "anzeigename": p["anzeigename"], "vorname": p["vorname"], "nachname": p["nachname"],
                 "emails": p["emails"], "rollen": p["rollen"], "status": p["status"], "gesperrtBis": p["gesperrt_bis"],
-                "notfallAdmin": p["name"] in e.admins, "ordner": ordner,
+                "notfallAdmin": p["name"] in rollen.notfall_admins(e), "ordner": ordner,
                 "uploadKonto": None if konten is None else p["name"] in konten,
                 "zuletzt": aktiv.get(p["name"]), "nieAngemeldet": p["name"] not in aktiv and not p["erste_anmeldung"],
                 "einladungGesendet": p["einladung_gesendet"],
@@ -97,7 +97,7 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         if not p:
             raise HTTPException(404, "Person nicht gefunden")
         konten = upload_konten()
-        return {**p, "notfallAdmin": name in e.admins, "ordner": (e.spiele_dir / name).is_dir(), "uploadKonto": None if konten is None else name in konten,
+        return {**p, "notfallAdmin": name in rollen.notfall_admins(e), "ordner": (e.spiele_dir / identitaet.ordner(name)).is_dir(), "uploadKonto": None if konten is None else name in konten,
                 "notizen": crm.notizen(name), "zeitleiste": zeitleiste(name), "protokoll": crm.protokoll(name, 100),
                 "anmeldungen": db.anmeldungen(name, 50)}
 
@@ -198,7 +198,7 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
 
     @app.post("/api/admin/personen/{name}/loeschen")
     def loeschen(admin_name: str = Depends(admin), name: str = P(...), body: dict[str, Any] = Body(...)):
-        if body.get("bestaetigung") != name:
+        if body.get("bestaetigung") != identitaet.handle(name):     # getippt wird das Handle, nicht die UUID (1.5.0)
             raise HTTPException(422, "Zur Bestätigung den Benutzernamen eingeben")
         ausfuehren(crm.loeschen, admin_name, name)
         log.info("%s hat %s endgültig gelöscht (anonymisiert)", admin_name, name)
@@ -241,10 +241,10 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
                                      "Selbst prüfen und mit „trotzdem senden“ bestätigen.")
         adresse = str(request.base_url).rstrip("/")
         hallo = p["anzeigename"] or p["vorname"] or p["name"]
-        text = (f"Hallo {hallo},\n\n{admin_name} lädt dich zur Spielebibliothek ein.\n\n"
+        text = (f"Hallo {hallo},\n\n{identitaet.handle(admin_name)} lädt dich zur Spielebibliothek ein.\n\n"
                 f"So geht's:\n1. Öffne {adresse}\n2. Gib diese E-Mail-Adresse ein: {email}\n"
                 f"3. Du bekommst einen Code per Mail (Absender Cloudflare) – den eingeben, fertig.\n\n"
-                f"Dein Benutzername: {p['name']}\nHilfe findest du in der Bibliothek unter {adresse}/hilfe/\n\n"
+                f"Dein Benutzername: {identitaet.handle(p['name'])}\nHilfe findest du in der Bibliothek unter {adresse}/hilfe/\n\n"
                 f"Viel Spaß!\n")
         try:
             mail.senden(email, "Einladung zur Spielebibliothek", text)

@@ -14,7 +14,7 @@ def test_uebernahme_behaelt_alle_rechte(client, umgebung):
     """Nach dem Umzug: gleiche Personen, gleiche Rollen wie vorher (ADMINS → admin, Ordner → entwickler)."""
     db = Datenbank(umgebung.db)
     c = crm_modul.Crm(db, frozenset({"seb"}))
-    personen = {p["name"]: p for p in c.personen()}
+    personen = {p.get("handle") or p["name"]: p for p in c.personen()}
     assert set(personen) == {"seb", "paul"}
     assert personen["seb"]["rollen"] == ["admin", "entwickler", "spieler"]
     assert personen["paul"]["rollen"] == ["entwickler", "spieler"] and personen["paul"]["emails"] == ["paul@example.com"]
@@ -77,14 +77,14 @@ def test_rollen_und_upload_konto(client, upload):  # noqa: F811
     assert client.get("/api/meldungen", headers=client.als(PAUL)).json()["wichtigUngelesen"] == 1
 
 
-def test_sperre_mit_ablauf(client, umgebung):
+def test_sperre_mit_ablauf(client, umgebung, pid):
     bald = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
     assert client.post("/api/admin/personen/paul/sperren", json={"grund": "kurz", "bis": "2000-01-01T00:00:00"}, headers=client.als()).status_code == 422
     assert client.post("/api/admin/personen/paul/sperren", json={"grund": "Pause", "bis": bald}, headers=client.als()).status_code == 200
     assert "bis" in client.get("/api/me", headers=client.als(PAUL)).json()["detail"]
     db = Datenbank(umgebung.db)
     with db.verbindung() as v:
-        v.execute("UPDATE personen SET gesperrt_bis='2000-01-01T00:00:00+00:00' WHERE name='paul'")
+        v.execute("UPDATE personen SET gesperrt_bis='2000-01-01T00:00:00+00:00' WHERE name=?", (pid("paul"),))
     assert client.get("/api/me", headers=client.als(PAUL)).status_code == 200                 # abgelaufen → frei
     p = client.get("/api/admin/personen/paul", headers=client.als()).json()
     assert p["status"] == "aktiv" and any(z["text"] == "Sperre abgelaufen" for z in p["zeitleiste"])
@@ -214,7 +214,7 @@ def test_nie_angemeldet_bleibt_eingeladen(client, upload):  # noqa: F811
     assert client.post("/api/admin/personen/neu/wiederherstellen", headers=h).json()["person"]["status"] == "eingeladen"
 
 
-def test_uebernahme_seb_zugeschrieben_und_angelegt_korrigierbar(client, umgebung):
+def test_uebernahme_seb_zugeschrieben_und_angelegt_korrigierbar(client, umgebung, pid):
     """1.4.1: „angelegt von übernahme“ stimmte nicht – alle Konten vor dem CRM hat Seb angelegt. „Angelegt am“ kann nur
     der Admin korrigieren (Personen ohne Aktivität haben sonst den Tag der Umstellung)."""
     db = Datenbank(umgebung.db)
@@ -222,14 +222,14 @@ def test_uebernahme_seb_zugeschrieben_und_angelegt_korrigierbar(client, umgebung
     with db.verbindung() as v:
         v.execute("UPDATE personen SET eingeladen_von='übernahme'")
     assert crm_modul.uebernahme_zuschreiben(c, frozenset({"seb"})) == 2 and crm_modul.uebernahme_zuschreiben(c, frozenset({"seb"})) == 0
-    assert {p["eingeladen_von"] for p in c.personen()} == {"seb"}
+    assert {p["eingeladen_von"] for p in c.personen()} == {pid("seb")}
     h = client.als()
     r = client.patch("/api/admin/personen/paul", json={"angelegt": "2026-10-20"}, headers=h)
     assert r.status_code == 200 and r.json()["angelegt"] == "2026-10-19T22:00:00+00:00"          # Mitternacht in Berlin
     assert client.patch("/api/admin/personen/paul", json={"angelegt": "2019-01-01"}, headers=h).status_code == 422
     assert client.patch("/api/admin/personen/paul", json={"angelegt": "2999-01-01"}, headers=h).status_code == 422
     client.patch("/api/mein/konto", json={"angelegt": "2020-01-01", "anzeigename": "Phil"}, headers=client.als(PAUL))
-    p = c.person("paul")
+    p = c.person(pid("paul"))
     assert p["angelegt"] == "2026-10-19T22:00:00+00:00" and p["anzeigename"] == "Phil"           # selbst nicht änderbar
 
 

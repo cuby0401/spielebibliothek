@@ -303,3 +303,120 @@ def zurueck(pfad: Path, sicherung: Path) -> dict:
         v.close()
     log.info("Identität zurück auf Benutzernamen (Rückweg auf 1.4.1): %d Personen", len(rueck))
     return {"zurueck": True, "personen": len(rueck)}
+
+
+# ---------- Laufzeit: Übersetzen zwischen UUID, Handle und Spieleordner (Schritt 2) ----------
+#
+# Innen ist „player“ die UUID. Nach außen (Browser) gehen Handles: Die Antwort-Schicht in app.py übersetzt jede
+# Personen-UUID in jeder JSON-Antwort ins aktuelle Handle – auch in Texten („… hat dich überholt“). Herein kommen
+# Personen nur an wenigen Stellen über die Adresse (/api/profil/<handle>, /api/admin/personen/<handle>), dort wird
+# das Handle (auch ein früheres) in die UUID übersetzt.
+# Spieleordner (spiele/paul/…) heißen nach dem ersten Benutzernamen und ändern sich nie (E82) = alt_name.
+#
+# Solange die Datenbank nicht umgestellt ist (oder im Upload-Dienst, der keine Personen kennt), gibt jede Funktion
+# den Namen unverändert zurück – dann verhält sich alles wie in 1.4.1.
+
+UUID_IN_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+
+
+class Register:
+    def __init__(self, pfad: Path):
+        self.pfad = pfad
+        self._aktiv = False
+
+    def aktiv(self) -> bool:
+        if not self._aktiv:      # einmal umgestellt, bleibt es (der Rückweg läuft nur bei gestopptem Dienst)
+            self._aktiv = umgestellt(self.pfad)
+        return self._aktiv
+
+    def karten(self) -> dict:
+        """Frisch aus der Datenbank – wenige Dutzend Zeilen, kein Zwischenspeicher, der veralten könnte."""
+        v = _verbinden(self.pfad)
+        try:
+            zu_handle, zu_ordner, zu_id = {}, {}, {}
+            for z in v.execute("SELECT id, handle, alt_name FROM personen WHERE id IS NOT NULL"):
+                zu_handle[z["id"]] = z["handle"]
+                zu_ordner[z["id"]] = z["alt_name"]
+                zu_id[z["alt_name"].lower()] = z["id"]
+            for z in v.execute("SELECT handle, person FROM handles"):         # frühere Handles leiten weiter
+                zu_id.setdefault(z["handle"].lower(), z["person"])
+            for pid, h in zu_handle.items():                                   # aktuelle Handles haben Vorrang
+                zu_id[h.lower()] = pid
+            return {"handle": zu_handle, "ordner": zu_ordner, "id": zu_id}
+        finally:
+            v.close()
+
+    def id_von(self, name: str | None) -> str | None:
+        """Handle (auch ein früheres), Ordnername oder UUID → UUID der Person. Unbekannt → None."""
+        if not name or not self.aktiv():
+            return name
+        basis, rest = _teile(name)
+        k = self.karten()
+        if basis in k["handle"]:
+            return name
+        pid = k["id"].get(str(basis).lower())
+        return pid + rest if pid else None
+
+    def handle(self, pid: str) -> str:
+        if not pid or not self.aktiv():
+            return pid
+        basis, rest = _teile(pid)
+        h = self.karten()["handle"].get(basis)
+        return h + rest if h else pid
+
+    def ordner(self, pid: str) -> str:
+        """Name des Spieleordners einer Person (= erster Benutzername)."""
+        if not pid or not self.aktiv():
+            return pid
+        basis, rest = _teile(pid)
+        o = self.karten()["ordner"].get(basis)
+        return o + rest if o else pid
+
+    def id_von_ordner(self, ordner: str) -> str:
+        """Spieleordner → UUID des Besitzers (unbekannte Ordner wie Testspiele bleiben, wie sie sind)."""
+        if not ordner or not self.aktiv():
+            return ordner
+        for pid, o in self.karten()["ordner"].items():
+            if o == ordner:
+                return pid
+        return ordner
+
+    def nach_aussen(self, wert, karten: dict | None = None):
+        """Jede Personen-UUID (auch in Schlüsseln und mitten in Texten) durch das aktuelle Handle ersetzen."""
+        if not self.aktiv():
+            return wert
+        k = (karten or self.karten())["handle"]
+        if not k:
+            return wert
+
+        def text(s: str) -> str:
+            return UUID_IN_TEXT.sub(lambda m: k.get(m.group(0), m.group(0)), s) if "-" in s else s
+
+        def gehen(w):
+            if isinstance(w, str):
+                return text(w)
+            if isinstance(w, list):
+                return [gehen(x) for x in w]
+            if isinstance(w, dict):
+                return {(text(a) if isinstance(a, str) else a): gehen(b) for a, b in w.items()}
+            return w
+        return gehen(wert)
+
+
+REGISTER: Register | None = None      # setzt app.erstellen; im Upload-Dienst bleibt es leer
+
+
+def id_von(name):
+    return REGISTER.id_von(name) if REGISTER else name
+
+
+def handle(pid):
+    return REGISTER.handle(pid) if REGISTER else pid
+
+
+def ordner(pid):
+    return REGISTER.ordner(pid) if REGISTER else pid
+
+
+def id_von_ordner(o):
+    return REGISTER.id_von_ordner(o) if REGISTER else o

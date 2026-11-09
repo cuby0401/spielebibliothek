@@ -227,17 +227,18 @@ class Datenbank:
                        json.dumps(werte, ensure_ascii=False, separators=(",", ":")) if werte else None))
 
     def bestenliste(self, game: str, season: int, aufsteigend: bool, limit: int) -> list[dict]:
-        """Bester Score je Spieler, sortiert. Bei Gleichstand gewinnt, wer ihn zuerst erreicht hat."""
+        """Bester Score je Spieler, sortiert. Bei Gleichstand gewinnt, wer ihn zuerst erreicht hat – in derselben Sekunde
+        der frühere Eintrag (id), nicht der Name (fiel mit UUIDs auf, 1.5.0)."""
         richtung = "ASC" if aufsteigend else "DESC"
         with self.verbindung() as v:
             # je Spieler der beste Eintrag (bei Gleichstand der früheste) – mit seinen Zusatzwerten
             zeilen = v.execute(
-                f"""SELECT player, score, created_at AS erreicht, werte FROM (
-                        SELECT player, score, created_at, werte,
+                f"""SELECT player, score, created_at AS erreicht, werte, id FROM (
+                        SELECT player, score, created_at, werte, id,
                                ROW_NUMBER() OVER (PARTITION BY player ORDER BY score {richtung}, created_at ASC, id ASC) AS nr
                         FROM scores WHERE game=? AND season=?)
                     WHERE nr = 1
-                    ORDER BY score {richtung}, erreicht ASC
+                    ORDER BY score {richtung}, erreicht ASC, id ASC
                     LIMIT ?""",
                 (game, season, limit),
             ).fetchall()
@@ -447,11 +448,11 @@ class Datenbank:
         richtung = "ASC" if aufsteigend else "DESC"
         with self.verbindung() as v:
             zeilen = v.execute(
-                f"""SELECT player, score, created_at AS erreicht, werte FROM (
-                        SELECT player, score, created_at, werte,
+                f"""SELECT player, score, created_at AS erreicht, werte, id FROM (
+                        SELECT player, score, created_at, werte, id,
                                ROW_NUMBER() OVER (PARTITION BY player ORDER BY score {richtung}, created_at ASC, id ASC) AS nr
                         FROM scores WHERE game=? AND created_at >= ? AND created_at < ?)
-                    WHERE nr = 1 ORDER BY score {richtung}, erreicht ASC LIMIT ?""",
+                    WHERE nr = 1 ORDER BY score {richtung}, erreicht ASC, id ASC LIMIT ?""",
                 (game, von, bis, limit)).fetchall()
         return [{"rank": i + 1, "player": z["player"], "score": z["score"], "at": z["erreicht"],
                  "werte": json.loads(z["werte"]) if z["werte"] else {}} for i, z in enumerate(zeilen)]

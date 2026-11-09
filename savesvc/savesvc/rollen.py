@@ -22,15 +22,21 @@ def admins(e) -> set[str]:
     """Alle Admins: Notfall-Admins aus ADMINS und alle mit der CRM-Rolle admin."""
     extra = {p["name"] for p in QUELLE.personen() if "admin" in p["rollen"] and p["status"] in ("aktiv", "verwarnt", "eingeladen")} \
         if QUELLE is not None else set()
-    return set(e.admins) | extra
+    return notfall_admins(e) | extra
+
+
+def notfall_admins(e) -> set[str]:
+    """ADMINS (compose) nennt Benutzernamen – ab 1.5.0 als UUID der Person (identitaet), vorher unverändert."""
+    from . import identitaet
+    return {identitaet.id_von(n) or n for n in e.admins}
 
 
 def rolle(e, request: Request, player: str) -> dict:
     crm = crm_rollen(player)
-    echter_admin = player in e.admins or "admin" in crm
+    echter_admin = player in notfall_admins(e) or "admin" in crm
     # Mit CRM zählt nur die Rolle (1.4.0, Nachtest 08.11.): Ein Spieleordner bleibt nach dem Entziehen der Rolle stehen (die Spiele
     # bleiben), darf aber nicht weiter als „Entwickler“ gelten. Ohne CRM (Upload-Dienst, alte Tests) wie bisher der Ordner.
-    hat_ordner = "entwickler" in crm if QUELLE is not None else (e.spiele_dir / player).is_dir()
+    hat_ordner = "entwickler" in crm if QUELLE is not None else (e.spiele_dir / identitaet_ordner(player)).is_dir()
     ansicht = request.headers.get("x-ansicht")
     if echter_admin and ansicht in ANSICHTEN:
         return {"admin": False, "entwickler": ansicht == "entwickler", "uploader": ansicht == "entwickler" and hat_ordner,
@@ -48,3 +54,8 @@ def daten_id(e, request: Request, player: str) -> str:
 
 def simuliert(e, request: Request, player: str) -> str | None:
     return rolle(e, request, player)["ansicht"]
+
+
+def identitaet_ordner(player: str) -> str:
+    from . import identitaet
+    return identitaet.ordner(player)

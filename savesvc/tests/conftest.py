@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -64,7 +65,9 @@ def umgebung(tmp_path: Path):
 @pytest.fixture
 def client(umgebung, rsa_schluessel, token):
     e = Einstellungen(team_domain=TEAM, audience=AUD, users_file=umgebung.users,
-                      spiele_dir=umgebung.spiele, db_path=umgebung.db, dev_user=None)
+                      spiele_dir=umgebung.spiele, db_path=umgebung.db, dev_user=None,
+                      # 1.5.0: TEST_IDENTITAET_UUID=1 fährt die ganze Sammlung mit UUIDs im Hintergrund
+                      identitaet_uuid=os.environ.get("TEST_IDENTITAET_UUID") == "1")
     app = erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key()))
     c = TestClient(app)
 
@@ -72,3 +75,18 @@ def client(umgebung, rsa_schluessel, token):
         return {"Cf-Access-Jwt-Assertion": token(email=email, **kw), "X-Bibliothek": "1"}
     c.als = als
     return c
+
+
+@pytest.fixture(autouse=True)
+def _identitaet_zuruecksetzen():
+    """Das Register ist je Prozess global (eine Datenbank je Dienst) – in Tests nicht an den nächsten Test vererben."""
+    yield
+    from savesvc import identitaet
+    identitaet.REGISTER = None
+
+
+@pytest.fixture
+def pid(umgebung):
+    """Schlüssel einer Person in der Datenbank: ihr Name (1.4.x) bzw. ihre UUID (ab 1.5.0, TEST_IDENTITAET_UUID=1)."""
+    from savesvc import identitaet
+    return lambda name: identitaet.Register(umgebung.db).id_von(name) or name

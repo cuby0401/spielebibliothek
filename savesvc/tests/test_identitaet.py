@@ -187,3 +187,61 @@ def test_befehle_status_und_zurueck(umgebung, monkeypatch, capsys):
     assert main(["identitaet-zurueck", str(umgebung.db.parent / "backup" / "vor-rueckweg.db")]) == 0
     assert (umgebung.db.parent / "backup" / "vor-rueckweg.db").is_file()
     assert _stand(umgebung.db) == vorher and not identitaet.umgestellt(umgebung.db)
+
+
+# ---------- Schritt 2: nach außen nie eine UUID ----------
+
+def test_keine_uuid_in_antworten(umgebung, rsa_schluessel, token, monkeypatch):
+    """Ruft jeden GET-Endpunkt unter /api/ auf – als Spieler (paul) und als Admin (seb), mit Daten in allen Bereichen.
+    Keine Antwort darf eine Personen-UUID enthalten; überall stehen Handles."""
+    import re as _re
+    from fastapi.testclient import TestClient
+    from savesvc import verwaltung
+    from savesvc.app import erstellen
+    from .conftest import AUD, TEAM, Schluessel
+    from savesvc.config import Einstellungen
+
+    monkeypatch.setattr(verwaltung.UploadDienst, "__call__", lambda self, m, p, b=None: [] if m == "GET" else {"passwort": "x"})
+    e = Einstellungen(team_domain=TEAM, audience=AUD, users_file=umgebung.users, spiele_dir=umgebung.spiele,
+                      db_path=umgebung.db, dev_user=None, identitaet_uuid=True)
+    app = erstellen(e, schluessel_quelle=Schluessel(rsa_schluessel.public_key()))
+    c = TestClient(app)
+    seb = {"Cf-Access-Jwt-Assertion": token(), "X-Bibliothek": "1"}
+    paul = {"Cf-Access-Jwt-Assertion": token(email="paul@example.com"), "X-Bibliothek": "1"}
+    assert identitaet.umgestellt(umgebung.db)
+
+    # Daten in allen Bereichen: Spielstände, Scores, Daumen, Anfragen, Meldungen, Notizen, Simulation
+    c.get("/api/me", headers=seb); c.get("/api/me", headers=paul)
+    c.put("/api/save/seb/zaehler/stand", json={"data": {"level": 3}}, headers=paul)
+    c.put("/api/save/seb/zaehler/stand", json={"data": {"level": 4}}, headers=paul)
+    c.post("/api/score/seb/zaehler", json={"score": 10}, headers=paul)
+    c.post("/api/score/seb/zaehler", json={"score": 12}, headers=seb)
+    c.put("/api/daumen/seb/zaehler", json={"an": True}, headers=paul)
+    a = c.post("/api/antraege", json={"art": "fehler", "spiel": "seb/zaehler", "text": "Geht nicht richtig"}, headers=paul).json()
+    c.patch(f"/api/antraege/{a.get('id', 1)}", json={"status": "erledigt", "antwort": "behoben"}, headers=seb)
+    c.post("/api/admin/personen/paul/notizen", json={"text": "Notiz"}, headers=seb)
+    c.post("/api/admin/personen/paul/verwarnen", json={"grund": "Test der Glocke"}, headers=seb)
+    c.post("/api/admin/personen/paul/verwarnung-aufheben", headers=seb)
+    c.put("/api/save/seb/zaehler/stand", json={"data": 1}, headers={**seb, "X-Ansicht": "spieler"})
+
+    werte = {"user": "seb", "game": "zaehler", "name": "paul", "key": "stand", "rolle": "spieler", "email": "paul@example.com"}
+    gefunden, geprueft = [], 0
+    for route in app.routes:
+        pfad = getattr(route, "path", "")
+        if "GET" not in getattr(route, "methods", set()) or not pfad.startswith("/api/"):
+            continue
+        teile = _re.findall(r"{(\w+)}", pfad)
+        url = pfad
+        for t in teile:
+            url = url.replace("{" + t + "}", werte.get(t, "1"))
+        for wer, h in (("paul", paul), ("seb", seb)):
+            r = c.get(url, headers=h)
+            geprueft += 1
+            if identitaet.UUID_IN_TEXT.search(r.text):
+                gefunden.append(f"{wer} {url} → {r.status_code}: {identitaet.UUID_IN_TEXT.search(r.text).group(0)}")
+    assert geprueft > 60
+    assert not gefunden, "UUID nach außen:\n" + "\n".join(gefunden)
+    # … und die Namen stimmen: Handles statt UUIDs
+    assert c.get("/api/me", headers=paul).json()["player"] == "paul"
+    assert [x["player"] for x in c.get("/api/leaderboard/seb/zaehler", headers=paul).json()["entries"]] == ["seb", "paul"]
+    assert c.get("/api/profil/paul", headers=seb).json()["name"] == "paul"

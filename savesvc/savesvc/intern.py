@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Query, Request
 
-from . import games, versionen
+from . import games, identitaet, versionen
 
 
 def registrieren(app: FastAPI, e, db, aktuelle_season) -> None:
@@ -64,4 +64,5 @@ def registrieren(app: FastAPI, e, db, aktuelle_season) -> None:
         if an.startswith("favoriten:"):   # Updates nur an Spieler, die das Spiel als Favorit haben
             db.melden_favoriten(an[len("favoriten:"):], text.strip(), link if isinstance(link, str) else None)
         else:
-            db.melden(an, text.strip(), link if isinstance(link, str) else None)
+            # Der Upload-Dienst nennt Entwickler beim Ordnernamen → UUID (1.5.0); „*“ = an alle bleibt
+            db.melden(an if an == "*" else identitaet.id_von_ordner(an), text.strip(), link if isinstance(link, str) else None)
