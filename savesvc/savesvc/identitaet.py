@@ -228,8 +228,8 @@ def _umstellen_in(v, _nach_umstellung) -> dict:
         if nr is None:
             nr, naechste = naechste, naechste + 1
         handle = p["handle"] or p["name"]
-        v.execute("UPDATE personen SET id=?, alt_name=?, nr=?, handle=?, handle_seit=COALESCE(handle_seit, ?) WHERE rowid=?",
-                  (pid, p["name"], nr, handle, p["angelegt"], p["rowid"]))
+        # handle_seit = Zeitpunkt der letzten ÄNDERUNG – bleibt leer, bis jemand sein Handle zum ersten Mal ändert
+        v.execute("UPDATE personen SET id=?, alt_name=?, nr=?, handle=? WHERE rowid=?", (pid, p["name"], nr, handle, p["rowid"]))
         v.execute("INSERT OR IGNORE INTO handles (handle, person, seit) VALUES (?,?,?)", (handle, pid, p["angelegt"]))
         zuordnung[p["name"]] = pid
 

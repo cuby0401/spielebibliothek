@@ -8,6 +8,7 @@ Jede Änderung über crm.Crm → Prüfprotokoll. Nach jeder Änderung wird users
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Path as P, Request
@@ -204,6 +205,11 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         log.info("%s hat %s endgültig gelöscht (anonymisiert)", admin_name, name)
         return crm.person(name)
 
+    @app.post("/api/admin/personen/{name}/handle")
+    def admin_handle(admin_name: str = Depends(admin), name: str = P(...), body: dict[str, Any] = Body(...)):
+        """Admin ändert ein Handle – ohne 30-Tage-Frist (1.5.0)."""
+        return ausfuehren(crm.handle_aendern, admin_name, name, body.get("handle"), True)
+
     @app.get("/api/admin/personen/{name}/export")
     def export(admin_name: str = Depends(admin), name: str = P(...)):
         """Auskunft (DSGVO Art. 15): alles, was über die Person gespeichert ist."""
@@ -261,8 +267,18 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         p = crm.person(player)
         if not p:
             raise HTTPException(404, "kein Eintrag im CRM")
-        return {k: p[k] for k in ("name", "anzeigename", "vorname", "nachname", "geburtstag", "status", "emails", "rollen",
-                                  "angelegt", "erste_anmeldung", "datenschutz_bestaetigt")}
+        ab = crm_modul.handle_wieder_ab(p.get("handle_seit"))
+        return {**{k: p[k] for k in ("name", "anzeigename", "vorname", "nachname", "geburtstag", "status", "emails", "rollen",
+                                     "angelegt", "erste_anmeldung", "datenschutz_bestaetigt")},
+                # 1.5.0: Handle (@name) – alle 30 Tage änderbar; None = jetzt änderbar
+                "handle": identitaet.handle(player), "handleAb": ab.isoformat(timespec="seconds") if ab and ab > datetime.now(timezone.utc) else None}
+
+    @app.put("/api/mein/handle")
+    def mein_handle(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):
+        if rollen.simuliert(e, request, player):
+            raise HTTPException(409, "In der Ansicht als Spieler/Entwickler wird nichts geändert")
+        ausfuehren(crm.handle_aendern, player, player, body.get("handle"))
+        return mein_konto(request, player)
 
     @app.patch("/api/mein/konto")
     def mein_konto_aendern(request: Request, player: str = Depends(spieler), body: dict[str, Any] = Body(...)):

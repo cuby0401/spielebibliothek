@@ -429,10 +429,35 @@ async function angabenAbschnitt(c) {
 		} },
 			h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname),
 				h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag)),
-			h("p", { class: "leise", text: `Benutzername ${k.name} · Login-E-Mail ${k.emails.join(", ")} · Rollen: ${k.rollen.map((r) => ROLLEN_NAMEN[r] || r).join(", ")} · dabei seit ${datumZeit(k.angelegt)}` }),
+			h("p", { class: "leise", text: `Login-E-Mail ${k.emails.join(", ")} · Rollen: ${k.rollen.map((r) => ROLLEN_NAMEN[r] || r).join(", ")} · dabei seit ${datumZeit(k.angelegt)}` }),
 			h("label", { class: "haken" }, ds, " Ich habe gelesen, welche Daten die Bibliothek speichert (",
 				h("a", { href: "/hilfe/#daten", target: "_blank", rel: "noopener", text: "Hilfe → Deine Daten" }), ")."),
 			h("div", {}, h("button", { type: "submit", class: "knopf klein", text: "Speichern" }))));
+	c.append(handleAbschnitt(k));
+}
+
+// ---------- Handle (@name, Zentrale 1.5.0, E82): alle 30 Tage änderbar ----------
+function handleAbschnitt(k) {
+	const feld = h("input", { value: k.handle, maxlength: "20", autocomplete: "off", spellcheck: "false", "aria-label": "Neues Handle" });
+	const knopf = h("button", { type: "submit", class: "knopf klein", text: "Handle ändern" });
+	const gesperrt = !!k.handleAb;
+	feld.disabled = knopf.disabled = gesperrt;
+	return h("form", { class: "karte", onsubmit: async (e) => {
+		e.preventDefault();
+		const neu = feld.value.trim().replace(/^@/, "").toLowerCase();
+		if (neu === k.handle) return meldung("Das ist schon dein Handle.", "fehler");
+		if (!confirm(`Dein Handle wird @${neu}. Danach kannst du es 30 Tage lang nicht wieder ändern. Weiter?`)) return;
+		try {
+			await Bridge.json("PUT", "/api/mein/handle", { handle: neu });
+			meldung(`Dein Handle ist jetzt @${neu}. Die Seite lädt neu.`);
+			setTimeout(() => location.reload(), 1200);
+		} catch (x) { if (!(x instanceof Bridge.SitzungAbgelaufen)) meldung(x.message, "fehler"); }
+	} },
+		h("h3", { text: "Handle" }),
+		h("p", { class: "leise", text: "Dein eindeutiger Name in der Bibliothek, z. B. in Adressen und neben deinem Anzeigenamen. 3–20 Zeichen: a–z, 0–9, _ und -. " +
+			"Ändern geht alle 30 Tage. Dein altes Handle bleibt für dich reserviert, alte Links auf dein Profil funktionieren weiter. Spielstände, Spiele und Erfolge bleiben." }),
+		h("div", { class: "zeile" }, h("label", {}, "@ ", feld), knopf),
+		gesperrt ? h("p", { class: "leise", text: `Wieder änderbar ab ${new Date(k.handleAb).toLocaleDateString("de-DE")}.` }) : null);
 }
 
 // ---------- Anmeldungen (E55) mit „Trennen“ (Zentrale 1.2.1) ----------

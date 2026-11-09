@@ -19,6 +19,7 @@ als neue Person übernommen – entfernt wird von Hand nichts, das geht nur übe
 """
 
 import json
+import re
 import logging
 import shutil
 import threading
@@ -39,6 +40,20 @@ ROLLEN = ("spieler", "entwickler", "admin", "tester")
 # geloescht: endgültig anonymisiert, nur der Benutzername bleibt (geht nur aus „archiviert“).
 STATUS = ("eingeladen", "aktiv", "verwarnt", "gesperrt", "archiviert", "geloescht")
 ZUGELASSEN = ("eingeladen", "aktiv", "verwarnt")      # dürfen hinein
+HANDLE_MUSTER = re.compile(r"^[a-z0-9][a-z0-9_-]{2,19}$")        # 1.5.0: neue Handles 3–20 Zeichen
+# Wörter, die in Antworten eine eigene Bedeutung haben („zustaendig: admin“ = Seb) oder Systemen gehören
+HANDLE_RESERVIERT = {"admin", "system", "mac", "alle", "niemand", "umstellung", "uebernahme", "tester", "spieler", "entwickler"}
+HANDLE_FRIST_TAGE = 30
+
+
+def handle_wieder_ab(seit) -> datetime | None:
+    """Ab wann sich das Handle wieder ändern lässt – None, wenn es noch nie geändert wurde (dann sofort)."""
+    if not seit:
+        return None
+    from datetime import timedelta
+    return datetime.fromisoformat(seit).astimezone(timezone.utc) + timedelta(days=HANDLE_FRIST_TAGE)
+
+
 TEXT_MAX = {"anzeigename": 40, "vorname": 60, "nachname": 60}
 
 SCHEMA = """
@@ -258,7 +273,7 @@ class Crm:
                           (name, felder["anzeigename"], felder["vorname"], felder["nachname"], geb, status, von, jetzt(), jetzt()))
                 if name != handle:
                     nr = (v.execute("SELECT MAX(nr) FROM personen").fetchone()[0] or 0) + 1
-                    v.execute("UPDATE personen SET id=?, alt_name=?, handle=?, handle_seit=?, nr=? WHERE name=?", (name, handle, handle, jetzt(), nr, name))
+                    v.execute("UPDATE personen SET id=?, alt_name=?, handle=?, nr=? WHERE name=?", (name, handle, handle, nr, name))
                     v.execute("INSERT INTO handles (handle, person, seit) VALUES (?,?,?)", (handle, name, jetzt()))
                 v.execute("INSERT INTO person_emails (email, name, angelegt) VALUES (?,?,?)", (email, name, jetzt()))
                 for r in rollen:
@@ -281,6 +296,48 @@ class Crm:
         if not z:
             raise KeyError(name)
         return dict(z)
+
+    def handle_aendern(self, von: str, name: str, neu, ohne_frist: bool = False) -> dict:
+        """Handle ändern (1.5.0, E82): höchstens alle 30 Tage (ab der letzten Änderung; der Admin ohne Frist). Frühere
+        Handles bleiben für ihre Person reserviert – sie darf sie zurücknehmen, sonst niemand. Ordner und UUID bleiben."""
+        if not isinstance(neu, str):
+            raise Ungueltig("Handle fehlt")
+        neu = neu.strip().lower().lstrip("@")
+        if not HANDLE_MUSTER.match(neu):
+            raise Ungueltig("Handle: 3–20 Zeichen, a–z, 0–9, _ und -, beginnt mit Buchstabe oder Ziffer")
+        if neu in HANDLE_RESERVIERT:
+            raise Konflikt(f"@{neu} ist reserviert")
+        with self.db.verbindung() as v:
+            v.execute("BEGIN IMMEDIATE")
+            try:
+                p = v.execute("SELECT name, handle, handle_seit, status FROM personen WHERE name=? AND id IS NOT NULL", (name,)).fetchone()
+                if not p:
+                    raise KeyError(name)
+                if p["status"] == "geloescht":
+                    raise Konflikt("Gelöschte Personen behalten ihr Handle")
+                if neu == (p["handle"] or "").lower():
+                    raise Konflikt(f"@{neu} ist schon dein Handle")
+                ab = handle_wieder_ab(p["handle_seit"])
+                if not ohne_frist and ab and ab > datetime.now(timezone.utc):
+                    raise Konflikt(f"Das Handle lässt sich alle 30 Tage ändern – wieder ab {ab.astimezone(ZoneInfo('Europe/Berlin')):%d.%m.%Y}")
+                frueher = v.execute("SELECT person FROM handles WHERE handle=? COLLATE NOCASE", (neu,)).fetchone()
+                if (frueher and frueher["person"] != name) or v.execute(
+                        "SELECT 1 FROM personen WHERE name<>? AND (handle=? COLLATE NOCASE OR alt_name=? COLLATE NOCASE)", (name, neu, neu)).fetchone():
+                    raise Konflikt(f"@{neu} ist vergeben")
+                zeit = jetzt()
+                v.execute("UPDATE handles SET bis=? WHERE person=? AND bis IS NULL", (zeit, name))
+                if frueher:
+                    v.execute("UPDATE handles SET bis=NULL WHERE handle=? COLLATE NOCASE", (neu,))
+                else:
+                    v.execute("INSERT INTO handles (handle, person, seit) VALUES (?,?,?)", (neu, name, zeit))
+                v.execute("UPDATE personen SET handle=?, handle_seit=?, geaendert=? WHERE name=?", (neu, zeit, zeit, name))
+                self._ereignis(v, name, "handle", f"Handle geändert: @{p['handle']} → @{neu}", von)
+                self._protokoll(v, von, "handle", name, {"handle": p["handle"]}, {"handle": neu})
+                v.execute("COMMIT")
+            except BaseException:
+                v.execute("ROLLBACK")
+                raise
+        return self.person(name)
 
     def stammdaten(self, von: str, name: str, daten: dict) -> dict:
         neu = {}
