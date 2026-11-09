@@ -33,10 +33,12 @@ if [ "$ART" = probe ]; then
 	COOKIE_SECURE=1
 	PORTS="-p $LAN:$PG:8080 -p $LAN:$PP:8080 -p $LAN:$PU:8080"
 	TESTERGEBNISSE=/volume1/docker/spielebibliothek-tests   # bleibt über Neubauten der Probe erhalten
+	NEUSTART="--restart unless-stopped"   # 1.5.0: nach einem NAS-Neustart (z. B. Update am 09.11.2026) von selbst wieder da
 else
 	N=sbtest; T=/tmp/sb-teststand; PG=18088; PP=18089; PU=18090
 	G="http://$GH:$PG"; P="http://$PH:$PP"; U="http://$UH:$PU"
 	ANMELDUNG="-e DEV_USER=seb -e DEV_ALLOW=1"
+	NEUSTART=""                            # Teststand für die automatischen Tests: nur kurz, nicht neu starten
 	COOKIE_SECURE=0
 	PORTS="-p $PG:8080 -p $PP:8080 -p $PU:8080"
 	[ "${LOKAL:-0}" = 1 ] && PORTS="-p 127.0.0.1:$PG:8080 -p 127.0.0.1:$PP:8080 -p 127.0.0.1:$PU:8080"
@@ -95,15 +97,15 @@ up)
 	mkdir -p "$TESTERGEBNISSE" 2>/dev/null || docker run --rm -v "$(dirname "$TESTERGEBNISSE")":/t caddy:2 mkdir -p "/t/$(basename "$TESTERGEBNISSE")"
 	docker run --rm -v "$TESTERGEBNISSE":/z caddy:2 chmod a+rwX /z
 	# IDENTITAET_UUID=0 (1.5.0): Teststand ohne Umstellung auf UUID, nur zum Vergleich mit dem alten Verhalten
-	docker run -d --name $N-savesvc --network $N $ANMELDUNG -e WAECHTER=0 -e IDENTITAET_UUID=${IDENTITAET_UUID:-1} \
+	docker run -d $NEUSTART --name $N-savesvc --network $N $ANMELDUNG -e WAECHTER=0 -e IDENTITAET_UUID=${IDENTITAET_UUID:-1} \
 		-e TESTPLAN_DIR=/testplan -e TESTERGEBNISSE=/tests/ergebnisse.db -v "$T/repo/tests/manuell:/testplan:ro" -v "$TESTERGEBNISSE:/tests" \
 		-e ADMINS=seb -e TESTER=emil -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://$N-upload:8000 \
 		-e PROBE="$( [ "$ART" = probe ] && echo 1 || echo 0 )" -e ZENTRALE_COMMIT="${ZENTRALE_COMMIT:-}" -e ZENTRALE_VERSION="${ZENTRALE_VERSION:-}" \
 		-v "$T/data:/data" -v "$T/spiele:/spiele:ro" -v "$T/config:/config" spielebibliothek-savesvc:$N >/dev/null
-	docker run -d --name $N-upload --network $N --user 10021:10021 $ANMELDUNG -e UPLOAD_DATA=/data \
+	docker run -d $NEUSTART --name $N-upload --network $N --user 10021:10021 $ANMELDUNG -e UPLOAD_DATA=/data \
 		-e UPLOAD_COOKIE_SECURE=$COOKIE_SECURE -e INTERN_TOKEN=test-token -e SAVESVC_URL=http://$N-savesvc:8000 -v "$T/udata:/data" -v "$T/config:/config:ro" -v "$T/spiele:/spiele" spielebibliothek-savesvc:$N \
 		uvicorn savesvc.upload:app_factory --factory --host 0.0.0.0 --port 8000 >/dev/null
-	docker run -d --name $N-caddy --network $N --user 10020:10020 -e XDG_CONFIG_HOME=/tmp -e XDG_DATA_HOME=/tmp \
+	docker run -d $NEUSTART --name $N-caddy --network $N --user 10020:10020 -e XDG_CONFIG_HOME=/tmp -e XDG_DATA_HOME=/tmp \
 		$PORTS \
 		-v "$T/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$T/repo/site:/srv/site:ro" -v "$T/repo/lib:/srv/lib:ro" -v "$T/spiele:/srv/spiele:ro" -v "$T/config:/config:ro" \
 		caddy:2 >/dev/null

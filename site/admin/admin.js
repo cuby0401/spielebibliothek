@@ -255,7 +255,7 @@ const STATUS_KLASSE = { eingeladen: "offen", aktiv: "erledigt", verwarnt: "offen
 // Archiviert (zurückholbar) und gelöscht (anonymisiert) stehen nicht in der normalen Liste und lassen sich nicht bearbeiten
 const RAUS = (status) => status === "archiviert" || status === "geloescht";
 const ROLLEN_TEXT = { spieler: "Spieler", entwickler: "Entwickler", admin: "Admin", tester: "Tester" };
-const anzeige = (p) => p.anzeigename || [p.vorname, p.nachname].filter(Boolean).join(" ") || "";
+const anzeigePerson = (p) => p.anzeigename || [p.vorname, p.nachname].filter(Boolean).join(" ") || "";
 function passwortKarte(name, pw) {
 	return h("div", { class: "karte" }, h("strong", { text: `Upload-Passwort für ${name} (wird nur jetzt angezeigt):` }),
 		h("div", { class: "passwort-box", text: pw }), h("span", { class: "leise", text: "Persönlich weitergeben, nicht per Mail." }));
@@ -269,54 +269,97 @@ const rollenWahl = (aktuell, gesperrt = []) => {
 	return { el, werte: () => Object.keys(boxen).filter((r) => boxen[r].checked) };
 };
 
+// ---------- CRM (Zentrale 1.5.0, Klick-Muster vom 09.11.2026) ----------
+// Nummer, Name, @handle oder E-Mail eingeben → alles zu einer Person auf einen Blick, alles verlinkt. Leere Blöcke fehlen
+// ganz (Seb, 07.11.). Personen werden mit ihrem Handle angesprochen (#person/<handle>), gelöschte über die Nummer (P-0007).
+const pnr = (nr) => nr ? "P-" + String(nr).padStart(4, "0") : "";
+const personLink = (p) => "#person/" + (p.status === "geloescht" || !p.handle ? pnr(p.nr) : p.handle);
+const tageHer = (iso) => iso ? Math.floor((Date.now() - new Date(iso)) / 864e5) : Infinity;
+function initialen(ziel, text, schluessel) {
+	const teile = String(text || "?").trim().split(/[\s._-]+/).filter(Boolean);
+	ziel.textContent = ((teile[0] || "?")[0] + (teile.length > 1 ? teile[1][0] : (teile[0] || "")[1] || "")).toUpperCase();
+	let n = 0;
+	for (const z of String(schluessel || text)) n = (n * 31 + z.charCodeAt(0)) >>> 0;
+	ziel.style.setProperty("--avatar-farbe", `hsl(${n % 360} 55% 42%)`);
+	return ziel;
+}
+const crmFilter = { q: "", rolle: "", status: "", inaktiv: false };   // bleibt beim Hin und Her zur Personenkarte erhalten
+
 async function personenSeite(c) {
 	const [d, cf] = await Promise.all([api("GET", "/personen"), api("GET", "/cloudflare").catch(() => ({ eingerichtet: false }))]);
 	// Einladen
 	const mail = h("input", { type: "email", required: true, placeholder: "name@beispiel.de" });
-	const name = h("input", { required: true, pattern: "[a-z0-9][a-z0-9_\\-]{0,31}", placeholder: "z. B. paul" });
+	const name = h("input", { required: true, pattern: "[a-z0-9][a-z0-9_\\-]{2,19}", placeholder: "z. B. paul" });
 	const vorname = h("input", { placeholder: "optional" });
 	const wahl = rollenWahl(["spieler"]);
-	c.append(h("details", { class: "karte" }, h("summary", { text: "➕ Person einladen" }),
+	const einladen = h("details", { class: "karte" }, h("summary", { text: "➕ Person einladen" }),
 		h("form", { onsubmit: (e) => { e.preventDefault(); sicher(async () => {
 			const r = await api("POST", "/personen", { email: mail.value, name: name.value, vorname: vorname.value || null, rollen: wahl.werte() });
-			location.hash = "#person/" + r.person.name;
-			meldung(`${r.person.name} eingeladen. Nächster Schritt: am Mac „python3 scripts/cloudflare.py abgleichen“, dann hier „Einladung senden“.`);
-			if (r.passwort) setTimeout(() => $("inhalt").prepend(passwortKarte(r.person.name, r.passwort)), 300);
+			location.hash = "#person/" + r.person.handle;
+			meldung(`${r.person.handle} eingeladen. Nächster Schritt: am Mac „python3 scripts/cloudflare.py abgleichen“, dann hier „Einladung senden“.`);
+			if (r.passwort) setTimeout(() => $("inhalt").prepend(passwortKarte(r.person.handle, r.passwort)), 300);
 		}); } },
-			h("div", { class: "zeile" }, h("label", {}, "E-Mail (Cloudflare-Login) ", mail), h("label", {}, "Benutzername ", name), h("label", {}, "Vorname ", vorname)),
+			h("div", { class: "zeile" }, h("label", {}, "E-Mail (Cloudflare-Login) ", mail), h("label", {}, "Handle ", name), h("label", {}, "Vorname ", vorname)),
 			h("p", {}, "Rollen: ", wahl.el),
-			h("p", { class: "leise", text: "Der Benutzername lässt sich danach nicht mehr ändern. Eingeladene kommen erst rein, wenn ihre E-Mail in Cloudflare steht (scripts/cloudflare.py abgleichen am Mac)." }),
-			h("div", {}, h("button", { type: "submit", class: "knopf", text: "Einladen" })))));
-	// Filter
-	const suche = h("input", { type: "search", placeholder: "Name oder E-Mail" });
-	const status = h("select", {}, h("option", { value: "", text: "alle außer archiviert/gelöscht" }), ...d.status.map((s) => h("option", { value: s, text: STATUS_TEXTE[s] })));
-	const rolle = h("select", {}, h("option", { value: "", text: "alle Rollen" }), ...d.rollen.map((r) => h("option", { value: r, text: ROLLEN_TEXT[r] })));
+			h("p", { class: "leise", text: "Das Handle (3–20 Zeichen) kann die Person später alle 30 Tage selbst ändern; ihr Spieleordner behält diesen ersten Namen. Eingeladene kommen erst rein, wenn ihre E-Mail in Cloudflare steht (scripts/cloudflare.py abgleichen am Mac)." }),
+			h("div", {}, h("button", { type: "submit", class: "knopf", text: "Einladen" }))));
+
+	const sichtbar = d.personen.filter((p) => !RAUS(p.status));
+	const inaktiv = (p) => p.status !== "eingeladen" && !p.nieAngemeldet && tageHer(p.zuletzt) > 30;
+	const suche = h("input", { type: "search", class: "crm-suche", placeholder: "Nummer (P-0003), Name, @handle oder E-Mail …", value: crmFilter.q, "aria-label": "Person suchen" });
+	const treffer = () => {
+		const q = crmFilter.q.trim().toLowerCase().replace(/^@/, "");
+		const nur = crmFilter.status === "auffaellig" ? null : crmFilter.status;
+		return d.personen.filter((p) => (nur ? p.status === nur : crmFilter.status === "auffaellig" ? ["verwarnt", "gesperrt"].includes(p.status) : !RAUS(p.status))
+			&& (!crmFilter.rolle || p.rollen.includes(crmFilter.rolle))
+			&& (!crmFilter.inaktiv || inaktiv(p))
+			&& (!q || [pnr(p.nr), String(p.nr || ""), p.handle, ...(p.alteHandles || []), p.anzeigename, p.vorname, p.nachname, ...p.emails]
+				.filter(Boolean).some((x) => String(x).toLowerCase().includes(q))));
+	};
 	const tbody = h("tbody", {});
 	const mitCf = d.cloudflare.geprueft;
-	const fuellen = () => {
-		const q = suche.value.trim().toLowerCase();
-		tbody.replaceChildren(...d.personen.filter((p) => (status.value ? p.status === status.value : !RAUS(p.status))
-			&& (!rolle.value || p.rollen.includes(rolle.value))
-			&& (!q || [p.name, anzeige(p), ...p.emails].some((x) => x.toLowerCase().includes(q)))).map((p) => h("tr", {},
-			h("td", {}, h("a", { href: "#person/" + p.name }, h("strong", { text: p.name })), anzeige(p) ? h("div", { class: "leise", text: anzeige(p) }) : null),
-			h("td", { text: p.emails.join(", ") || "–" }),
-			h("td", { text: p.rollen.filter((r) => r !== "spieler").map((r) => ROLLEN_TEXT[r]).join(", ") || "Spieler" }),
-			h("td", {}, h("span", { class: "status " + STATUS_KLASSE[p.status], text: STATUS_TEXTE[p.status] }),
-				p.status === "eingeladen" ? h("div", { class: "leise", text: p.einladungGesendet ? "Mail " + datumZeit(p.einladungGesendet) : "noch keine Mail" }) : null),
-			p.nieAngemeldet && !RAUS(p.status)
-				? h("td", { class: "warn", title: "Noch keine Anmeldung, kein Spielstand, kein Upload. Kommt der E-Mail-Code nicht an? Dann fehlt die Adresse meist in der Cloudflare-Richtlinie „Kollegen“.", text: "noch nie angemeldet" })
-				: h("td", { text: datumZeit(p.zuletzt) }),
-			...(mitCf ? [p.cloudflare ? h("td", { class: p.cloudflare.kollegen && p.cloudflare.entwickler !== false ? "" : "warn",
-				text: !p.cloudflare.kollegen ? "fehlt in Kollegen" : p.cloudflare.entwickler === false ? "fehlt in Entwickler" : "✓" }) : h("td", {})] : []))));
-	};
-	for (const x of [suche, status, rolle]) x.addEventListener("input", fuellen);
-	fuellen();
-	c.append(h("h2", { text: `Personen (${d.personen.filter((p) => !RAUS(p.status)).length})` }), cloudflareBox(cf),
-		d.mail ? null : h("p", { class: "leise", text: "E-Mail-Versand nicht eingerichtet (SMTP_* in der .env) – Einladungen dann selbst verschicken." }),
-		h("div", { class: "filter" }, h("label", {}, "Suche", suche), h("label", {}, "Status", status), h("label", {}, "Rolle", rolle)),
+	const fuellen = () => tbody.replaceChildren(...treffer().map((p) => h("tr", { class: "klickbar", "data-handle": p.handle || "", onclick: (e) => { if (!e.target.closest("a")) location.hash = personLink(p); } },
+		h("td", { class: "nr", text: pnr(p.nr) }),
+		h("td", {}, h("div", { class: "wer" }, initialen(h("span", { class: "avatar", "aria-hidden": "true" }), p.anzeigename || p.handle, p.handle),
+			h("div", {}, h("a", { href: personLink(p) }, h("strong", { text: p.status === "geloescht" ? "gelöschte Person" : (anzeigePerson(p) || "@" + p.handle) })),
+				p.status !== "geloescht" && anzeigePerson(p) ? h("div", { class: "leise", text: "@" + p.handle }) : null,
+				p.alteHandles && p.alteHandles.length ? h("div", { class: "leise", text: "früher @" + p.alteHandles.join(", @") }) : null))),
+		h("td", { text: p.emails.join(", ") || "–" }),
+		h("td", {}, ...p.rollen.filter((r) => r !== "spieler").map((r) => h("span", { class: "rolle " + r, text: ROLLEN_TEXT[r] })), p.rollen.length <= 1 ? "Spieler" : null),
+		h("td", {}, h("span", { class: "status " + STATUS_KLASSE[p.status], text: STATUS_TEXTE[p.status] }),
+			p.status === "eingeladen" ? h("div", { class: "leise", text: p.einladungGesendet ? "Mail " + datumZeit(p.einladungGesendet) : "noch keine Mail" }) : null),
+		p.nieAngemeldet && !RAUS(p.status)
+			? h("td", { class: "warn", title: "Noch keine Anmeldung, kein Spielstand, kein Upload. Kommt der E-Mail-Code nicht an? Dann fehlt die Adresse meist in der Cloudflare-Richtlinie „Kollegen“.", text: "noch nie angemeldet" })
+			: h("td", {}, datumZeit(p.zuletzt), tageHer(p.zuletzt) > 30 && p.zuletzt ? h("div", { class: "leise", text: `vor ${tageHer(p.zuletzt)} Tagen` }) : null),
+		...(mitCf ? [p.cloudflare ? h("td", { class: p.cloudflare.kollegen && p.cloudflare.entwickler !== false ? "" : "warn",
+			text: !p.cloudflare.kollegen ? "fehlt in Kollegen" : p.cloudflare.entwickler === false ? "fehlt in Entwickler" : "✓" }) : h("td", {})] : []))));
+	suche.addEventListener("input", () => { crmFilter.q = suche.value; fuellen(); });
+	suche.addEventListener("keydown", (e) => { if (e.key === "Enter") { const t = treffer(); if (t.length === 1) location.hash = personLink(t[0]); } });
+	const neuZeigen = () => { c.replaceChildren(); personenSeite(c); };
+	const kachel = (wert, text, f) => h("button", { type: "button", class: "kennzahl", onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false }, f); neuZeigen(); } },
+		h("div", { class: "wert", text: String(wert) }), h("div", { class: "text", text }));
+	const chip = (text, an, setzen) => h("button", { type: "button", class: "chip" + (an ? " an" : ""), text, onclick: () => { setzen(); neuZeigen(); } });
+	c.append(h("h2", { text: `CRM (${sichtbar.length})` }),
+		h("div", { class: "suche-zeile" }, suche),
+		h("div", { class: "kacheln-klein" },
+			kachel(sichtbar.length, "Personen", {}),
+			kachel(sichtbar.filter((p) => tageHer(p.zuletzt) <= 30).length, "aktiv in 30 Tagen", {}),
+			kachel(sichtbar.filter((p) => p.status === "eingeladen").length, "eingeladen", { status: "eingeladen" }),
+			kachel(sichtbar.filter((p) => ["verwarnt", "gesperrt"].includes(p.status)).length, "verwarnt oder gesperrt", { status: "auffaellig" }),
+			kachel(sichtbar.filter(inaktiv).length, "seit 30 Tagen nicht da", { inaktiv: true })),
+		h("div", { class: "chips" }, h("span", { class: "leise", text: "Rolle:" }),
+			...d.rollen.map((r) => chip(ROLLEN_TEXT[r], crmFilter.rolle === r, () => { crmFilter.rolle = crmFilter.rolle === r ? "" : r; })),
+			h("span", { class: "leise", text: "Status:" }),
+			...d.status.map((s) => chip(STATUS_TEXTE[s], crmFilter.status === s, () => { crmFilter.status = crmFilter.status === s ? "" : s; })),
+			chip("seit 30 Tagen nicht da", crmFilter.inaktiv, () => { crmFilter.inaktiv = !crmFilter.inaktiv; }),
+			crmFilter.rolle || crmFilter.status || crmFilter.inaktiv ? chip("✕ Filter löschen", false, () => Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false })) : null),
 		h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
-			h("thead", {}, h("tr", {}, ...["Person", "E-Mail", "Rollen", "Status", "Zuletzt aktiv", ...(mitCf ? ["Cloudflare"] : [])].map((t) => h("th", { text: t })))), tbody)),
+			h("thead", {}, h("tr", {}, ...["Nr.", "Person", "E-Mail", "Rollen", "Status", "Zuletzt aktiv", ...(mitCf ? ["Cloudflare"] : [])].map((t) => h("th", { text: t })))), tbody)),
+		einladen, cloudflareBox(cf),
+		d.mail ? null : h("p", { class: "leise", text: "E-Mail-Versand nicht eingerichtet (SMTP_* in der .env) – Einladungen dann selbst verschicken." }),
 		h("p", {}, h("a", { href: "#protokoll", text: "Prüfprotokoll aller Änderungen →" })));
+	fuellen();
+	suche.focus();
 	const liste = await api("GET", "/anmeldungen");
 	c.append(h("h2", { text: "Letzte Anmeldungen" }),
 		h("p", { class: "leise", text: "Je Cloudflare-Sitzung und Gerät. Unbekanntes Gerät? „Trennen“ meldet es bei der nächsten Anfrage ab (neuer E-Mail-Code nötig)." }),
@@ -328,35 +371,90 @@ async function personenSeite(c) {
 
 async function personSeite(c, name) {
 	const p = await api("GET", "/personen/" + encodeURIComponent(name));
-	const pfad = "/personen/" + encodeURIComponent(name);
+	// Für alle weiteren Aufrufe die Nummer: gilt auch für gelöschte Personen und nach einem Handle-Wechsel
+	const pfad = "/personen/" + encodeURIComponent(pnr(p.nr) || p.name);
+	const wer = p.status === "geloescht" ? "gelöschte Person" : "@" + p.handle;
 	const neu = () => zeigen();
 	const tun = (fn, text) => sicher(async () => { const r = await fn(); if (text) meldung(text); await neu(); return r; });
-	c.append(h("p", {}, h("a", { href: "#personen", text: "← alle Personen" })),
-		h("h2", {}, p.name, " ", h("span", { class: "status " + STATUS_KLASSE[p.status], text: STATUS_TEXTE[p.status] }),
-			p.notfallAdmin ? h("span", { class: "leise", text: " · Notfall-Admin (ADMINS)" }) : null),
-		p.status === "gesperrt" ? h("p", { class: "hinweis-box", text: `Gesperrt: ${p.sperrgrund || "–"}${p.gesperrt_bis ? " · bis " + datumZeit(p.gesperrt_bis) : " · unbefristet"}. Aus Cloudflare entfernt das erst „python3 scripts/cloudflare.py abgleichen --entfernen“ am Mac – hinein kommt die Person aber schon jetzt nicht mehr.` }) : null);
+	// Zusatzdaten (Profil, Spiele, Anfragen) parallel – fehlt eins, fehlt nur der Block
+	const [profil, spiele, anfragen] = await Promise.all([
+		p.status === "geloescht" ? null : Bridge.json("GET", "/api/profil/" + encodeURIComponent(p.handle)).catch(() => null),
+		api("GET", "/spiele").catch(() => []), api("GET", "/antraege").catch(() => [])]);
+	const eigeneSpiele = spiele.filter((s) => s.author === p.handle);
+	const gestellt = anfragen.filter((a) => a.player === p.handle);
+	const bekommen = anfragen.filter((a) => a.zustaendig === p.handle && a.player !== p.handle);
+	const gespielt = profil ? profil.spiele : [];
 
-	// Stammdaten
-	const f = {};
-	for (const k of ["anzeigename", "vorname", "nachname"]) f[k] = h("input", { value: p[k] || "", maxlength: k === "anzeigename" ? "40" : "60" });
-	f.geburtstag = h("input", { type: "date", value: p.geburtstag || "", min: "1900-01-01", max: new Date().toISOString().slice(0, 10) });
-	// 1.4.1: „Angelegt am“ korrigierbar – bei Personen ohne Aktivität kennt die Bibliothek nur den Tag der Umstellung
-	const tag = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-	f.angelegt = h("input", { type: "date", value: p.angelegt ? tag(p.angelegt) : "", min: "2020-01-01", max: tag(new Date().toISOString()) });
-	c.append(h("h3", { text: "Stammdaten" }), h("form", { class: "karte", onsubmit: (e) => { e.preventDefault();
-		const daten = { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value, geburtstag: f.geburtstag.value || null };
-		if (f.angelegt.value && f.angelegt.value !== tag(p.angelegt)) daten.angelegt = f.angelegt.value;
-		tun(() => api("PATCH", pfad, daten), "Gespeichert."); } },
-		h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag),
-			h("label", { title: "Wann das Konto angelegt wurde – „dabei seit“ im Profil. Korrigieren, wenn du es besser weißt." }, "Angelegt am ", f.angelegt)),
-		h("p", { class: "leise", text: `Angelegt ${datumZeit(p.angelegt)}${p.eingeladen_von ? " von " + p.eingeladen_von : ""} · erste Anmeldung ${datumZeit(p.erste_anmeldung)} · Datenschutzhinweis ${p.datenschutz_bestaetigt ? "bestätigt " + datumZeit(p.datenschutz_bestaetigt) : "noch nicht bestätigt"} · 2FA: kommt in einer späteren Version` }),
-		h("div", {}, h("button", { type: "submit", class: "knopf klein", text: "Speichern" }))));
+	// Kopf
+	const zahlen = [[profil && profil.sekunden ? dauer(profil.sekunden) : 0, "Spielzeit"], [gespielt.length, "gespielt"], [eigeneSpiele.length, "eigene Spiele"],
+		[gestellt.length + bekommen.length, "Anfragen"]].filter((z) => z[0]);
+	c.append(h("p", {}, h("a", { href: "#personen", text: "← CRM" }), h("span", { class: "leise", text: " · Suche bleibt erhalten" })),
+		h("section", { class: "karte profil-kopf crm-kopf" },
+			initialen(h("span", { class: "avatar gross", "aria-hidden": "true" }), p.anzeigename || p.handle, p.handle),
+			h("div", { class: "profil-name" },
+				h("h2", {}, p.status === "geloescht" ? "gelöschte Person" : (anzeigePerson(p) || "@" + p.handle), " ",
+					h("span", { class: "status " + STATUS_KLASSE[p.status], text: STATUS_TEXTE[p.status] }),
+					p.notfallAdmin ? h("span", { class: "leise", text: " · Notfall-Admin (ADMINS)" }) : null),
+				h("div", { class: "leise", text: [p.status !== "geloescht" && anzeigePerson(p) ? "@" + p.handle : null, pnr(p.nr), "dabei seit " + datumZeit(p.angelegt).split(",")[0],
+					p.erste_anmeldung ? null : "noch nie angemeldet"].filter(Boolean).join(" · ") }),
+				p.alteHandles && p.alteHandles.length ? h("div", { class: "leise", text: "früher @" + p.alteHandles.join(", @") + " (reserviert, leitet weiter)" }) : null,
+				h("div", { class: "rollen" }, ...p.rollen.map((r) => h("span", { class: "rolle " + r, text: ROLLEN_TEXT[r] })))),
+			zahlen.length ? h("div", { class: "profil-zahlen zeile" }, ...zahlen.map(([w, t]) => h("div", {}, h("b", { text: String(w) }), h("div", { text: t })))) : null),
+		p.status === "gesperrt" ? h("p", { class: "hinweis-box", text: `Gesperrt: ${p.sperrgrund || "–"}${p.gesperrt_bis ? " · bis " + datumZeit(p.gesperrt_bis) : " · unbefristet"}. Aus Cloudflare entfernt das erst „python3 scripts/cloudflare.py abgleichen --entfernen“ am Mac – hinein kommt die Person aber schon jetzt nicht mehr.` }) : null,
+		p.status === "eingeladen" && !p.erste_anmeldung ? h("p", { class: "hinweis-box", text: `Eingeladen${p.einladung_gesendet ? " (Mail " + datumZeit(p.einladung_gesendet) + ")" : ""}, hat sich noch nie angemeldet. Häufigster Grund: Der E-Mail-Code kommt nicht an – dann fehlt die Adresse in der Cloudflare-Richtlinie „Kollegen“.` }) : null,
+		p.status === "geloescht" ? h("p", { class: "hinweis-box", text: "Endgültig gelöscht (anonymisiert). In Bestenlisten und an Spielständen steht überall „gelöschte Person“. Erreichbar nur noch über die Nummer " + pnr(p.nr) + "." }) : null);
 
-	// E-Mails
+	// Schnellaktionen
+	const schnell = [];
+	if (!RAUS(p.status)) schnell.push(knopf("Handle ändern …", async () => {
+		const neuesHandle = prompt(`Neues Handle für @${p.handle} (3–20 Zeichen: a–z, 0–9, _ und -). Als Admin ohne 30-Tage-Frist. Das alte bleibt für die Person reserviert, alte Links leiten weiter.`, p.handle);
+		if (!neuesHandle || neuesHandle === p.handle) return;
+		const r = await api("POST", pfad + "/handle", { handle: neuesHandle });
+		location.hash = "#person/" + r.handle; meldung(`Handle geändert: @${p.handle} → @${r.handle}.`);
+	}));
+	schnell.push(knopf("Auskunft (Export)", async () => {
+		const daten = await api("GET", pfad + "/export");
+		const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" })), download: `auskunft-${pnr(p.nr) || p.handle}.json` });
+		document.body.append(a); a.click(); a.remove();
+	}));
+	if (p.uploadKonto) schnell.push(knopf("Neues Upload-Passwort", async () => {
+		if (!confirm(`Neues Upload-Passwort für ${wer}? Das alte gilt sofort nicht mehr.`)) return;
+		const r = await api("POST", `/entwickler/${encodeURIComponent(p.handle)}/passwort`); $("inhalt").prepend(passwortKarte(p.handle, r.passwort)); scrollTo(0, 0);
+	}));
+	c.append(h("div", { class: "zeile crm-aktionen" }, ...schnell));
+
+	const bloecke = [];
+	const block = (titel, ...inhalt) => h("section", { class: "karte crm-block" }, h("h3", { text: titel }), ...inhalt);
+
+	// Stammdaten (immer – hier wird auch korrigiert)
+	if (p.status !== "geloescht") {
+		const f = {};
+		for (const k of ["anzeigename", "vorname", "nachname"]) f[k] = h("input", { value: p[k] || "", maxlength: k === "anzeigename" ? "40" : "60" });
+		f.geburtstag = h("input", { type: "date", value: p.geburtstag || "", min: "1900-01-01", max: new Date().toISOString().slice(0, 10) });
+		const tag = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+		f.angelegt = h("input", { type: "date", value: p.angelegt ? tag(p.angelegt) : "", min: "2020-01-01", max: tag(new Date().toISOString()) });
+		bloecke.push(h("form", { class: "karte crm-block", onsubmit: (e) => { e.preventDefault();
+			const daten = { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value, geburtstag: f.geburtstag.value || null };
+			if (f.angelegt.value && f.angelegt.value !== tag(p.angelegt)) daten.angelegt = f.angelegt.value;
+			tun(() => api("PATCH", pfad, daten), "Gespeichert."); } },
+			h("h3", { text: "Stammdaten" }),
+			h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag),
+				h("label", { title: "Wann das Konto angelegt wurde – „dabei seit“ im Profil. Korrigieren, wenn du es besser weißt." }, "Angelegt am ", f.angelegt)),
+			h("p", { class: "leise", text: `Nummer ${pnr(p.nr)} · Handle @${p.handle}${p.handle_seit ? " (geändert " + datumZeit(p.handle_seit) + ")" : ""} · Spieleordner ${p.alt_name || p.handle} · angelegt ${datumZeit(p.angelegt)}${p.eingeladen_von ? " von " + p.eingeladen_von : ""} · erste Anmeldung ${datumZeit(p.erste_anmeldung)} · Datenschutzhinweis ${p.datenschutz_bestaetigt ? "bestätigt " + datumZeit(p.datenschutz_bestaetigt) : "noch nicht bestätigt"}` }),
+			h("div", {}, h("button", { type: "submit", class: "knopf klein", text: "Speichern" }))));
+	}
+
+	// Notizen (nur Admin) – Eingabe immer, Liste nur wenn vorhanden
+	const notiz = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Interne Notiz – sieht nur der Admin" });
+	bloecke.push(block("Notizen (nur für Admins)",
+		h("div", { class: "zeile" }, notiz, knopf("Notiz speichern", async () => { await api("POST", pfad + "/notizen", { text: notiz.value }); meldung("Notiz gespeichert."); neu(); })),
+		p.notizen.length ? h("ul", { class: "einfach" }, p.notizen.map((n) => h("li", {}, h("span", { class: "leise", text: `${datumZeit(n.zeit)} · ${n.von}: ` }), h("span", { class: "antrag-text", text: n.text })))) : null));
+
+	// Login-E-Mails
 	const neueMail = h("input", { type: "email", placeholder: "weitere Login-E-Mail" });
-	c.append(h("h3", { text: "Login-E-Mails" }), h("div", { class: "karte" },
-		h("ul", {}, p.emails.map((m) => h("li", {}, m, " ", p.emails.length > 1 ? knopf("Entfernen", async () => {
-			if (!confirm(`${m} entfernen? Mit dieser Adresse kommt ${p.name} dann nicht mehr hinein.`)) return;
+	if (p.emails.length || !RAUS(p.status)) bloecke.push(block("Login-E-Mails",
+		h("ul", { class: "einfach" }, p.emails.map((m) => h("li", {}, m, " ", p.emails.length > 1 ? knopf("Entfernen", async () => {
+			if (!confirm(`${m} entfernen? Mit dieser Adresse kommt ${wer} dann nicht mehr hinein.`)) return;
 			await api("DELETE", `${pfad}/emails/${encodeURIComponent(m)}`); meldung("E-Mail entfernt."); neu();
 		}, "gefahr") : null))),
 		!RAUS(p.status) ? h("div", { class: "zeile" }, neueMail, knopf("Hinzufügen", async () => {
@@ -366,28 +464,22 @@ async function personSeite(c, name) {
 	// Rollen
 	if (!RAUS(p.status)) {
 		const wahl = rollenWahl(p.rollen, p.notfallAdmin ? ["admin"] : []);
-		c.append(h("h3", { text: "Rollen" }), h("div", { class: "karte" }, wahl.el,
+		bloecke.push(block("Rollen", wahl.el,
 			h("p", { class: "leise", text: (p.ordner && !p.rollen.includes("entwickler") ? "Hat noch einen Spieleordner (die Spiele bleiben), aber keine Entwickler-Rechte. " : "") + "Entwickler bekommt ein Upload-Konto (Passwort wird einmal angezeigt), ohne Entwickler wird es entfernt – die Spiele bleiben. Tester: sieht auf dem Testserver das Tester-Panel und bekommt eine Glocke, wenn neue Tests anstehen." }),
 			h("div", { class: "zeile" }, knopf("Rollen speichern", async () => {
 				const r = await api("PUT", pfad + "/rollen", { rollen: wahl.werte() });
 				await neu();
 				meldung(r.dazu.length || r.weg.length ? `Rollen geändert: ${[...r.dazu.map((x) => "+" + ROLLEN_TEXT[x]), ...r.weg.map((x) => "−" + ROLLEN_TEXT[x])].join(", ")}.` + (r.hinweis ? " " + r.hinweis : "") : "Keine Änderung.");
-				if (r.passwort) $("inhalt").prepend(passwortKarte(p.name, r.passwort));
-			}, ""),
-			p.uploadKonto ? knopf("Neues Upload-Passwort", async () => {
-				if (!confirm(`Neues Upload-Passwort für ${p.name}? Das alte gilt sofort nicht mehr.`)) return;
-				const r = await api("POST", `/entwickler/${encodeURIComponent(p.name)}/passwort`); $("inhalt").prepend(passwortKarte(p.name, r.passwort)); scrollTo(0, 0);
-			}) : null)));
+				if (r.passwort) $("inhalt").prepend(passwortKarte(p.handle, r.passwort));
+			}, ""))));
 	}
 
-	// Status: einladen, verwarnen, sperren, archivieren
-	const grund = h("input", { placeholder: "Grund (sieht die Person)", maxlength: "500", size: "40" });
+	// Status und Maßnahmen
+	const grund = h("input", { placeholder: "Grund (sieht die Person)", maxlength: "500", size: "34" });
 	const bis = h("input", { type: "datetime-local", title: "leer = unbefristet" });
 	const aktionen = [];
 	if (p.status === "eingeladen" || (p.status !== "gesperrt" && !RAUS(p.status) && !p.erste_anmeldung)) {
-		const senden = async (ohnePruefung) => {
-			await api("POST", pfad + "/einladung", { ohnePruefung }); meldung(`Einladung an ${p.emails[0]} verschickt.`); neu();
-		};
+		const senden = async (ohnePruefung) => { await api("POST", pfad + "/einladung", { ohnePruefung }); meldung(`Einladung an ${p.emails[0]} verschickt.`); neu(); };
 		aktionen.push(knopf(p.einladung_gesendet ? "Einladung erneut senden" : "Einladung senden", async () => {
 			try { await senden(false); } catch (e) {
 				if (e.status === 409 && e.message.includes("trotzdem senden") && confirm(e.message + "\n\nSteht die E-Mail sicher in Cloudflare? Dann trotzdem senden.")) return senden(true);
@@ -397,67 +489,73 @@ async function personSeite(c, name) {
 	}
 	if (["aktiv", "eingeladen", "verwarnt"].includes(p.status)) aktionen.push(knopf("Verwarnen", async () => {
 		if (!grund.value.trim()) return meldung("Erst einen Grund eintragen.", true);
-		await api("POST", pfad + "/verwarnen", { grund: grund.value }); meldung(`${p.name} verwarnt – die Meldung steht in der Glocke.`); neu();
+		await api("POST", pfad + "/verwarnen", { grund: grund.value }); meldung(`${wer} verwarnt – die Meldung steht in der Glocke.`); neu();
 	}));
 	if (p.status === "verwarnt") aktionen.push(knopf("Verwarnung aufheben", async () => { await api("POST", pfad + "/verwarnung-aufheben"); meldung("Verwarnung aufgehoben."); neu(); }));
 	if (!p.notfallAdmin && !RAUS(p.status) && p.status !== "gesperrt") aktionen.push(knopf("Sperren", async () => {
 		if (!grund.value.trim()) return meldung("Erst einen Grund eintragen.", true);
-		if (!confirm(`${p.name} sperren? Gilt sofort für Bibliothek und Upload.`)) return;
-		await api("POST", pfad + "/sperren", { grund: grund.value, bis: bis.value ? new Date(bis.value).toISOString() : null }); meldung(`${p.name} gesperrt.`); neu();
+		if (!confirm(`${wer} sperren? Gilt sofort für Bibliothek und Upload.`)) return;
+		await api("POST", pfad + "/sperren", { grund: grund.value, bis: bis.value ? new Date(bis.value).toISOString() : null }); meldung(`${wer} gesperrt.`); neu();
 	}, "gefahr"));
 	if (p.status === "gesperrt") aktionen.push(knopf("Entsperren", async () => { await api("POST", pfad + "/entsperren"); meldung("Entsperrt."); neu(); }));
-	// Archivieren ist rückgängig zu machen (Sebs Test 08.11.2026), endgültig löschen ist ein eigener zweiter Schritt
 	if (!p.notfallAdmin && !RAUS(p.status)) aktionen.push(knopf("Archivieren …", async () => {
-		if (!confirm(`${p.name} archivieren? Kein Zugang mehr (auch kein Upload), die Person verschwindet aus der Liste. Alle Daten bleiben – „Wiederherstellen“ holt sie jederzeit zurück.`)) return;
-		await api("POST", pfad + "/archivieren"); meldung(`${p.name} archiviert – rückgängig mit „Wiederherstellen“.`); neu();
+		if (!confirm(`${wer} archivieren? Kein Zugang mehr (auch kein Upload), die Person verschwindet aus der Liste. Alle Daten bleiben – „Wiederherstellen“ holt sie jederzeit zurück.`)) return;
+		await api("POST", pfad + "/archivieren"); meldung(`${wer} archiviert – rückgängig mit „Wiederherstellen“.`); neu();
 	}, "gefahr"));
 	if (p.status === "archiviert") {
 		aktionen.push(knopf("Wiederherstellen", async () => {
 			const r = await api("POST", pfad + "/wiederherstellen");
 			await neu();
-			meldung(`${p.name} wiederhergestellt – Status ${STATUS_TEXTE[r.person.status]}.` + (r.passwort ? " Neues Upload-Passwort siehe oben." : ""));
-			if (r.passwort) { $("inhalt").prepend(passwortKarte(p.name, r.passwort)); scrollTo(0, 0); }
+			meldung(`${wer} wiederhergestellt – Status ${STATUS_TEXTE[r.person.status]}.` + (r.passwort ? " Neues Upload-Passwort siehe oben." : ""));
+			if (r.passwort) { $("inhalt").prepend(passwortKarte(p.handle, r.passwort)); scrollTo(0, 0); }
 		}, ""));
 		aktionen.push(knopf("Endgültig löschen (anonymisieren) …", async () => {
-			const b = prompt(`${p.name} ENDGÜLTIG löschen? Name, Geburtstag, E-Mails, Notizen und Rollen werden gelöscht – nur der Benutzername bleibt (an Spielständen und Spielen). Das lässt sich NICHT rückgängig machen. Gedacht z. B., wenn die Person die Löschung ihrer Daten verlangt.\n\nZur Bestätigung den Benutzernamen eingeben:`);
+			const b = prompt(`${wer} ENDGÜLTIG löschen? Name, Geburtstag, E-Mails, Notizen und Rollen werden gelöscht – an Spielständen und in Bestenlisten steht danach „gelöschte Person“. Das lässt sich NICHT rückgängig machen. Gedacht z. B., wenn die Person die Löschung ihrer Daten verlangt.\n\nZur Bestätigung das Handle eingeben (${p.handle}):`);
 			if (b === null) return;
-			await api("POST", pfad + "/loeschen", { bestaetigung: b }); meldung(`${p.name} endgültig gelöscht.`); neu();
+			await api("POST", pfad + "/loeschen", { bestaetigung: b.trim().replace(/^@/, "") }); meldung(`${wer} endgültig gelöscht.`); neu();
 		}, "gefahr"));
 	}
-	aktionen.push(knopf("Auskunft (Export)", async () => {
-		const daten = await api("GET", pfad + "/export");
-		const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" })), download: `auskunft-${p.name}.json` });
-		document.body.append(a); a.click(); a.remove();
-	}));
-	c.append(h("h3", { text: "Status und Maßnahmen" }), h("div", { class: "karte" },
+	if (aktionen.length) bloecke.push(block("Status und Maßnahmen",
 		h("div", { class: "zeile" }, h("label", {}, "Grund ", grund), h("label", { title: "nur fürs Sperren, leer = unbefristet" }, "gesperrt bis ", bis)),
 		h("div", { class: "zeile" }, ...aktionen)));
 
-	// Notizen (nur Admin)
-	const notiz = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Interne Notiz – sieht nur der Admin" });
-	c.append(h("h3", { text: "Notizen (nur für Admins)" }), h("div", { class: "karte" },
-		h("div", { class: "zeile" }, notiz, knopf("Notiz speichern", async () => { await api("POST", pfad + "/notizen", { text: notiz.value }); meldung("Notiz gespeichert."); neu(); })),
-		p.notizen.length ? h("ul", {}, p.notizen.map((n) => h("li", {}, h("span", { class: "leise", text: `${datumZeit(n.zeit)} · ${n.von}: ` }), h("span", { class: "antrag-text", text: n.text }))))
-			: h("p", { class: "leise", text: "Noch keine Notizen." })));
+	// Spiele, gespielt, Anfragen – nur wenn es etwas gibt
+	const spielLink = (id, titel) => h("a", { href: "#spiele", title: id, text: titel || id });
+	if (eigeneSpiele.length) bloecke.push(block(`Eigene Spiele (${eigeneSpiele.length})`, h("ul", { class: "einfach" }, eigeneSpiele.map((s) => h("li", {},
+		spielLink(s.id, s.title), h("span", { class: "leise", text: ` · ${s.version || "Entwurf"} · ${s.spieler || 0} Spieler · ${dauer(s.spielzeit || 0)} gespielt` + (s.testspiel ? " · Testspiel" : "") + (s.offline ? " · offline" : "") }))))));
+	if (gespielt.length) bloecke.push(block(`Gespielt (${gespielt.length})`, tabelle(["Spiel", "von", "Spielzeit", "Platz", "Erfolge"], gespielt.map((s) => h("tr", {},
+		h("td", { text: s.title }), h("td", {}, s.author ? h("a", { href: "#person/" + s.author, text: "@" + s.author }) : "–"), h("td", { text: dauer(s.sekunden) }),
+		h("td", { text: s.platz ? s.platz + "." : "–" }), h("td", { text: s.erfolgeGesamt ? `${s.erfolge.length}/${s.erfolgeGesamt}` : "–" }))))));
+	const anfrageZeile = (a, gegenueber) => h("li", {}, h("a", { href: "/#/antrag/" + a.id, target: "_blank", rel: "noopener", text: "#" + a.id }), " ",
+		h("span", { class: "status " + (a.status === "offen" ? "offen" : a.status === "erledigt" ? "erledigt" : ""), text: a.status }), " ", a.artText,
+		a.title ? " zu " + a.title : "", " ", gegenueber, h("div", { class: "leise", text: `${datumZeit(a.erstellt)} · ${a.text.length > 120 ? a.text.slice(0, 120) + " …" : a.text}` }));
+	if (gestellt.length || bekommen.length) bloecke.push(block("Anfragen",
+		gestellt.length ? h("div", {}, h("strong", { text: `Gestellt (${gestellt.length})` }), h("ul", { class: "einfach" }, gestellt.map((a) => anfrageZeile(a,
+			a.zustaendig && a.zustaendig !== "admin" ? h("span", {}, "→ ", h("a", { href: "#person/" + a.zustaendig, text: "@" + a.zustaendig })) : "→ Seb")))) : null,
+		bekommen.length ? h("div", {}, h("strong", { text: `Als Entwickler bekommen (${bekommen.length}, ${bekommen.filter((a) => a.status === "offen").length} offen)` }),
+			h("ul", { class: "einfach" }, bekommen.map((a) => anfrageZeile(a, h("span", {}, "von ", h("a", { href: "#person/" + a.player, text: "@" + a.player })))))) : null,
+		h("p", { class: "leise", text: "Ab 1.6.0 stehen hier die Tickets." })));
 
-	// Zeitleiste, Anmeldungen, Protokoll
-	c.append(h("h3", { text: "Zeitleiste" }), p.zeitleiste.length ? tabelle(["Zeit", "Was", ""], p.zeitleiste.map((z) => h("tr", {},
-		h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.art }), h("td", { text: z.text + (z.von ? ` (${z.von})` : "") })))) : h("p", { class: "leise", text: "Noch nichts." }));
-	c.append(h("h3", { text: "Anmeldungen" }), p.anmeldungen.length ? anmeldeTabelle(p.anmeldungen, false, async (a) => {
+	if (p.anmeldungen.length) bloecke.push(block(`Anmeldungen (${p.anmeldungen.length})`, anmeldeTabelle(p.anmeldungen, false, async (a) => {
 		if (!confirm(`Anmeldung „${a.geraet}“ beenden?`)) return;
-		await api("POST", "/anmeldungen/trennen", { player: p.name, sitzung: a.sitzung }); meldung("Getrennt."); neu();
-	}) : h("p", { class: "leise", text: "Keine." }));
-	c.append(h("details", {}, h("summary", { text: `Prüfprotokoll zu ${p.name} (${p.protokoll.length})` }), protokollTabelle(p.protokoll)));
+		await api("POST", "/anmeldungen/trennen", { player: p.handle, sitzung: a.sitzung }); meldung("Getrennt."); neu();
+	})));
+	if (p.sicherheit.length) bloecke.push(block(`Sicherheitsprotokoll (${p.sicherheit.length})`,
+		tabelle(["Zeit", "Art", ""], p.sicherheit.map((z) => h("tr", {}, h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.art }), h("td", { text: z.text }))))));
+	if (p.zeitleiste.length) bloecke.push(h("section", { class: "karte crm-block breit" }, h("h3", { text: "Zeitleiste" }),
+		tabelle(["Zeit", "Was", ""], p.zeitleiste.map((z) => h("tr", {}, h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.art }), h("td", { text: z.text + (z.von ? ` (${z.von})` : "") }))))));
+	c.append(h("div", { class: "crm-raster" }, ...bloecke));
+	if (p.protokoll.length) c.append(h("details", {}, h("summary", { text: `Prüfprotokoll zu ${wer} (${p.protokoll.length})` }), protokollTabelle(p.protokoll)));
 }
 
 function protokollTabelle(liste) {
 	const kurz = (x) => x === null || x === undefined ? "" : String(x).length > 120 ? String(x).slice(0, 120) + " …" : String(x);
 	return tabelle(["Zeit", "Wer", "Aktion", "Person", "Vorher", "Nachher"], liste.map((z) => h("tr", {},
-		h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.von }), h("td", { text: z.aktion }), h("td", {}, z.ziel ? h("a", { href: "#person/" + z.ziel, text: z.ziel }) : ""),
+		h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.von }), h("td", { text: z.aktion }), h("td", {}, z.ziel ? h("a", { href: "#person/" + z.ziel, text: "@" + z.ziel }) : ""),
 		h("td", { class: "leise", text: kurz(z.vorher) }), h("td", { text: kurz(z.nachher) }))));
 }
 async function protokollSeite(c) {
-	c.append(h("p", {}, h("a", { href: "#personen", text: "← Personen" })), h("h2", { text: "Prüfprotokoll" }),
+	c.append(h("p", {}, h("a", { href: "#personen", text: "← CRM" })), h("h2", { text: "Prüfprotokoll" }),
 		h("p", { class: "leise", text: "Jede Änderung an Personen – wer, was, wann, vorher und nachher. Wird nie gelöscht." }),
 		protokollTabelle(await api("GET", "/protokoll")));
 }
@@ -645,8 +743,8 @@ for (const m of ["append", "prepend", "replaceChildren"]) {
 const SEITEN = { uebersicht, spiele: spieleSeite, personen: personenSeite, protokoll: protokollSeite, spielstaende: spielstaendeSeite, antraege: antraegeSeite, aufgaben: aufgabenSeite };
 
 async function zeigen() {
-	if (location.hash === "#benutzer") return location.replace("#personen");   // alte Adresse (vor 1.4.0)
-	const person = location.hash.match(/^#person\/([a-z0-9][a-z0-9_-]{0,31})$/);
+	if (location.hash === "#benutzer" || location.hash === "#crm") return location.replace("#personen");   // alte Adresse (vor 1.4.0) / Kurzform
+	const person = location.hash.match(/^#person\/([a-z0-9][a-z0-9_-]{0,31}|P-\d{1,6})$/);
 	const name = person ? "personen" : SEITEN[location.hash.slice(1)] ? location.hash.slice(1) : "uebersicht";
 	const reiter = name === "protokoll" ? "personen" : name;
 	for (const a of $("reiter").querySelectorAll("a")) a.classList.toggle("aktiv", a.getAttribute("href") === "#" + reiter);

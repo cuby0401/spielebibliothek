@@ -105,12 +105,14 @@ const { data, migriert } = await GameSave.load("spielstand", { standard: {...}, 
 await GameSave.remove("spielstand");
 await GameSave.submitScore(1250);                // nur mit Bestenliste in game.json
 const top = await GameSave.leaderboard();        // [{ rank, player, score, werte }, …]
-const ich = await GameSave.player();             // "paul"
+const ich = await GameSave.player();             // "paul" – das Handle, kann sich ändern (alle 30 Tage)
 GameSave.version                                 // "1.2.0" – vergibt die Bibliothek (lokal und im Entwurf: null)
 await GameSave.erfolg("erster-sieg");            // Erfolg freischalten → { neu: true } beim ersten Mal
 const erfolge = await GameSave.erfolge();        // [{ id, titel, …, freigeschaltet }]
 GameSave.available                               // false beim lokalen Testen</code></pre>
     <ul>
+      <li><code>GameSave.player()</code> liefert das <strong>Handle</strong> (z. B. <code>paul</code>). Spieler können es alle 30 Tage ändern –
+        nur anzeigen, nichts daran festmachen. Spielstände und Bestenlisten ordnet die Bibliothek selbst richtig zu, auch nach einer Änderung.</li>
       <li>Alle Aufrufe können fehlschlagen – mit <code>try/catch</code> abfangen. Keys: Buchstaben, Ziffern, <code>. _ : -</code>, max. 100 Zeichen.
         Höchstens 256 KB pro Spielstand, 50 Spielstände pro Spieler und Spiel.</li>
       <li><strong>Sofort speichern</strong>, wenn sich etwas Wichtiges ändert – nicht erst beim Beenden. Ein Tab kann jederzeit geschlossen werden.</li>

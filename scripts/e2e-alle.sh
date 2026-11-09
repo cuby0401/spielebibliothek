@@ -63,7 +63,7 @@ teststand() {
 }
 
 FEHLER=""
-for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm boese}; do
+for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm zentrale-1.5 boese}; do
 	echo "→ Ende-zu-Ende: $t"
 	PW=$(teststand) || { FEHLER="$FEHLER $t"; continue; }
 	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"
@@ -74,7 +74,8 @@ for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentr
 	if perl -e 'alarm shift; exec @ARGV' 300 "$@" > "$TMP/log" 2>&1; then
 		echo "  ✓ $(grep -c '^✓' "$TMP/log") Prüfpunkte grün"
 	else
-		grep -E "^✗|ABBRUCH" "$TMP/log" | sed 's/^/  /' || tail -5 "$TMP/log" | sed 's/^/  /'
+		# Ohne ✗/ABBRUCH (Absturz, Zeitgrenze) die letzten Zeilen zeigen – vorher blieb es dann stumm (1.5.0)
+		if grep -qE "^✗|ABBRUCH" "$TMP/log"; then grep -E "^✗|ABBRUCH" "$TMP/log" | sed 's/^/  /'; else echo "  (Abbruch ohne Prüfpunkt – letzte Zeilen:)"; tail -8 "$TMP/log" | sed 's/^/  /'; fi
 		FEHLER="$FEHLER $t"
 	fi
 done

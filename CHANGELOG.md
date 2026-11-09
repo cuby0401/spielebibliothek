@@ -5,6 +5,25 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.5.0 – in Arbeit (ab 09.11.2026)
+
+Kleines Update mit großem Umbau im Hintergrund: Identität mit drei Schichten und das komplette CRM (E80–E82). Die Tickets folgen in 1.6.0.
+Plan im Vault: `Projekte/Spielebibliothek/Architektur/Identitaet-und-CRM-1.5.0.md`.
+
+- **Neu: Identität mit UUID, Handle und Anzeigename** (E81). Jede Person hat eine zufällige, unveränderliche ID, auf die alles verweist (Spielstände, Bestenlisten, Erfolge, Anfragen, CRM, Protokolle). Nach außen erscheint sie nie: Überall steht das Handle (`@paul`) bzw. der Anzeigename. Dazu eine Personennummer `P-0007` für den Admin-Bereich.
+- **Umstellung beim ersten Start**, einmalig und in einer Transaktion: vorher Sicherung (`data/backup/vor-uuid-<Tag>.db`), danach Prüfung von Zeilenzahl und Prüfsumme jeder Tabelle. Scheitert etwas, bleibt die Datenbank unverändert und der Dienst startet nicht. `deploy.sh --zurueck` auf eine Version vor 1.5.0 stellt vorher automatisch zurück. Probelauf auf einer Kopie der Live-Daten (09.11.): 6 Personen, 1.009 Zeilen, Prüfsummen gleich, Rückweg identisch.
+- **Neu: Handle ändern** (E82) unter Profil → „Handle“, alle 30 Tage (ab der letzten Änderung; wer noch nie geändert hat, sofort). Frühere Handles bleiben für die Person reserviert und alte Profil-Links leiten weiter. Spielstände, Spiele, Erfolge und Plätze bleiben. Der Admin ändert ohne Frist. Spieleordner und Spiel-IDs behalten den ersten Namen.
+- **Neu: CRM** im Admin-Panel (Reiter „CRM“ statt „Personen“, nach dem Klick-Muster): Suche nach Nummer, Name, Handle (auch früheren) oder E-Mail, Enter öffnet bei einem Treffer die Karte. Kacheln und Filter nach Rolle, Status und „seit 30 Tagen nicht da“. Die **Personenkarte** zeigt alles auf einen Blick, leere Blöcke fehlen: Stammdaten, Notizen, E-Mails, Rollen, Maßnahmen, eigene und gespielte Spiele, Anfragen in beide Richtungen, Anmeldungen, Sicherheitsprotokoll, Zeitleiste.
+- **Neu: volles Sicherheitsprotokoll je Person**: abgelehnte Zugriffe und Rate-Limits (je Person, Art und Adresse höchstens einmal pro Minute), Anmeldeversuche Gesperrter, getrennte Sitzungen, blockierte Uploads, falsche Upload-Passwörter und Sperren, Admin-Maßnahmen.
+- **Neu:** Endgültig gelöschte Personen erscheinen überall als „gelöschte Person“ (vorher stand der Benutzername weiter in Bestenlisten).
+- **Neu:** Bei Anfragen und in der Bestenliste (beim Drüberfahren) steht das Handle neben dem Anzeigenamen – Anzeigenamen sind nicht eindeutig.
+- **Geändert:** Der Zwischenspeicher im Browser (noch nicht übertragene Spielstände) gehört zum Konto statt zum Namen und übersteht Handle-Änderungen. Vorhandene Zwischenspeicher bleiben gültig.
+- **Geändert:** Der Testserver startet nach einem NAS-Neustart von selbst wieder (`--restart unless-stopped`; am 09.11. blieb er nach dem NAS-Update aus).
+- **Behoben:** Bestenliste: Bei Gleichstand in derselben Sekunde entschied der Name statt der Reihenfolge.
+- **Behoben:** Admin-Panel → Letzte Anmeldungen: Die Spalte „Spieler“ war seit 1.4.1 leer.
+- **Behoben:** `scripts/e2e-alle.sh` zeigte bei einem Absturz ohne Prüfpunkt nichts an.
+- **Tests:** `test_identitaet.py` (Umstellung, Rückweg, Fehler mittendrin, keine UUID in irgendeiner Antwort – Gegenprobe ohne Übersetzung rot), `test_handle.py`, `test_zugriff.py` (fremde IDs an jedem Admin-Endpunkt, Gegenprobe rot), Bridge-Test für den Zwischenspeicher, Ende-zu-Ende `scripts/e2e-zentrale-1.5.mjs`. Die ganze Sammlung läuft mit UUIDs im Hintergrund, mit `TEST_IDENTITAET_UUID=0` wie in 1.4.1.
+
 ## 1.4.1 – in Arbeit (ab 08.11.2026)
 
 Kleines Update nach dem ersten Testdurchgang mit dem Tester-Panel: Tester-Panel aufräumen, „Dabei seit“ korrigieren, schnellere Ende-zu-Ende-Tests, NAS entlasten.

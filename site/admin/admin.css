@@ -26,3 +26,28 @@
 
 /* Meldung klebt oben im Fenster (1.4.0, Nachtest 08.11.), Fehler rot umrandet */
 #meldung.fehler { border-color: var(--warn); }
+
+/* CRM (Zentrale 1.5.0, Klick-Muster 09.11.2026) */
+.suche-zeile { margin: 0.4rem 0 0.8rem; }
+.admin input.crm-suche { width: 100%; font-size: 1.1rem; padding: 0.6rem 0.8rem; border-radius: 8px; }
+button.kennzahl { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+button.kennzahl:hover { border-color: var(--akzent); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-bottom: 0.9rem; }
+.chips .leise { margin-left: 0.4rem; font-size: 0.85rem; }
+.chip { border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); border-radius: 999px; padding: 0.1rem 0.7rem; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.chip.an { background: var(--akzent); color: var(--akzent-text); border-color: var(--akzent); }
+.tabelle td.nr, .nr { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; color: var(--leise); white-space: nowrap; }
+.wer { display: flex; gap: 0.55rem; align-items: center; }
+tr.klickbar { cursor: pointer; }
+tr.klickbar:hover td { background: var(--grund); }
+.crm-kopf h2 { margin: 0; font-size: 1.35rem; }
+.crm-kopf .profil-zahlen { margin-left: auto; }
+.crm-aktionen { margin: 0.8rem 0; }
+.crm-raster { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); align-items: start; margin-bottom: 1rem; }
+.crm-raster .breit { grid-column: 1 / -1; }
+.crm-block h3 { margin: 0 0 0.6rem; font-size: 1rem; }
+.crm-block .tabelle-rahmen { max-height: 28rem; overflow: auto; }
+ul.einfach { list-style: none; padding: 0; margin: 0; }
+ul.einfach li { padding: 0.35rem 0; border-bottom: 1px solid var(--linie); }
+ul.einfach li:last-child { border-bottom: 0; }
+@media (max-width: 640px) { .crm-raster { grid-template-columns: 1fr; } .crm-kopf .profil-zahlen { margin-left: 0; } }

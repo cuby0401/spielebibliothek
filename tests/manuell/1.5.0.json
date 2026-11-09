@@ -1,0 +1,243 @@
+{
+  "version": "1.5.0",
+  "hinweis": "Der Testserver ist eine Kopie der echten Bibliothek mit deinem Konto. Nichts davon landet im Live-System. Neu in 1.5.0: Jede Person hat innen eine feste ID, außen ihr Handle (bisher der Benutzername), das sich alle 30 Tage ändern lässt. Hier stehen nur Dinge, die in 1.5.0 NEU sind, jedes einzeln. Die Admin-Tests sieht nur Seb.",
+  "tests": [
+    {
+      "id": "umstellung-alles-da",
+      "bereich": "Identität",
+      "titel": "Nach der Umstellung ist alles noch da",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Öffne ein Spiel, das du schon gespielt hast, und lade deinen Spielstand.",
+        "Öffne die Bestenliste eines Spiels, in dem du einen Eintrag hast.",
+        "Klick oben rechts auf deinen Namen → Profil. Schau auf Spielzeit, gespielte Spiele und Erfolge."
+      ],
+      "erwartet": "Spielstand, Platz in der Bestenliste, Spielzeit und Erfolge sind wie in der echten Bibliothek. Nichts fehlt, nichts ist doppelt. Nirgends steht eine lange Zeichenkette wie „3f2a…-…-…“ statt eines Namens."
+    },
+    {
+      "id": "handle-anzeigen",
+      "bereich": "Handle",
+      "titel": "Dein Handle steht im Profil",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Klick oben rechts auf deinen Namen → Profil.",
+        "Scroll zu „Meine Angaben“ und darunter zum Abschnitt „Handle“."
+      ],
+      "erwartet": "Der Abschnitt „Handle“ zeigt dein aktuelles Handle (bisher dein Benutzername, z. B. „emil“) mit einer kurzen Erklärung. Das Feld ist frei, der Knopf „Handle ändern“ ist anklickbar (wer noch nie geändert hat, darf sofort)."
+    },
+    {
+      "id": "handle-aendern",
+      "bereich": "Handle",
+      "titel": "Handle ändern",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Profil → Abschnitt „Handle“.",
+        "Trag ein neues Handle ein, z. B. dein Name mit „_test“ dahinter (3–20 Zeichen, a–z, 0–9, _ und -).",
+        "Klick „Handle ändern“ und bestätige die Rückfrage.",
+        "Warte, bis die Seite neu lädt. Fahr oben rechts mit der Maus über deinen Namen."
+      ],
+      "erwartet": "Es kommt die Meldung „Dein Handle ist jetzt @…“, die Seite lädt neu. Beim Drüberfahren oben rechts steht „@neues-handle“. Das Feld im Abschnitt „Handle“ ist jetzt gesperrt, darunter „Wieder änderbar ab …“ (30 Tage später)."
+    },
+    {
+      "id": "handle-ueberall",
+      "bereich": "Handle",
+      "titel": "Das neue Handle steht überall",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Nach dem Test „Handle ändern“: Öffne eine Bestenliste, in der du stehst, und fahr mit der Maus über deinen Namen.",
+        "Öffne ein Spiel, in dem du einen Spielstand hast.",
+        "Wenn du Entwickler bist: Schau, was unter deinem Spiel bei „von …“ steht."
+      ],
+      "erwartet": "In der Bestenliste steht dein Anzeigename (oder dein neues Handle), beim Drüberfahren „Profil von … (@neues-handle)“. Dein Spielstand ist unverändert da. Unter deinen Spielen steht „von …“ mit deinem Anzeigenamen bzw. neuen Handle."
+    },
+    {
+      "id": "handle-alter-link",
+      "bereich": "Handle",
+      "titel": "Alter Link auf dein Profil funktioniert weiter",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Nach dem Test „Handle ändern“: Gib in der Adresszeile hinter „test.cuby0401.uk/“ ein: „#/profil/“ und dein ALTES Handle (z. B. #/profil/emil)."
+      ],
+      "erwartet": "Dein Profil öffnet sich und zeigt dein NEUES Handle (@…). Es kommt keine Fehlermeldung."
+    },
+    {
+      "id": "handle-regeln",
+      "bereich": "Handle",
+      "titel": "Ungültige und vergebene Handles werden abgelehnt",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Profil → „Handle“ (wenn du schon geändert hast, geht das erst in 30 Tagen – dann diesen Test überspringen und „Hat geklappt“ mit Hinweis eintragen).",
+        "Versuch nacheinander: „ab“ (zu kurz), „Mein Name“ (Leerzeichen), „admin“, und das Handle einer anderen Person (z. B. „seb“)."
+      ],
+      "erwartet": "Jedes Mal eine rote Meldung: zu kurz/ungültige Zeichen, „@admin ist reserviert“ bzw. „@seb ist vergeben“. Dein Handle bleibt unverändert."
+    },
+    {
+      "id": "anfrage-mit-handle",
+      "bereich": "Anfragen",
+      "titel": "Bei Anfragen steht das Handle dabei",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Klick oben rechts auf deinen Namen → Anfragen. Öffne eine Anfrage, die jemand anderes gestellt hat (falls du Entwickler bist: eine zu deinem Spiel), oder schau in die Liste."
+      ],
+      "erwartet": "Hinter „von“ steht der Anzeigename mit dem Handle in Klammern, z. B. „von Phil (@paul)“. Hat die Person keinen Anzeigenamen, steht nur „@paul“."
+    },
+    {
+      "id": "zwischenspeicher-handle",
+      "bereich": "Spielstände",
+      "titel": "Offline gespeicherter Stand übersteht eine Handle-Änderung",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Öffne ein Spiel mit Spielstand und spiel kurz.",
+        "Schalte WLAN aus (oder Flugmodus) und spiel weiter, sodass gespeichert wird (Band „nicht verbunden“).",
+        "WLAN wieder an, Seite NICHT neu laden. Im Admin-Panel (zweiter Tab) unter CRM bei dir „Handle ändern …“ wählen und ein neues Handle setzen.",
+        "Zurück im Spiel-Tab: Seite neu laden und das Spiel öffnen."
+      ],
+      "erwartet": "Nach dem Neuladen kommt „… übertragen“, und der zuletzt offline gespielte Stand ist da. Danach dein Handle im CRM wieder zurücksetzen."
+    },
+    {
+      "id": "crm-reiter-liste",
+      "bereich": "CRM",
+      "titel": "CRM-Liste mit Nummer, Handle und Kacheln",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Admin-Panel → Reiter „CRM“ (hieß vorher „Personen“).",
+        "Schau dir die Liste und die Kacheln darüber an."
+      ],
+      "erwartet": "Ganz oben ein großes Suchfeld, darunter Kacheln (Personen, aktiv in 30 Tagen, eingeladen, verwarnt oder gesperrt, seit 30 Tagen nicht da), dann Rollen- und Status-Filter. Jede Zeile hat vorne eine Nummer P-0001 …, ein Initialen-Bild, fett den Anzeigenamen und darunter @handle. Seb ist P-0001."
+    },
+    {
+      "id": "crm-suche",
+      "bereich": "CRM",
+      "titel": "Suche nach Nummer, Name, Handle und E-Mail",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "CRM: Tipp nacheinander ins Suchfeld: eine Nummer (z. B. P-0003), einen Vornamen, ein Handle mit @, einen Teil einer E-Mail-Adresse.",
+        "Tipp etwas, das genau eine Person findet, und drück Enter."
+      ],
+      "erwartet": "Die Liste filtert bei jedem Zeichen. Jede der vier Arten findet die richtige Person. Bei genau einem Treffer öffnet Enter direkt die Personenkarte."
+    },
+    {
+      "id": "crm-kacheln-filter",
+      "bereich": "CRM",
+      "titel": "Kacheln und Filter",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "CRM: Klick auf die Kachel „eingeladen“, dann auf „seit 30 Tagen nicht da“.",
+        "Klick einen Rollen-Filter (z. B. Entwickler) an und wieder aus.",
+        "Klick „✕ Filter löschen“."
+      ],
+      "erwartet": "Jede Kachel und jeder Filter zeigt nur passende Personen, der aktive Filter ist grün. „✕ Filter löschen“ zeigt wieder alle."
+    },
+    {
+      "id": "crm-karte-ueberblick",
+      "bereich": "CRM",
+      "titel": "Personenkarte: alles auf einen Blick",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "CRM → klick auf eine Person, die spielt und Entwickler ist (z. B. paul).",
+        "Schau dir Kopf und Blöcke an."
+      ],
+      "erwartet": "Oben ein Kopf mit Initialen-Bild, Anzeigename, Status, @handle, Nummer, „dabei seit“, Rollen und rechts Zahlen (Spielzeit, gespielt, eigene Spiele, Anfragen – nur was nicht 0 ist). Darunter Blöcke: Stammdaten, Notizen, Login-E-Mails, Rollen, Status und Maßnahmen, Eigene Spiele, Gespielt, Anfragen, Anmeldungen, Zeitleiste. Personen und Spiele darin sind verlinkt."
+    },
+    {
+      "id": "crm-leere-bloecke",
+      "bereich": "CRM",
+      "titel": "Leere Blöcke fehlen ganz",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "CRM → öffne eine Person, die kaum etwas gemacht hat (z. B. eingeladen oder lange nicht da)."
+      ],
+      "erwartet": "Es gibt keine leeren Blöcke wie „Eigene Spiele (0)“ oder „Anfragen: keine“. Blöcke ohne Inhalt fehlen; nur Stammdaten, Notizen (zum Eintragen), E-Mails, Rollen und Maßnahmen stehen immer da."
+    },
+    {
+      "id": "crm-karte-nummer",
+      "bereich": "CRM",
+      "titel": "Personenkarte über die Nummer öffnen",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Gib in der Adresszeile ein: test.cuby0401.uk/admin/#person/P-0002 (oder eine andere Nummer aus der Liste)."
+      ],
+      "erwartet": "Die Karte der Person mit dieser Nummer öffnet sich."
+    },
+    {
+      "id": "crm-handle-admin",
+      "bereich": "CRM",
+      "titel": "Admin ändert ein Handle (ohne Frist)",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "CRM → eine Person öffnen → „Handle ändern …“ → neues Handle eingeben.",
+        "Danach gleich noch einmal „Handle ändern …“ und das alte Handle zurücksetzen."
+      ],
+      "erwartet": "Beide Änderungen klappen sofort (für dich gilt keine 30-Tage-Frist). Im Kopf steht danach „früher @…“. Die Zeitleiste zeigt beide Änderungen."
+    },
+    {
+      "id": "crm-sicherheitsprotokoll",
+      "bereich": "CRM",
+      "titel": "Sicherheitsprotokoll auf der Personenkarte",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Öffne die Browser-Konsole (Mac: ⌥⌘J in Chrome, ⌥⌘C in Safari).",
+        "Füg ein und drück Enter: fetch(\"/api/admin/personen\",{headers:{\"X-Ansicht\":\"spieler\"}}).then(r=>r.status)",
+        "Das gleich noch zweimal wiederholen (Pfeil hoch, Enter).",
+        "Admin-Panel → CRM → deine eigene Karte."
+      ],
+      "erwartet": "Die Konsole zeigt dreimal 403 (als „Spieler“ ist das Admin-Panel gesperrt). Auf deiner Karte steht ein Block „Sicherheitsprotokoll“ mit „abgelehnt · GET /api/admin/personen → 403“ – nur EIN Eintrag, obwohl es drei Versuche waren (höchstens einer pro Minute)."
+    },
+    {
+      "id": "crm-upload-blockiert",
+      "bereich": "CRM",
+      "titel": "Blockierter Upload und falsches Passwort im Sicherheitsprotokoll",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Upload-Seite (test-upload…): einmal ein falsches Upload-Passwort eingeben.",
+        "Dann richtig anmelden und eine ZIP hochladen, in der keine index.html liegt (z. B. eine ZIP mit nur einem Bild).",
+        "Admin-Panel → CRM → deine Karte → Sicherheitsprotokoll."
+      ],
+      "erwartet": "Die Upload-Seite lehnt die ZIP ab („index.html fehlt …“). Im Sicherheitsprotokoll deiner Karte stehen „Upload-Passwort falsch“ und „Upload blockiert: index.html fehlt …“."
+    },
+    {
+      "id": "crm-geloeschte-person",
+      "bereich": "CRM",
+      "titel": "Gelöschte Person heißt überall „gelöschte Person“",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "CRM → eine Testperson einladen (Handle z. B. „loeschtest“, E-Mail egal), archivieren, dann „Endgültig löschen“ (Bestätigung: das Handle).",
+        "Schau, was die Karte danach zeigt. Öffne die Liste mit dem Status-Filter „gelöscht“."
+      ],
+      "erwartet": "Die Karte zeigt „gelöschte Person“ und die Nummer, keine E-Mail mehr. In der Liste (Filter „gelöscht“) steht sie als „gelöschte Person“ mit ihrer Nummer, ein Klick öffnet die Karte."
+    },
+    {
+      "id": "crm-anmeldungen-spalte",
+      "bereich": "CRM",
+      "titel": "Letzte Anmeldungen zeigen wieder, wer es war",
+      "nurAdmin": true,
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Admin-Panel → CRM, ganz nach unten zu „Letzte Anmeldungen“."
+      ],
+      "erwartet": "In der Spalte „Spieler“ steht bei jeder Zeile ein Handle (in 1.4.1 war die Spalte leer)."
+    },
+    {
+      "id": "testserver-neustart",
+      "bereich": "Betrieb",
+      "titel": "Testserver kommt nach einem NAS-Neustart von selbst wieder",
+      "nurAdmin": true,
+      "schritte": [
+        "Nur beim nächsten NAS-Neustart (Update o. Ä.) prüfen – sonst überspringen und mit Hinweis eintragen.",
+        "Nach dem Neustart test.cuby0401.uk öffnen."
+      ],
+      "erwartet": "Der Testserver ist da, ohne dass jemand die Container von Hand starten musste."
+    }
+  ]
+}

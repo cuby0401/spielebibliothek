@@ -1,4 +1,4 @@
-# CRM – Personen, Rollen, Einladungen (Zentrale 1.4.0)
+# CRM – Personen, Rollen, Einladungen (Zentrale 1.4.0, ausgebaut in 1.5.0)
 
 Entscheidungen im Vault: E67 (Cloudflare Access bleibt, nur mit Einladung), E68 (CRM statt `users.yaml`).
 
@@ -13,7 +13,42 @@ Entscheidungen im Vault: E67 (Cloudflare Access bleibt, nur mit Einladung), E68 
   (Rollen: `ADMINS` → admin, eigener Spieleordner → entwickler, alle → spieler). Vorher liegt eine Kopie in
   `data/backup/users-vor-crm-<Zeit>.yaml`.
 
-## Rollen und Status
+## Identität (1.5.0, E81/E82)
+
+Jede Person hat drei Schichten:
+
+| | Beispiel | |
+|---|---|---|
+| **ID** | UUID | zufällig, ändert sich nie. Alle Tabellen verweisen darauf (Spalten `player`, `name`, `von` …). Verlässt den Server nie. |
+| **Handle** | `@paul` | eindeutig, in Adressen und neben dem Anzeigenamen. Alle 30 Tage änderbar (ab der letzten Änderung; der Admin ohne Frist). Frühere Handles bleiben für die Person reserviert und leiten weiter (Tabelle `handles`). |
+| **Anzeigename** | „Phil 🚀“ | frei, nicht eindeutig. |
+
+Dazu die **Personennummer** `P-0007` (fortlaufend, nur im Admin-Bereich) und der **Spieleordner** (`personen.alt_name`): der erste
+Benutzername, ändert sich nie. Spiel-IDs (`paul/Dino_Park`), der Upload-Dienst, `users.yaml` und die Ergebnisse des Tester-Panels
+arbeiten mit dem Spieleordner.
+
+- **Umstellung** (`savesvc/identitaet.py`): beim ersten Start von 1.5.0, einmalig, in einer Transaktion. Vorher Sicherung
+  `data/backup/vor-uuid-<Tag>.db`, danach Prüfung (Zeilenzahl, Prüfsumme jeder Tabelle, kein alter Name übrig). Scheitert etwas,
+  bleibt die Datenbank unverändert und der Dienst startet nicht. Stand abfragen: `python -m savesvc identitaet-status`.
+- **Rückweg:** `scripts/deploy.sh --zurueck 1.4.1` stellt die Datenbank vorher automatisch zurück (`identitaet-zurueck`).
+- **Innen UUID, außen Handle:** Eine Schicht in `app.py` übersetzt Handles in Adressen (`/api/profil/…`, `/api/admin/personen/…`, auch
+  `P-0007`) und `?player=` in die UUID und jede UUID in JSON-Antworten in das aktuelle Handle – auch in Texten. Gelöschte Personen
+  erscheinen als „gelöschte Person“.
+- **Spiele** bekommen über `GameSave.player()` das Handle, nie die UUID.
+- **Tests:** `tests/test_identitaet.py` (Umstellung, Rückweg, keine UUID nach außen), `test_handle.py`, `test_zugriff.py` (fremde IDs).
+  Die ganze Sammlung läuft standardmäßig mit UUIDs, mit `TEST_IDENTITAET_UUID=0` wie in 1.4.1.
+
+## CRM-Oberfläche (1.5.0)
+
+Admin-Panel → **CRM**: Suche nach Nummer, Name, Handle (auch früheren) oder E-Mail, Enter bei einem Treffer öffnet die Karte.
+Kacheln und Filter nach Rolle, Status und „seit 30 Tagen nicht da“. Die **Personenkarte** zeigt alles auf einen Blick, leere Blöcke
+fehlen: Stammdaten, Notizen, Login-E-Mails, Rollen, Status und Maßnahmen, eigene Spiele, gespielte Spiele, Anfragen (gestellt und als
+Entwickler bekommen), Anmeldungen, Sicherheitsprotokoll, Zeitleiste, Prüfprotokoll.
+
+**Sicherheitsprotokoll je Person:** abgelehnte Zugriffe (403) und Rate-Limits (429) – je Person, Art und Adresse höchstens einmal
+pro Minute –, Anmeldeversuche Gesperrter, getrennte Sitzungen, blockierte Uploads, falsche Upload-Passwörter und Sperren im
+Upload-Dienst, Admin-Maßnahmen aus dem Prüfprotokoll. Aufbewahrung wie das Sicherheitsprotokoll des Not-Aus (ein Jahr).
+
 
 | Rolle | bedeutet |
 |---|---|

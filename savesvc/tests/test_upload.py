@@ -449,3 +449,20 @@ def test_notaus_sperrt_upload(uclient, umgebung):
     assert anmelden(uclient).status_code == 503
     (umgebung.users.parent / "notaus.json").unlink()
     assert uclient.get("/api/upload/status", headers=uclient.als()).status_code != 503
+
+
+def test_sicherheitsereignisse(uclient):
+    """1.5.0: falsches Passwort, Sperre nach Fehlversuchen und blockierte Uploads landen in den Ereignissen
+    (das Sicherheitsprotokoll der Personenkarte liest sie über /intern/ereignisse?player=…)."""
+    uclient.store.setzen("paul", "richtiges-passwort-123")
+    assert anmelden(uclient, "falsch").status_code == 401
+    assert anmelden(uclient).status_code == 204
+    r = uclient.post("/api/upload/spiele/x", files={"datei": ("x.zip", b"kein zip", "application/zip")}, headers=uclient.als())
+    assert r.status_code == 422
+    aktionen = [x["aktion"] for x in uclient.store.ereignisse(50, "paul")]
+    assert "Upload-Passwort falsch" in aktionen and any(a.startswith("Upload blockiert: ") for a in aktionen)
+    for _ in range(6):
+        anmelden(uclient, "falsch")
+    assert anmelden(uclient).status_code == 429
+    assert "Upload-Anmeldung gesperrt (zu viele Fehlversuche)" in [x["aktion"] for x in uclient.store.ereignisse(50, "paul")]
+    assert uclient.store.ereignisse(50, "niemand") == []

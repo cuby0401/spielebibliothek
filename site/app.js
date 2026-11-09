@@ -24,6 +24,8 @@ let bisherigeRoute = "";
 const idPfad = (id) => id.split("/").map(encodeURIComponent).join("/");
 // 1.4.1: In der Bibliothek steht der Anzeigename (falls gesetzt), Links und Admin-Panel bleiben beim Benutzernamen
 const anzeige = (name) => (ich.namen && ich.namen[name]) || name;
+// 1.5.0: wo es darauf ankommt, wer wirklich dahinter steckt (Anfragen), steht das Handle dabei – Anzeigenamen sind nicht eindeutig
+const anzeigeMitHandle = (name) => anzeige(name) === name ? "@" + name : `${anzeige(name)} (@${name})`;
 
 async function einstellungenSpeichern(aenderung) {
 	Object.assign(einstellungen, aenderung);
@@ -97,7 +99,7 @@ async function bestenlisteZeigen(spiel, season) {
 		if (e.player === ichSelbst) li.className = "ich";
 		const platz = document.createElement("span"); platz.className = "platz"; platz.textContent = e.rank + ".";
 		const name = document.createElement(e.player.includes("~") ? "span" : "a"); name.className = "name"; name.textContent = anzeige(e.player);
-		if (!e.player.includes("~")) { name.href = "#/profil/" + encodeURIComponent(e.player); name.title = "Profil von " + anzeige(e.player); }
+		if (!e.player.includes("~")) { name.href = "#/profil/" + encodeURIComponent(e.player); name.title = "Profil von " + anzeigeMitHandle(e.player); }
 		li.append(platz, name);
 		const werte = document.createElement("span"); werte.className = "werte";
 		for (const s of spalten) {

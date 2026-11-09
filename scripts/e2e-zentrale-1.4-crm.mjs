@@ -52,7 +52,8 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
 
-  const ZEILE = (name) => `[...document.querySelectorAll("tbody tr")].find(t=>t.querySelector("td strong")?.textContent===${JSON.stringify(name)})`;
+  // 1.5.0: Zeilen der CRM-Liste tragen das Handle (fett steht dort der Anzeigename)
+  const ZEILE = (name) => `document.querySelector('tbody tr[data-handle=${JSON.stringify(name)}]')`;
   // Kein leeres „null“ als Text auf der Seite (1.4.1, Nachtest 09.11.: Admin-Panel Personen und Tester-Panel)
   const OHNE_NULL = `(()=>{const w=document.createTreeWalker(document.getElementById("inhalt"),NodeFilter.SHOW_TEXT);
     while(w.nextNode()) if(w.currentNode.nodeValue.trim()==="null") return false; return true})()`;

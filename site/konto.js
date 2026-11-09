@@ -237,7 +237,7 @@ function antraegeProSpiel(c, antraege) {
 		const k = (text, fn, art = "leise") => h("button", { type: "button", class: "knopf klein " + art, text, onclick: fn });
 		return h("div", { class: "karte" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
-				h("span", { class: "leise", text: ` · von ${anzeige(a.player)} · ${datumZeit(a.erstellt)}` }), " ", oeffnen(a)),
+				h("span", { class: "leise", text: ` · von ${anzeigeMitHandle(a.player)} · ${datumZeit(a.erstellt)}` }), " ", oeffnen(a)),
 			h("div", { class: "antrag-text", text: a.text }), antwort,
 			h("div", { class: "zeile" }, k("Erledigt", () => setzen("erledigt"), ""), k("Ablehnen", () => setzen("abgelehnt"), "gefahr"),
 				a.status !== "offen" ? k("Wieder öffnen", () => setzen("offen")) : null));
@@ -287,7 +287,7 @@ SEITEN_REG["antraege"] = async (c) => {
 		formular.before(h("div", { class: "karte antraege-an-mich" },
 			h("h2", { text: `An dich – Anfragen zu deinen Spielen (${offen.length} offen)` }),
 			offen.length ? h("ul", { class: "antrag-liste" }, offen.map((a) => h("li", {},
-				h("a", { href: "#/antrag/" + a.id }, h("strong", { text: a.title || a.spiel }), ` · ${a.artText} von ${anzeige(a.player)} · ${datumZeit(a.erstellt)}${bildText(a.bilder)}`),
+				h("a", { href: "#/antrag/" + a.id }, h("strong", { text: a.title || a.spiel }), ` · ${a.artText} von ${anzeigeMitHandle(a.player)} · ${datumZeit(a.erstellt)}${bildText(a.bilder)}`),
 				h("div", { class: "leise", text: a.text.length > 140 ? a.text.slice(0, 140) + " …" : a.text }))))
 				: h("p", { class: "leise", text: "Alles erledigt. 🎉" }),
 			h("p", {}, h("a", { href: "#/meine-spiele", text: `Alle ${fremde.length} Anfragen pro Spiel → Meine Spiele` }))));
@@ -313,7 +313,7 @@ SEITEN_REG["antrag"] = async (c) => {
 		h("div", { class: "karte antrag-ticket" },
 			h("div", {}, h("span", { class: "status " + a.status, text: a.status }), " ", h("strong", { text: a.artText }),
 				a.spiel ? h("span", {}, " · ", h("a", { href: "#/spiel/" + a.spiel, text: a.title || a.spiel })) : null),
-			h("div", { class: "leise", text: `von ${a.eigener ? "dir" : anzeige(a.player)} · ${datumZeit(a.erstellt)} · geht an ${an}` +
+			h("div", { class: "leise", text: `von ${a.eigener ? "dir" : anzeigeMitHandle(a.player)} · ${datumZeit(a.erstellt)} · geht an ${an}` +
 				(a.geaendert !== a.erstellt ? ` · zuletzt geändert ${datumZeit(a.geaendert)}` : "") }),
 			h("div", { class: "antrag-text", text: a.text })));
 	// Bilder: Klick öffnet groß in neuem Tab
@@ -482,7 +482,8 @@ function anmeldeTabelle(liste, mitSpieler, trennen) {
 	return h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
 		h("thead", {}, h("tr", {}, ...[...(mitSpieler ? ["Spieler"] : []), "Gerät", "Ort", "IP", "Angemeldet", "Zuletzt aktiv", ""].map((t) => h("th", { text: t })))),
 		h("tbody", {}, liste.map((a) => h("tr", {},
-			mitSpieler ? h("td", { text: anzeige(a.player) }) : null,
+			// anzeige() gibt es nur in der Bibliothek (Anzeigename); im Admin-Panel steht das Handle (1.5.0: dort war die Spalte leer)
+			mitSpieler ? h("td", { text: typeof anzeige === "function" ? anzeige(a.player) : a.player }) : null,
 			h("td", {}, a.geraet, a.aktuell ? h("span", { class: "status erledigt", text: " dieses Gerät " }) : null),
 			h("td", { text: a.ort || "–" }),
 			h("td", { text: a.ip || "–" }),
