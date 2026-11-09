@@ -24,11 +24,11 @@ Plan im Vault: `Projekte/Spielebibliothek/Architektur/Identitaet-und-CRM-1.5.0.m
 - **Behoben:** `scripts/e2e-alle.sh` zeigte bei einem Absturz ohne Prüfpunkt nichts an.
 - **Tests:** `test_identitaet.py` (Umstellung, Rückweg, Fehler mittendrin, keine UUID in irgendeiner Antwort – Gegenprobe ohne Übersetzung rot), `test_handle.py`, `test_zugriff.py` (fremde IDs an jedem Admin-Endpunkt, Gegenprobe rot), Bridge-Test für den Zwischenspeicher, Ende-zu-Ende `scripts/e2e-zentrale-1.5.mjs`. Die ganze Sammlung läuft mit UUIDs im Hintergrund, mit `TEST_IDENTITAET_UUID=0` wie in 1.4.1.
 
-## 1.4.1 – in Arbeit (ab 08.11.2026)
+## 1.4.1 – 09.11.2026
 
 Kleines Update nach dem ersten Testdurchgang mit dem Tester-Panel: Tester-Panel aufräumen, „Dabei seit“ korrigieren, schnellere Ende-zu-Ende-Tests, NAS entlasten.
 
-- **Behoben:** „Dabei seit“ im Profil und im CRM zeigte bei allen übernommenen Personen den Zeitpunkt der Übernahme (erster Start von 1.4.0). Jetzt steht dort die früheste bekannte Aktivität (Anmeldung, Spielstand, Rangliste, Erfolg, Anfrage, Daumen), die erste Anmeldung ebenso. Wird bei jedem Start nachgeholt, nur für übernommene Personen.
+- **Behoben:** „Dabei seit“ im Profil und im CRM zeigte bei allen übernommenen Personen den Zeitpunkt der Übernahme (erster Start von 1.4.0). Jetzt steht dort die früheste bekannte Aktivität (Anmeldung, Spielstand, Rangliste, Erfolg, Anfrage, Daumen), die erste Anmeldung ebenso. Wird beim ersten Start von 1.4.1 einmal nachgeholt, nur für übernommene Personen (danach sind sie Seb zugeschrieben).
 - **Neu:** Tester-Panel mit drei Reitern (Sebs Notiz vom 08.11.): „Offen“ ist die Startseite und zeigt nur, was noch zu testen ist, Nachtests eingeschlossen. Eingetragene Tests wandern nach „Abgelehnt“ bzw. „Bestanden“ (Archiv, eingeklappt). Dort steht der ganze Verlauf: wer wann geprüft hat, mit Begründung und Fotos, auch ältere Einträge vor einem Nachtest. Neu eintragen geht dort weiterhin.
 - **Neu:** Fotos an Testergebnissen: bis zu 5 Bilder je Eintrag (Datei wählen oder Screenshot mit Strg/⌘+V), im Browser verkleinert, in der Ergebnis-Datenbank außerhalb der Probe-Daten. Sehen darf sie, wer den Test sieht, anfügen nur, wer eingetragen hat.
 - **Geändert (NAS entlasten):** Ende-zu-Ende-Tests laufen auf dem Mac, wenn Docker Desktop läuft. Teststand und Chrome stehen dann auf dem Mac, die NAS rechnet nichts. Ohne Docker Desktop wie bisher auf der NAS. Erzwingen mit `E2E_ORT=mac|nas`.
