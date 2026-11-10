@@ -43,7 +43,9 @@ if [ "$ART" = probe ]; then
 elif [ "$ART" = design ]; then
 	N=sbdesign; T=/volume1/docker/spielebibliothek-design; PG=18288; PP=18289; PU=18290
 	G="http://$GH:$PG"; P="http://$PH:$PP"; U="http://$UH:$PU"
-	TS=${TS:-<NAS_PH>}   # nur an der Tailscale-Adresse lauschen – nicht im LAN, nie über den Tunnel
+	# Tailscale läuft auf der NAS als Container (Host-Netz, --tun=userspace-networking): Es reicht Zugriffe auf
+	# <NAS_PH>:<Port> an 127.0.0.1:<Port> weiter. Deshalb nur an 127.0.0.1 lauschen – so kommt Tailscale ran, das LAN nicht.
+	TS=${TS:-127.0.0.1}
 	ANMELDUNG="-e DEV_USER=seb -e DEV_ALLOW=1"
 	COOKIE_SECURE=0
 	PORTS="-p $TS:$PG:8080 -p $TS:$PP:8080 -p $TS:$PU:8080"
