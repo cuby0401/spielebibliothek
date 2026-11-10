@@ -141,6 +141,12 @@
 		respond 404
 	}
 
+	# Testseite der Bausteine (/ui-test/) nur für die automatischen Tests: live und auf dem Testserver gesperrt.
+	# teststand.sh entfernt die mit NUR-LIVE markierten Zeilen für Teststand und Design-Spielwiese.
+	handle /ui-test* {   # NUR-LIVE
+		respond 404      # NUR-LIVE
+	}                    # NUR-LIVE
+
 	# Bibliotheksseite
 	handle {
 		root * /srv/site

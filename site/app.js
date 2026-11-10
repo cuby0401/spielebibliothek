@@ -804,6 +804,7 @@ async function start() {
 			Bridge.json("GET", "/api/me"), Bridge.json("GET", "/api/games"), Bridge.json("GET", "/api/einstellungen")]);
 		ich = wer;
 		einstellungen = einst;
+		if (window.UI && einst.aussehen) UI.aussehenAnwenden(einst.aussehen);   // neue UI: Thema, Akzent, Dichte des Spielers
 		Bridge.spieler = ich.player;
 		Bridge.konto = ich.konto;           // 1.5.0: Zwischenspeicher je Konto, bleibt bei Handle-Änderungen
 		Bridge.sitzungBis = ich.sitzungBis;

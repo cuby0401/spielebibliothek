@@ -63,7 +63,7 @@ teststand() {
 }
 
 FEHLER=""
-for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm zentrale-1.5 boese}; do
+for t in ${E2E_TESTS:-versionierung zentrale-1.1 zentrale-1.2 zentrale-1.3 zentrale-1.3-steckbrief zentrale-1.3.1-antraege zentrale-1.4-crm zentrale-1.5 bausteine boese}; do
 	echo "→ Ende-zu-Ende: $t"
 	PW=$(teststand) || { FEHLER="$FEHLER $t"; continue; }
 	rm -rf "$TMP/chrome-profil" "$TMP/chrome-profil2"

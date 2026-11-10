@@ -50,6 +50,7 @@ elif [ "$ART" = design ]; then
 	COOKIE_SECURE=0
 	PORTS="-p $TS:$PG:8080 -p $TS:$PP:8080 -p $TS:$PU:8080"
 	TESTERGEBNISSE=$T/tests
+	TESTPLAENE=tests/manuell/design   # eigener Testplan (Bausteine, Umbau), nicht der der nächsten Version
 	NEUSTART="--restart unless-stopped"
 else
 	N=sbtest; T=/tmp/sb-teststand; PG=18088; PP=18089; PU=18090
@@ -142,7 +143,7 @@ up)
 	docker run --rm -v "$TESTERGEBNISSE":/z caddy:2 chmod a+rwX /z
 	# IDENTITAET_UUID=0 (1.5.0): Teststand ohne Umstellung auf UUID, nur zum Vergleich mit dem alten Verhalten
 	docker run -d $NEUSTART --name $N-savesvc --network $N $ANMELDUNG -e WAECHTER=0 -e IDENTITAET_UUID=${IDENTITAET_UUID:-1} \
-		-e TESTPLAN_DIR=/testplan -e TESTERGEBNISSE=/tests/ergebnisse.db -v "$T/repo/tests/manuell:/testplan:ro" -v "$TESTERGEBNISSE:/tests" \
+		-e TESTPLAN_DIR=/testplan -e TESTERGEBNISSE=/tests/ergebnisse.db -v "$T/repo/${TESTPLAENE:-tests/manuell}:/testplan:ro" -v "$TESTERGEBNISSE:/tests" \
 		-e ADMINS=seb -e TESTER=emil -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://$N-upload:8000 \
 		-e PROBE="$( [ "$ART" = probe ] && echo 1 || echo 0 )" -e DESIGN="$( [ "$ART" = design ] && echo 1 || echo 0 )" -e ZENTRALE_COMMIT="${ZENTRALE_COMMIT:-}" -e ZENTRALE_VERSION="${ZENTRALE_VERSION:-}" \
 		-v "$T/data:/data" -v "$T/spiele:/spiele:ro" -v "$T/config:/config" spielebibliothek-savesvc:$N >/dev/null

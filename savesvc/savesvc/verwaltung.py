@@ -26,12 +26,12 @@ log = logging.getLogger("savesvc.verwaltung")
 
 SORTIERUNGEN = ("alphabetisch", "zuletzt", "neu", "meistgespielt")
 # Aussehen und Startseite (neue UI, 10.11.2026). Jeder Spieler stellt das selbst ein. Die Farbwerte der Akzente stehen in
-# site/ui/tokens.css; „standard“ ist der Akzent, den Seb mit Claude Design als Standard wählt.
+# site/ui/tokens.css. Standard ist Blau (Richtung „Klar“, Seb 10.11.2026).
 THEMEN = ("auto", "hell", "dunkel")
-AKZENTE = ("standard", "blau", "gruen", "tuerkis", "violett", "rosa", "orange")
+AKZENTE = ("blau", "gruen", "tuerkis", "violett", "rosa", "orange")
 DICHTEN = ("kompakt", "normal", "luftig")
 KACHELN = ("klein", "mittel", "gross")
-AUSSEHEN_STANDARD = {"thema": "auto", "akzent": "standard", "dichte": "normal", "kachelgroesse": "mittel"}
+AUSSEHEN_STANDARD = {"thema": "auto", "akzent": "blau", "dichte": "normal", "kachelgroesse": "mittel"}
 AUSSEHEN_WERTE = {"thema": THEMEN, "akzent": AKZENTE, "dichte": DICHTEN, "kachelgroesse": KACHELN}
 ABSCHNITTE = ("weiterspielen", "favoriten", "neu", "spiel-der-woche", "alle")
 

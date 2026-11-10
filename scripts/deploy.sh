@@ -202,6 +202,8 @@ fi
 if [ "$DESIGN" = 1 ]; then
 	DESIGN_URL=http://<NAS_GH>:18288
 	if [ "$WEG" = 1 ]; then ssh "$NAS" "ART=design sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh down"; exit 0; fi
+	node scripts/ui-pruefen.mjs || { echo "✗ Oberfläche nicht einheitlich – nichts deployt (docs/ui-bausteine.md)." >&2; exit 1; }
+	node scripts/kontrast-pruefen.mjs >/dev/null || { node scripts/kontrast-pruefen.mjs >&2; echo "✗ Farben zu kontrastarm – nichts deployt." >&2; exit 1; }
 	COMMIT="$(git rev-parse --short HEAD)"; [ -n "$(git status --porcelain)" ] && COMMIT="$COMMIT+"
 	VERSION_DESIGN="$(tr -d ' \n' < VERSION)-design"
 	# verfolgte und neue (nicht ignorierte) Dateien – auch noch nicht committete Arbeit kommt mit
@@ -262,6 +264,12 @@ if [ "$PROBE" = 0 ] && [ "$OHNE_PROBE" = 0 ]; then
 		exit 1
 	fi
 	echo "  ✓ in der Probe freigegeben: $(printf '%s' "$FREIGABE" | sed -n 's/.*"zeit": *"\([^"]*\)".*/\1/p')"
+fi
+
+# Einheitliche Oberfläche und Kontrast (UI-Bausteine, 10.11.2026) – dauert unter einer Sekunde
+if command -v node >/dev/null 2>&1; then
+	node scripts/ui-pruefen.mjs || { echo "✗ Oberfläche nicht einheitlich – nichts deployt (docs/ui-bausteine.md)." >&2; exit 1; }
+	node scripts/kontrast-pruefen.mjs >/dev/null || { node scripts/kontrast-pruefen.mjs >&2; echo "✗ Farben zu kontrastarm – nichts deployt." >&2; exit 1; }
 fi
 
 if [ "$TESTS" = 1 ]; then

@@ -51,26 +51,47 @@ const titelVon = (id) => (spiele.find((s) => s.id === id) || {}).title || id;
 
 // ---------- Einstellungen ----------
 SEITEN_REG["einstellungen"] = async (c) => {
-	const umschalter = (key, text, hinweis) => h("label", { class: "haken" },
-		h("input", { type: "checkbox", checked: !!einstellungen[key], onchange: (e) => einstellungenSpeichern({ [key]: e.target.checked }) }),
-		h("span", {}, text, hinweis ? h("span", { class: "leise", text: " – " + hinweis }) : null));
-	const sort = h("select", { onchange: (e) => einstellungenSpeichern({ sortierung: e.target.value }) },
-		...[["alphabetisch", "alphabetisch"], ["zuletzt", "zuletzt gespielt"], ["neu", "neueste zuerst"]]
-			.map(([w, t]) => h("option", { value: w, selected: einstellungen.sortierung === w, text: t })));
+	// Erste Seite aus den UI-Bausteinen (10.11.2026, docs/ui-bausteine.md). Jede Änderung gilt sofort und auf allen Geräten.
+	const aussehen = { ...(einstellungen.aussehen || {}) };
+	const aussehenSetzen = async (schluessel, wert) => {
+		aussehen[schluessel] = wert;
+		UI.aussehenAnwenden(aussehen);
+		await einstellungenSpeichern({ aussehen: { [schluessel]: wert } });
+	};
+	const NAMEN = { weiterspielen: "Weiterspielen", favoriten: "Favoriten", neu: "Neu in der Bibliothek", "spiel-der-woche": "Spiel der Woche", alle: "Alle Spiele" };
+	const abschnitte = ((einstellungen.startseite || {}).abschnitte || Object.keys(NAMEN).map((id) => ({ id, sichtbar: true })))
+		.map((a) => ({ ...a, text: NAMEN[a.id] || a.id }));
+	const rolle = ich.admin ? "Admin" : ich.uploader ? "Entwickler" : "Spieler";
 	c.append(
 		h("h1", { text: "Einstellungen" }),
-		h("div", { class: "karte" },
-			h("label", {}, "Spiele in der Übersicht sortieren", sort),
-			h("p", { class: "leise", text: "Favoriten (★ auf der Kachel) stehen immer oben, danach von Seb empfohlene Spiele." }),
-			umschalter("grossansicht", "Großansicht", "Spiele füllen das ganze Fenster (echtes Vollbild weiter über den Knopf „Vollbild“)"),
-			umschalter("bestenliste", "Bestenliste neben dem Spiel anzeigen")),
-		h("p", { class: "leise", text: "Die Einstellungen gelten auf allen deinen Geräten." }),
-		h("h2", { text: "Konto" }),
-		h("div", { class: "karte" },
-			h("div", {}, "Angemeldet als ", h("strong", { text: ich.player }),
-				ich.admin ? " (Admin)" : ich.uploader ? " (Entwickler)" : ""),
-			h("div", {}, h("a", { class: "knopf leise", href: "/cdn-cgi/access/logout", text: "Abmelden" }),
-				h("span", { class: "leise", text: "  – z. B. an einem fremden Rechner. Beim nächsten Besuch ist ein neuer E-Mail-Code nötig." }))));
+		UI.stapel([
+			UI.karte({ titel: "Aussehen", untertitel: "Gilt sofort und auf allen deinen Geräten.", inhalt: [
+				UI.segment({ id: "e-thema", label: "Thema", optionen: UI.AUSSEHEN.thema, wert: aussehen.thema || "auto", onwechsel: (w) => aussehenSetzen("thema", w) }),
+				UI.farbwahl({ id: "e-akzent", label: "Farbe", wert: aussehen.akzent || "blau", onwechsel: (w) => aussehenSetzen("akzent", w) }),
+				UI.segment({ id: "e-dichte", label: "Abstände", hinweis: "Kompakt zeigt mehr auf einmal, luftig ist ruhiger.", optionen: UI.AUSSEHEN.dichte,
+					wert: aussehen.dichte || "normal", onwechsel: (w) => aussehenSetzen("dichte", w) }),
+				UI.segment({ id: "e-kachel", label: "Größe der Spielkacheln", optionen: UI.AUSSEHEN.kachelgroesse, wert: aussehen.kachelgroesse || "mittel",
+					onwechsel: (w) => aussehenSetzen("kachelgroesse", w) }),
+			] }),
+			UI.karte({ titel: "Startseite", untertitel: "Reihenfolge und welche Bereiche du sehen willst. Wirkt mit der neuen Startseite, gespeichert wird es schon jetzt.", inhalt: [
+				UI.sortierliste({ label: "Bereiche", ohneLabel: true, eintraege: abschnitte,
+					onwechsel: (liste) => einstellungenSpeichern({ startseite: { abschnitte: liste } }) }),
+			] }),
+			UI.karte({ titel: "Bibliothek", inhalt: [
+				UI.auswahl({ id: "e-sortierung", label: "Spiele sortieren", hinweis: "Favoriten stehen immer oben, danach von Seb empfohlene Spiele.",
+					wert: einstellungen.sortierung, optionen: [["alphabetisch", "Alphabetisch"], ["zuletzt", "Zuletzt gespielt"], ["neu", "Neueste zuerst"], ["meistgespielt", "Meistgespielt"]],
+					onchange: (w) => einstellungenSpeichern({ sortierung: w }) }),
+				UI.schalter({ id: "e-gross", label: "Großansicht", hinweis: "Spiele füllen das ganze Fenster. Echtes Vollbild weiter über den Knopf „Vollbild“.",
+					an: !!einstellungen.grossansicht, onwechsel: (an) => einstellungenSpeichern({ grossansicht: an }) }),
+				UI.schalter({ id: "e-bestenliste", label: "Bestenliste neben dem Spiel", an: einstellungen.bestenliste !== false,
+					onwechsel: (an) => einstellungenSpeichern({ bestenliste: an }) }),
+			] }),
+			UI.karte({ titel: "Konto", inhalt: [
+				UI.angaben([["Angemeldet als", "@" + ich.player], ["Rolle", UI.marke({ text: rolle, art: ich.admin ? "akzent" : "neutral" })]]),
+				UI.knopfleiste([UI.knopf({ art: "gefahr-leise", text: "Abmelden", ikon: "abmelden", href: "/cdn-cgi/access/logout" })], { ausrichtung: "links" }),
+				UI.text("Zum Beispiel an einem fremden Rechner. Beim nächsten Besuch ist ein neuer E-Mail-Code nötig.", { art: "klein" }),
+			] }),
+		]));
 };
 
 // ---------- Meine Spielstände ----------

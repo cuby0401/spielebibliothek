@@ -7,7 +7,7 @@ ALLE = [{"id": i, "sichtbar": True} for i in verwaltung.ABSCHNITTE]
 
 def test_standardwerte(client):
     d = client.get("/api/einstellungen", headers=client.als()).json()
-    assert d["aussehen"] == {"thema": "auto", "akzent": "standard", "dichte": "normal", "kachelgroesse": "mittel"}
+    assert d["aussehen"] == {"thema": "auto", "akzent": "blau", "dichte": "normal", "kachelgroesse": "mittel"}
     assert d["startseite"] == {"abschnitte": ALLE}
 
 

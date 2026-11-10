@@ -1,0 +1,142 @@
+/* Spielebibliothek – Design-Tokens (Bausteine, Richtung „Klar“, Akzent Blau; Seb 10.11.2026)
+ *
+ * Die EINZIGE Stelle für Farben, Abstände, Radien, Schrift, Schatten und Bewegung. bausteine.css und alle
+ * Seiten nehmen nur var(--b-…). Visuelle Quelle: Design-System „Spielebibliothek Bausteine“ (Claude Design),
+ * https://claude.ai/artifact/44bcauRAN8ZCegDucpatkT – dort und hier dieselben Werte.
+ *
+ * Anpassen je Spieler über Attribute an <html> (gesetzt von thema-frueh.js / UI.aussehenAnwenden):
+ *   data-thema   hell | dunkel        fehlt = folgt dem Gerät
+ *   data-akzent  blau | gruen | tuerkis | violett | rosa | orange   fehlt = blau
+ *   data-dichte  kompakt | luftig     fehlt = normal
+ *   data-kachel  klein | gross        fehlt = mittel
+ * data-thema wirkt auch auf einem einzelnen Container (z. B. Vorschau hell und dunkel nebeneinander).
+ */
+
+/* ---------- Akzent-Paare (je hell/dunkel), Standard Blau ---------- */
+:root {
+	--b-akzent-h: #0a66d8; --b-akzent-zart-h: #e6effc; --b-akzent-text-h: #ffffff;
+	--b-akzent-d: #4c9bff; --b-akzent-zart-d: #15294a; --b-akzent-text-d: #06142b;
+}
+[data-akzent="blau"]    { --b-akzent-h: #0a66d8; --b-akzent-zart-h: #e6effc; --b-akzent-text-h: #ffffff; --b-akzent-d: #4c9bff; --b-akzent-zart-d: #15294a; --b-akzent-text-d: #06142b; }
+[data-akzent="gruen"]   { --b-akzent-h: #1f7a52; --b-akzent-zart-h: #e1f1e8; --b-akzent-text-h: #ffffff; --b-akzent-d: #5cc08f; --b-akzent-zart-d: #173426; --b-akzent-text-d: #07200f; }
+[data-akzent="tuerkis"] { --b-akzent-h: #0b7285; --b-akzent-zart-h: #def1f4; --b-akzent-text-h: #ffffff; --b-akzent-d: #4fc3d4; --b-akzent-zart-d: #10323a; --b-akzent-text-d: #04181c; }
+[data-akzent="violett"] { --b-akzent-h: #5b3fd1; --b-akzent-zart-h: #ece7fb; --b-akzent-text-h: #ffffff; --b-akzent-d: #a28cff; --b-akzent-zart-d: #2a2350; --b-akzent-text-d: #160e3a; }
+[data-akzent="rosa"]    { --b-akzent-h: #c2255c; --b-akzent-zart-h: #fbe4ec; --b-akzent-text-h: #ffffff; --b-akzent-d: #ff7aa8; --b-akzent-zart-d: #3d1828; --b-akzent-text-d: #2a0716; }
+[data-akzent="orange"]  { --b-akzent-h: #b45309; --b-akzent-zart-h: #fbeedd; --b-akzent-text-h: #ffffff; --b-akzent-d: #ffa04d; --b-akzent-zart-d: #3a2511; --b-akzent-text-d: #2a1503; }
+
+/* Akzent an einem einzelnen Element (z. B. Farbpunkte zur Auswahl): dort neu auflösen, passend zum Thema */
+[data-akzent] { --b-akzent: var(--b-akzent-h); --b-akzent-zart: var(--b-akzent-zart-h); --b-akzent-text: var(--b-akzent-text-h); }
+[data-thema="dunkel"] [data-akzent], [data-thema="dunkel"][data-akzent] { --b-akzent: var(--b-akzent-d); --b-akzent-zart: var(--b-akzent-zart-d); --b-akzent-text: var(--b-akzent-text-d); }
+@media (prefers-color-scheme: dark) {
+	:root:not([data-thema="hell"]) [data-akzent], :root:not([data-thema="hell"])[data-akzent] { --b-akzent: var(--b-akzent-d); --b-akzent-zart: var(--b-akzent-zart-d); --b-akzent-text: var(--b-akzent-text-d); }
+	[data-thema="hell"] [data-akzent] { --b-akzent: var(--b-akzent-h); --b-akzent-zart: var(--b-akzent-zart-h); --b-akzent-text: var(--b-akzent-text-h); }
+}
+
+/* ---------- Farben hell (Standard) ---------- */
+:root, [data-thema="hell"] {
+	color-scheme: light;
+	--b-grund: #f5f5f7;          /* Seitenhintergrund */
+	--b-flaeche: #ffffff;        /* Karten, Dialoge, Menüs, Eingabefelder */
+	--b-flaeche-2: #f0f0f3;      /* leise Füllung: Segment-Hintergrund, Hover, Suchfeld, Kachelbild ohne Bild */
+	--b-flaeche-3: #e6e6eb;      /* gedrückt */
+	--b-text: #1d1d1f;
+	--b-text-leise: #6e6e73;     /* Nebentexte auf grund und flaeche (≥ 4.5:1) */
+	--b-linie: #e3e3e8;          /* Trennlinien, Kartenränder (nur Deko) */
+	--b-linie-feld: #8a8a92;     /* Rand von Eingabefeldern, Haken, Radio (≥ 3:1) */
+	--b-akzent: var(--b-akzent-h); --b-akzent-zart: var(--b-akzent-zart-h); --b-akzent-text: var(--b-akzent-text-h);
+	--b-erfolg: #1c7c3c; --b-erfolg-zart: #e3f3e8;
+	--b-warnung: #9a5b00; --b-warnung-zart: #fdf0dc;
+	--b-gefahr: #c4281c; --b-gefahr-zart: #fce8e6; --b-gefahr-text: #ffffff;
+	--b-info: #0a66d8; --b-info-zart: #e6effc;
+	--b-kopf: rgba(255, 255, 255, 0.72);        /* Kopfleiste mit Milchglas */
+	--b-abdunkeln: rgba(0, 0, 0, 0.36);         /* hinter Dialogen */
+	--b-meldung: #1d1d1f; --b-meldung-text: #f5f5f7;
+	--b-schalter-knopf: #ffffff;   /* Knopf im Schalter, in beiden Themen weiß (wie iOS) */
+	--b-schatten-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.06);
+	--b-schatten-2: 0 4px 12px rgba(0, 0, 0, 0.08), 0 16px 40px rgba(0, 0, 0, 0.12);
+	--b-schatten-3: 0 24px 64px rgba(0, 0, 0, 0.22);
+	--b-avatar-1: #0a66d8; --b-avatar-2: #1f7a52; --b-avatar-3: #5b3fd1; --b-avatar-4: #c2255c; --b-avatar-5: #b45309; --b-avatar-6: #0b7285;
+	--b-bild-1: #cfe0f7; --b-bild-2: #e4dcf6; --b-bild-3: #d6eedf; --b-bild-4: #f8e2cc;   /* Kachelbild ohne Vorschaubild */
+}
+
+/* ---------- Farben dunkel ---------- */
+[data-thema="dunkel"] {
+	color-scheme: dark;
+	--b-grund: #111113; --b-flaeche: #1c1c1f; --b-flaeche-2: #26262a; --b-flaeche-3: #313136;
+	--b-text: #f2f2f5; --b-text-leise: #a1a1a8; --b-linie: #2f2f34; --b-linie-feld: #7a7a82;
+	--b-akzent: var(--b-akzent-d); --b-akzent-zart: var(--b-akzent-zart-d); --b-akzent-text: var(--b-akzent-text-d);
+	--b-erfolg: #4cc27a; --b-erfolg-zart: #14301f; --b-warnung: #f0a640; --b-warnung-zart: #33240f;
+	--b-gefahr: #ff6b5e; --b-gefahr-zart: #3a1714; --b-gefahr-text: #2a0602; --b-info: #4c9bff; --b-info-zart: #15294a;
+	--b-kopf: rgba(28, 28, 31, 0.72); --b-abdunkeln: rgba(0, 0, 0, 0.6); --b-meldung: #f2f2f5; --b-meldung-text: #111113;
+	--b-schatten-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+	--b-schatten-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.5);
+	--b-schatten-3: 0 24px 64px rgba(0, 0, 0, 0.6);
+	--b-avatar-1: #4c9bff; --b-avatar-2: #5cc08f; --b-avatar-3: #a28cff; --b-avatar-4: #ff7aa8; --b-avatar-5: #ffa04d; --b-avatar-6: #4fc3d4;
+	--b-bild-1: #1d3354; --b-bild-2: #2e2650; --b-bild-3: #1d3a2a; --b-bild-4: #45301b;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-thema="hell"]) {
+		color-scheme: dark;
+		--b-grund: #111113; --b-flaeche: #1c1c1f; --b-flaeche-2: #26262a; --b-flaeche-3: #313136;
+		--b-text: #f2f2f5; --b-text-leise: #a1a1a8; --b-linie: #2f2f34; --b-linie-feld: #7a7a82;
+		--b-akzent: var(--b-akzent-d); --b-akzent-zart: var(--b-akzent-zart-d); --b-akzent-text: var(--b-akzent-text-d);
+		--b-erfolg: #4cc27a; --b-erfolg-zart: #14301f; --b-warnung: #f0a640; --b-warnung-zart: #33240f;
+		--b-gefahr: #ff6b5e; --b-gefahr-zart: #3a1714; --b-gefahr-text: #2a0602; --b-info: #4c9bff; --b-info-zart: #15294a;
+		--b-kopf: rgba(28, 28, 31, 0.72); --b-abdunkeln: rgba(0, 0, 0, 0.6); --b-meldung: #f2f2f5; --b-meldung-text: #111113;
+		--b-schatten-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+		--b-schatten-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.5);
+		--b-schatten-3: 0 24px 64px rgba(0, 0, 0, 0.6);
+		--b-avatar-1: #4c9bff; --b-avatar-2: #5cc08f; --b-avatar-3: #a28cff; --b-avatar-4: #ff7aa8; --b-avatar-5: #ffa04d; --b-avatar-6: #4fc3d4;
+		--b-bild-1: #1d3354; --b-bild-2: #2e2650; --b-bild-3: #1d3a2a; --b-bild-4: #45301b;
+	}
+}
+
+/* ---------- Form, Schrift, Bewegung (themenunabhängig) ---------- */
+:root {
+	--b-schrift: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", system-ui, sans-serif;
+	--b-schrift-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+	--b-groesse-xs: 0.75rem;     /* 12px – Marken, Kleingedrucktes */
+	--b-groesse-s: 0.8125rem;    /* 13px – Hinweise, Labels, Tabellenkopf */
+	--b-groesse-m: 0.9375rem;    /* 15px – Fließtext, Knöpfe, Felder */
+	--b-groesse-l: 1.0625rem;    /* 17px – Kartentitel */
+	--b-groesse-xl: 1.25rem;     /* 20px – Abschnittstitel */
+	--b-groesse-xxl: 1.75rem;    /* 28px – Seitentitel */
+	--b-groesse-gross: 2.25rem;  /* 36px – Kennzahlen */
+	--b-zeile: 1.45; --b-zeile-eng: 1.2;
+	--b-gewicht: 400; --b-gewicht-mittel: 500; --b-gewicht-fett: 600; --b-gewicht-titel: 650;
+
+	--b-radius-s: 8px;           /* Felder, Knöpfe, Marken eckig */
+	--b-radius-m: 12px;          /* Menüs, Hinweise, Kachelbild */
+	--b-radius-l: 18px;          /* Karten, Kacheln, Dialoge */
+	--b-radius-voll: 999px;      /* Pillen, Avatare, Schalter */
+
+	--b-abstand-1: 4px; --b-abstand-2: 8px; --b-abstand-3: 12px; --b-abstand-4: 16px;
+	--b-abstand-5: 20px; --b-abstand-6: 24px; --b-abstand-7: 32px; --b-abstand-8: 48px;
+	--b-steuer: 40px;            /* Höhe von Knöpfen und Feldern (normal) */
+	--b-steuer-s: 32px;
+	--b-ziel: 44px;              /* Mindestgröße für Finger */
+	--b-linie-breite: 1px;
+	--b-fokus-breite: 2px;
+
+	--b-kachel-min: 180px;
+	--b-inhalt-max: 1200px;      /* Breite des Inhalts auf großen Bildschirmen */
+	--b-text-max: 68ch;
+
+	--b-dauer-kurz: 120ms; --b-dauer-mittel: 200ms; --b-kurve: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--b-ebene-kopf: 50; --b-ebene-menue: 60; --b-ebene-meldung: 90;
+}
+[data-dichte="kompakt"] {
+	--b-abstand-1: 3px; --b-abstand-2: 6px; --b-abstand-3: 9px; --b-abstand-4: 12px;
+	--b-abstand-5: 16px; --b-abstand-6: 18px; --b-abstand-7: 24px; --b-abstand-8: 36px; --b-steuer: 34px; --b-steuer-s: 28px;
+}
+[data-dichte="luftig"] {
+	--b-abstand-1: 5px; --b-abstand-2: 10px; --b-abstand-3: 15px; --b-abstand-4: 20px;
+	--b-abstand-5: 26px; --b-abstand-6: 30px; --b-abstand-7: 40px; --b-abstand-8: 60px; --b-steuer: 46px; --b-steuer-s: 36px;
+}
+[data-kachel="klein"] { --b-kachel-min: 140px; }
+[data-kachel="gross"] { --b-kachel-min: 240px; }
+/* Handy: zwei Kacheln nebeneinander (Groß: eine) */
+@media (max-width: 600px) { :root { --b-kachel-min: 140px; } [data-kachel="klein"] { --b-kachel-min: 100px; } [data-kachel="gross"] { --b-kachel-min: 200px; } }
+/* Finger: Knöpfe und Felder nie kleiner als 44 px, auch in „kompakt“ */
+@media (pointer: coarse) { :root:not([data-dichte="luftig"]) { --b-steuer: 44px; --b-steuer-s: 36px; } }
+@media (prefers-reduced-motion: reduce) { :root { --b-dauer-kurz: 0ms; --b-dauer-mittel: 0ms; } }
