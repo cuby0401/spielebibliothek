@@ -161,7 +161,14 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
     body:JSON.stringify({meldung:"TypeError: E2E-Test",quelle:"/app.js",zeile:42,seite:"#/e2e",version:"e2e"})}).then(r=>r.json()).then(d=>d.nr)`);
   ok(Number.isInteger(nr), "Fehler der Bibliothek bekommt eine Nummer: " + nr);
   await gehe(G + "/admin/", 3500);
-  ok(await eval_(`document.body.textContent.includes("Fehler in der Bibliothek") && document.body.textContent.includes("TypeError: E2E-Test")`), "Admin-Übersicht zeigt den Fehler oben");
+  // Seit 1.5.0 (Seb, 10.11.): in der Übersicht nur eine rote Zeile, die Liste öffnet sich im eigenen Fenster
+  ok(await bis(`document.querySelector(".fehler-zeile")?.textContent.includes("1 Fehler in der Bibliothek") && !document.querySelector("dialog.fenster").open`), "Admin-Übersicht: rote Zeile „1 Fehler in der Bibliothek“, Fenster zu");
+  await eval_(`document.querySelector(".fehler-zeile").click(); true`);
+  ok(await bis(`document.querySelector("dialog.fenster").open && document.querySelector("dialog.fenster").textContent.includes("TypeError: E2E-Test")`), "Klick öffnet das Fenster mit dem Fehler");
+  await eval_(`[...document.querySelectorAll("dialog.fenster button")].find(b=>b.textContent==="Erledigt").click(); true`);
+  ok(await bis(`document.querySelector("dialog.fenster")?.textContent.includes("Alle erledigt")`), "„Erledigt“ entfernt den Fehler im Fenster");
+  await eval_(`document.querySelector("dialog.fenster").close(); true`);
+  ok(await bis(`!document.querySelector(".fehler-zeile") && document.body.textContent.includes("Keine Fehler in der Bibliothek")`), "Nach dem Schließen: keine rote Zeile mehr");
 
   // 8b) Tester-Panel (1.4.0, E76): Plan aus tests/manuell, Ergebnis eintragen, Zusammenfassung
   await gehe(G + "/tester/", 3500);

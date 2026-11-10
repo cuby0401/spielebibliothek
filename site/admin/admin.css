@@ -64,3 +64,18 @@ ul.einfach { list-style: none; padding: 0; margin: 0; }
 ul.einfach li { padding: 0.35rem 0; border-bottom: 1px solid var(--linie); }
 ul.einfach li:last-child { border-bottom: 0; }
 @media (max-width: 640px) { .crm-kopf .profil-zahlen { margin-left: 0; } }
+
+/* Fehler der Bibliothek (1.5.0, Seb 10.11.2026): rote Zeile in der Übersicht, Liste im eigenen Fenster */
+.fehler-zeile { display: flex; align-items: center; gap: 0.3rem; width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  background: var(--flaeche); border: 2px solid #b3261e; border-radius: 10px; padding: 0.6rem 0.9rem; margin: 0 0 1rem; }
+.fehler-zeile strong { color: #e5534b; }
+.fehler-zeile:hover { background: var(--grund); }
+.fehler-zeile-los { margin-left: auto; font-weight: 600; }
+.fenster { width: min(1200px, calc(100% - 2rem)); max-height: calc(100vh - 4rem); overflow: auto; border: 1px solid var(--linie); border-radius: 12px;
+  background: var(--flaeche); color: var(--text); padding: 1.1rem 1.3rem 1.3rem; }
+.fenster::backdrop { background: rgba(0, 0, 0, 0.5); }
+.fenster-kopf { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.fenster-kopf h2 { margin: 0; font-size: 1.2rem; }
+.fenster pre { max-height: 16rem; }
+/* Abstand nach Tabellen, bevor Kacheln oder Abschnitte folgen */
+.admin .tabelle-rahmen + .kacheln-klein, .admin .tabelle-rahmen + .karte { margin-top: 1rem; }

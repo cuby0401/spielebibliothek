@@ -101,19 +101,35 @@ function notausZeigen(c) {
 	c.append(box);
 }
 
-// Fehler der Bibliothek selbst (Zentrale 1.4.0) – ganz oben, mit Fundort und Stacktrace. Leer: nur eine grüne Zeile.
+// Fehler der Bibliothek selbst (Zentrale 1.4.0). Seit 1.5.0 (Seb, 10.11.2026) nur noch eine rote Zeile in der Übersicht,
+// die Liste mit Fundort und Stacktrace öffnet sich in einem eigenen Fenster. Leer: nur eine grüne Zeile.
 async function zentraleFehlerZeigen(c) {
 	let liste = [];
 	try { liste = (await Bridge.json("GET", "/api/entwickler/fehler?alle=true")).filter((f) => f.zentrale); } catch { return; }
 	if (!liste.length) return c.append(h("p", { class: "leise", text: "✓ Keine Fehler in der Bibliothek selbst gemeldet." }));
-	c.append(h("h2", { text: `⚠ Fehler in der Bibliothek (${liste.length})` }),
+	const zuletzt = liste.map((f) => f.letztes).sort().pop();
+	const fenster = h("dialog", { class: "fenster breit-fenster", "aria-label": "Fehler in der Bibliothek" });
+	const fuellen = (l) => fenster.replaceChildren(
+		h("div", { class: "fenster-kopf" }, h("h2", { text: `⚠ Fehler in der Bibliothek (${l.length})` }),
+			h("button", { type: "button", class: "knopf leise klein", text: "Schließen", onclick: () => fenster.close() })),
 		h("p", { class: "leise", text: "Abstürze der Bibliotheksseite bei Spielern – der Spieler sah dazu „Fehler-Nr. …“. Gleiche Fehler sind zusammengefasst. „Erledigt“ entfernt den Eintrag, tritt er wieder auf, erscheint er neu." }),
-		tabelle(["Nr.", "Fehler", "Fundort", "Anzahl", "Zuletzt", "Browser", ""], liste.map((f) => h("tr", {},
+		l.length ? tabelle(["Nr.", "Fehler", "Fundort", "Anzahl", "Zuletzt", "Browser", ""], l.map((f) => h("tr", {},
 			h("td", { text: String(f.id) }),
 			h("td", {}, h("code", { text: f.meldung }), f.stack ? h("details", {}, h("summary", { text: "Seite, Version, Stacktrace" }), h("pre", { class: "changelog", text: f.stack })) : null),
 			h("td", {}, h("code", { text: (f.quelle || "inline") + (f.zeile ? `:${f.zeile}` + (f.spalte ? `:${f.spalte}` : "") : "") })),
 			h("td", { text: String(f.anzahl) }), h("td", { text: datumZeit(f.letztes) }), h("td", { text: f.browser || "" }),
-			h("td", {}, knopf("Erledigt", async () => { await Bridge.json("DELETE", "/api/entwickler/fehler/" + f.id); zeigen(); }))))));
+			h("td", {}, knopf("Erledigt", async () => {
+				await Bridge.json("DELETE", "/api/entwickler/fehler/" + f.id);
+				liste = liste.filter((x) => x.id !== f.id);
+				fuellen(liste);
+			})))))
+			: h("p", { text: "✓ Alle erledigt." }));
+	fuellen(liste);
+	fenster.addEventListener("close", () => zeigen());     // Übersicht danach mit dem neuen Stand
+	c.append(fenster, h("button", { type: "button", class: "fehler-zeile", onclick: () => fenster.showModal() },
+		h("strong", { text: `⚠ ${liste.length === 1 ? "1 Fehler" : liste.length + " Fehler"} in der Bibliothek` }),
+		h("span", { class: "leise", text: ` · zuletzt ${datumZeit(zuletzt)} · ${liste.reduce((n, f) => n + (f.anzahl || 1), 0)}× aufgetreten` }),
+		h("span", { class: "fehler-zeile-los", text: "Ansehen →" })));
 }
 
 // Version der Zentrale (E39): site/zentrale.json und CHANGELOG.md schreibt scripts/deploy.sh
