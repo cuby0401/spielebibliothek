@@ -55,6 +55,11 @@ def registrieren(app: FastAPI, e, db, aktuelle_season) -> None:
             raise HTTPException(422, "bisSaveVersion: Zahl ab 1")
         return db.spielstaende_zurueckholen(sid(user, ordner), bis)
 
+    @app.get("/intern/handle/{ordner}", dependencies=[Depends(intern)])
+    def handle_von_ordner(ordner: str = P(..., max_length=64)):
+        """Die Upload-Seite zeigt oben das aktuelle Handle (1.5.0) – der Upload-Dienst kennt nur den Spieleordner."""
+        return {"handle": identitaet.handle(identitaet.id_von_ordner(ordner))}
+
     @app.post("/intern/meldung", status_code=204, dependencies=[Depends(intern)])
     def meldung(body: dict[str, Any] = Body(...)):
         """Upload-Dienst meldet z. B. „Neues Spiel“ oder „Version 1.2.0“ an alle (Glocke, Zentrale 1.2.0)."""

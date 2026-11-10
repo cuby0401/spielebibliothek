@@ -354,10 +354,13 @@ class Register:
     def _karten_lesen(self) -> dict:
         v = _verbinden(self.pfad)
         try:
-            zu_handle, zu_ordner, zu_id, zu_nr = {}, {}, {}, {}
+            zu_handle, zu_ordner, zu_id, zu_nr, weg = {}, {}, {}, {}, set()
             for z in v.execute("SELECT id, handle, alt_name, nr, status FROM personen WHERE id IS NOT NULL"):
-                # Gelöschte (anonymisierte) Personen erscheinen überall als „gelöschte Person“ (1.5.0)
+                # Gelöschte (anonymisierte) Personen erscheinen überall als „gelöschte Person“ (1.5.0), auch im Admin-Bereich
                 zu_handle[z["id"]] = GELOESCHT if z["status"] == "geloescht" else z["handle"]
+                if z["status"] == "geloescht":
+                    weg |= {x.lower() for x in (z["handle"], z["alt_name"]) if x}
+                    weg |= {r["handle"].lower() for r in v.execute("SELECT handle FROM handles WHERE person=?", (z["id"],))}
                 zu_ordner[z["id"]] = z["alt_name"]
                 zu_id[z["alt_name"].lower()] = z["id"]
                 if z["nr"] is not None:
@@ -367,7 +370,9 @@ class Register:
             for pid, h in zu_handle.items():                                   # aktuelle Handles haben Vorrang
                 if h != GELOESCHT:
                     zu_id[h.lower()] = pid
-            return {"handle": zu_handle, "ordner": zu_ordner, "id": zu_id, "nr": zu_nr}
+            muster = re.compile(r"(?<![\w-])@?(?:" + "|".join(map(re.escape, sorted(weg, key=len, reverse=True))) + r")(?![\w-])",
+                                re.IGNORECASE) if weg else None
+            return {"handle": zu_handle, "ordner": zu_ordner, "id": zu_id, "nr": zu_nr, "geloescht": muster}
         finally:
             v.close()
 
@@ -440,6 +445,30 @@ class Register:
         return gehen(wert)
 
 
+    # Felder, deren Werte feste Begriffe sind (kein Name) – beim Anonymisieren unberührt
+    FESTE_FELDER = frozenset({"status", "art", "aktion", "rollen", "rolle", "name", "nr", "zeit", "id"})
+
+    def anonymisieren(self, wert):
+        """Handles, frühere Handles und Ordnernamen gelöschter Personen in Texten durch „gelöschte Person“ ersetzen –
+        für Admin-Antworten (Personenkarte, Liste, Prüfprotokoll, Auskunft), die sonst alte Einträge zeigen (Seb, 10.11.2026).
+        Nicht für Spiele-Adressen: Dort ist der Ordnername Teil der Adresse."""
+        if not self.aktiv():
+            return wert
+        muster = self.karten()["geloescht"]
+        if not muster:
+            return wert
+
+        def gehen(w, feld=None):
+            if isinstance(w, str):
+                return w if feld in self.FESTE_FELDER else muster.sub(GELOESCHT, w)
+            if isinstance(w, list):
+                return [gehen(x, feld) for x in w]
+            if isinstance(w, dict):
+                return {a: gehen(b, a) for a, b in w.items()}
+            return w
+        return gehen(wert)
+
+
 REGISTER: Register | None = None      # setzt app.erstellen; im Upload-Dienst bleibt es leer
 
 
@@ -463,3 +492,7 @@ def ordner(pid):
 
 def id_von_ordner(o):
     return REGISTER.id_von_ordner(o) if REGISTER else o
+
+
+def anonymisieren(wert):
+    return REGISTER.anonymisieren(wert) if REGISTER else wert

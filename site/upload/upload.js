@@ -396,7 +396,9 @@ async function start() {
 	} catch (e) {
 		return meldung(e.status === 403 ? "Für deine E-Mail-Adresse gibt es kein Konto in der Spielebibliothek." : e.message, "fehler");
 	}
-	$("benutzer").textContent = s.player;
+	// 1.5.0: oben das aktuelle Handle; der Spieleordner (erster Name, ändert sich nie) steht im Tooltip
+	$("benutzer").textContent = s.handle && s.handle !== s.player ? "@" + s.handle : s.player;
+	$("benutzer").title = "Spieleordner: " + s.player;
 	$("benutzer").hidden = false;
 	if (!s.entwickler) { zeige(""); return meldung("Du hast noch kein Upload-Konto – bitte bei Seb melden.", "fehler"); }
 	if (s.gesperrt) meldung("Zu viele falsche Passwörter – bitte 15 Minuten warten.", "fehler");

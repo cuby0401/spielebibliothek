@@ -100,6 +100,7 @@ class FalscherSpeicher:
         self.aufrufe = []
         self.tests = {"geoeffnet": True, "migrationOk": 1, "migrationFehler": [], "fehler": 0}
         self.weg = False
+        self.handles = {}
 
     def __call__(self, methode, pfad, body=None):
         from fastapi import HTTPException
@@ -108,6 +109,8 @@ class FalscherSpeicher:
             raise HTTPException(502, "Speicher-Dienst nicht erreichbar")
         if pfad.startswith("/intern/entwurf/") and methode == "GET":
             return self.tests
+        if pfad.startswith("/intern/handle/"):
+            return {"handle": self.handles.get(pfad.rsplit("/", 1)[1])} if self.handles else None
         if pfad.startswith("/intern/season/"):
             return {"season": 2}
         if pfad.startswith("/intern/spielstaende-zurueck/"):
@@ -466,3 +469,15 @@ def test_sicherheitsereignisse(uclient):
     assert anmelden(uclient).status_code == 429
     assert "Upload-Anmeldung gesperrt (zu viele Fehlversuche)" in [x["aktion"] for x in uclient.store.ereignisse(50, "paul")]
     assert uclient.store.ereignisse(50, "niemand") == []
+
+
+def test_status_zeigt_aktuelles_handle(uclient):
+    """1.5.0 (Seb, 10.11.2026): Oben auf der Upload-Seite steht das aktuelle Handle, nicht der Ordnername. Ist der
+    Speicher-Dienst weg oder kennt die Person nicht, bleibt es beim Ordnernamen – der Upload selbst hängt nie davon ab."""
+    c = uclient
+    assert c.get("/api/upload/status", headers=c.als()).json()["handle"] == "paul"
+    c.speicher.handles = {"paul": "phil_neu"}
+    r = c.get("/api/upload/status", headers=c.als()).json()
+    assert r["handle"] == "phil_neu" and r["player"] == "paul"
+    c.speicher.weg = True
+    assert c.get("/api/upload/status", headers=c.als()).json()["handle"] == "paul"

@@ -261,10 +261,20 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
             raise HTTPException(422, "Ordnername: Buchstaben, Ziffern, . _ - (max. 64 Zeichen, nicht mit . beginnend)")
         return e.spiele_dir / player / ordner
 
+    def handle_von(ordner: str) -> str:
+        """Aktuelles Handle für die Anzeige oben (1.5.0); ohne Speicher-Dienst bleibt es beim Ordnernamen."""
+        try:
+            from urllib.parse import quote
+            r = speicher("GET", f"/intern/handle/{quote(ordner)}")
+        except HTTPException:
+            return ordner
+        h = r.get("handle") if isinstance(r, dict) else None
+        return h if isinstance(h, str) and h else ordner
+
     @app.get("/api/upload/status")
     def status(request: Request, player: str = Depends(spieler)):
         return {
-            "player": player,
+            "player": player, "handle": handle_von(player),
             "entwickler": store.vorhanden(player),
             "angemeldet": cookie_gueltig(geheim, request.cookies.get(COOKIE, ""), player),
             "gesperrt": store.gesperrt(player),

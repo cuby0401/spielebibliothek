@@ -77,7 +77,10 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
                 "cloudflare": None if not cf.get("richtlinien") or p["status"] not in crm_modul.ZUGELASSEN else {
                     "kollegen": not any(m in fehlt.get("kollegen", set()) for m in p["emails"]),
                     "entwickler": (not any(m in fehlt.get("entwickler", set()) for m in p["emails"])) if entw and konten and p["name"] in konten else None}})
-        return {"personen": ergebnis, "rollen": crm_modul.ROLLEN, "status": crm_modul.STATUS,
+        for x in ergebnis:              # gelöscht = auch für den Admin anonym, nur über die Nummer erreichbar (Seb, 10.11.2026)
+            if x["status"] == "geloescht":
+                x.update(handle=identitaet.GELOESCHT, alteHandles=[])
+        return {"personen": identitaet.anonymisieren(ergebnis), "rollen": crm_modul.ROLLEN, "status": crm_modul.STATUS,
                 "mail": mail.eingerichtet(), "cloudflare": {"eingerichtet": bool(cf.get("eingerichtet")), "geprueft": bool(cf.get("richtlinien"))}}
 
     # ---------- Einzelne Person ----------
@@ -118,6 +121,10 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
         if not p:
             raise HTTPException(404, "Person nicht gefunden")
         konten = upload_konten()
+        if p["status"] == "geloescht":   # auch für den Admin anonym (Seb, 10.11.2026)
+            return identitaet.anonymisieren({**p, "handle": identitaet.GELOESCHT, "handle_seit": None, "alt_name": None, "alteHandles": [],
+                    "sicherheit": sicherheit(name), "notfallAdmin": False, "ordner": False, "uploadKonto": None, "notizen": crm.notizen(name),
+                    "zeitleiste": zeitleiste(name), "protokoll": crm.protokoll(name, 100), "anmeldungen": db.anmeldungen(name, 50)})
         return {**p, "alteHandles": crm.alte_handles().get(name, []), "sicherheit": sicherheit(name), "notfallAdmin": name in rollen.notfall_admins(e), "ordner": (e.spiele_dir / identitaet.ordner(name)).is_dir(), "uploadKonto": None if konten is None else name in konten,
                 "notizen": crm.notizen(name), "zeitleiste": zeitleiste(name), "protokoll": crm.protokoll(name, 100),
                 "anmeldungen": db.anmeldungen(name, 50)}
@@ -238,14 +245,18 @@ def registrieren(app: FastAPI, e, db, admin, spieler, benutzerliste: crm_modul.C
             raise HTTPException(404, "Person nicht gefunden")
         with crm.db.verbindung() as v:
             crm._protokoll(v, admin_name, "export", name)
-        return {"person": p, "notizen": crm.notizen(name), "ereignisse": crm.ereignisse(name, 10000),
-                "anmeldungen": db.anmeldungen(name, 1000), "antraege": db.antraege(name),
-                "spielstaende": [{k: s[k] for k in s if k != "data"} for s in db.spielstaende(name, None)],
-                "erstellt": crm_modul.jetzt()}
+        aus = {"person": p, "notizen": crm.notizen(name), "ereignisse": crm.ereignisse(name, 10000),
+               "anmeldungen": db.anmeldungen(name, 1000), "antraege": db.antraege(name),
+               "spielstaende": [{k: s[k] for k in s if k != "data"} for s in db.spielstaende(name, None)],
+               "erstellt": crm_modul.jetzt()}
+        if p["status"] == "geloescht":   # auch für den Admin anonym (Seb, 10.11.2026)
+            aus["person"] = {**p, "handle": identitaet.GELOESCHT, "handle_seit": None, "alt_name": None}
+            return identitaet.anonymisieren(aus)
+        return aus
 
     @app.get("/api/admin/protokoll")
     def protokoll(_: str = Depends(admin)):
-        return crm.protokoll(None, 500)
+        return identitaet.anonymisieren(crm.protokoll(None, 500))
 
     @app.post("/api/admin/personen/{name}/einladung")
     def einladung_senden(request: Request, admin_name: str = Depends(admin), name: str = P(...), body: dict[str, Any] = Body(...)):

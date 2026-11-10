@@ -86,3 +86,27 @@ def test_personennummer_und_geloeschte_person(client, upload, pid):  # noqa: F81
     assert [e["player"] for e in client.get("/api/leaderboard/seb/zaehler", headers=s).json()["entries"]] == ["gelöschte Person"]
     assert client.get(f"/api/admin/personen/P-{nr:04d}", headers=s).json()["status"] == "geloescht"
     assert client.get("/api/profil/paul", headers=s).status_code == 404
+
+
+def test_geloeschte_person_auch_fuer_admin_anonym(client, upload, pid):  # noqa: F811
+    """Seb, 10.11.2026: Nach dem Löschen steht auch im Admin-Bereich nirgends mehr ein Handle, ein früheres Handle oder
+    der Ordnername – Liste, Karte, Prüfprotokoll und Auskunft zeigen „gelöschte Person“, erreichbar nur über die Nummer."""
+    s = client.als()
+    client.get("/api/me", headers=client.als(PAUL))
+    assert client.post("/api/admin/personen/paul/handle", json={"handle": "phil_neu"}, headers=s).status_code == 200
+    nr = client.get("/api/admin/personen/phil_neu", headers=s).json()["nr"]
+    client.post("/api/admin/personen/phil_neu/archivieren", headers=s)
+    assert client.post("/api/admin/personen/phil_neu/loeschen", json={"bestaetigung": "phil_neu"}, headers=s).status_code == 200
+    karte = client.get(f"/api/admin/personen/P-{nr:04d}", headers=s)
+    liste = client.get("/api/admin/personen", headers=s)
+    protokoll = client.get("/api/admin/protokoll", headers=s)
+    auskunft = client.get(f"/api/admin/personen/P-{nr:04d}/export", headers=s)
+    for r in (karte, liste, protokoll, auskunft):
+        assert r.status_code == 200
+        assert "paul" not in r.text.lower() and "phil_neu" not in r.text.lower(), r.text[:400]
+    k = karte.json()
+    assert k["handle"] == "gelöschte Person" and k["alteHandles"] == [] and k["alt_name"] is None and k["status"] == "geloescht"
+    assert any(p["handle"] == "gelöschte Person" and p["nr"] == nr for p in liste.json()["personen"])
+    # Andere Personen bleiben unberührt, das Handle bleibt für niemanden frei
+    assert any(p["handle"] == "seb" for p in liste.json()["personen"])
+    assert client.put("/api/mein/handle", json={"handle": "phil_neu"}, headers=s).status_code == 409

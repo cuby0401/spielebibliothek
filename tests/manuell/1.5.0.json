@@ -206,16 +206,29 @@
       "erwartet": "Die Upload-Seite lehnt die ZIP ab („index.html fehlt …“). Im Sicherheitsprotokoll deiner Karte stehen „Upload-Passwort falsch“ und „Upload blockiert: index.html fehlt …“."
     },
     {
+      "id": "upload-seite-handle",
+      "bereich": "Handle",
+      "titel": "Upload-Seite zeigt dein aktuelles Handle",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Nach dem Test „Handle ändern“: Öffne die Upload-Seite des Testservers (test-upload…).",
+        "Schau oben rechts und fahr mit der Maus darüber."
+      ],
+      "erwartet": "Oben rechts steht „@dein-neues-handle“, beim Drüberfahren „Spieleordner: …“ mit deinem ersten Namen. Deine Spiele liegen unverändert im selben Ordner."
+    },
+    {
       "id": "crm-geloeschte-person",
       "bereich": "CRM",
-      "titel": "Gelöschte Person heißt überall „gelöschte Person“",
+      "titel": "Gelöschte Person heißt überall „gelöschte Person“ – auch für dich als Admin",
       "nurAdmin": true,
       "schritte": [
         "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
-        "CRM → eine Testperson einladen (Handle z. B. „loeschtest“, E-Mail egal), archivieren, dann „Endgültig löschen“ (Bestätigung: das Handle).",
-        "Schau, was die Karte danach zeigt. Öffne die Liste mit dem Status-Filter „gelöscht“."
+        "CRM → eine Testperson einladen (Handle z. B. „loeschtest“, E-Mail egal). Ändere ihr Handle einmal (z. B. auf „loeschtest2“), damit es ein früheres Handle gibt.",
+        "Archivieren, dann „Endgültig löschen“ (Bestätigung: das aktuelle Handle).",
+        "Schau, was die Karte danach zeigt. Öffne die Liste mit dem Status-Filter „gelöscht“ und such dort nach „loeschtest“.",
+        "Öffne das Prüfprotokoll (CRM → „Prüfprotokoll“) und such auf der Seite (Cmd+F) nach „loeschtest“."
       ],
-      "erwartet": "Die Karte zeigt „gelöschte Person“ und die Nummer, keine E-Mail mehr. In der Liste (Filter „gelöscht“) steht sie als „gelöschte Person“ mit ihrer Nummer, ein Klick öffnet die Karte."
+      "erwartet": "Die Karte zeigt „gelöschte Person“ und die Nummer, kein Handle, kein früheres Handle, keinen Spieleordner, keine E-Mail. Die Suche nach „loeschtest“ findet nichts, über den Filter „gelöscht“ steht sie als „gelöschte Person“ mit Nummer, ein Klick öffnet die Karte. Im Prüfprotokoll kommt „loeschtest“ nicht mehr vor – dort steht „gelöschte Person“."
     },
     {
       "id": "crm-anmeldungen-spalte",

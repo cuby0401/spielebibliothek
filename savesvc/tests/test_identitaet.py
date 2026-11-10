@@ -1,4 +1,5 @@
 """Zentrale 1.5.0: Umstellung der Identität auf UUIDs (E81) – nichts darf verloren gehen oder verrutschen."""
+import os
 import json
 import sqlite3
 
@@ -7,6 +8,8 @@ import pytest
 from savesvc import crm as crm_modul
 from savesvc import identitaet
 from savesvc.db import Datenbank
+
+from .test_verwaltung import iclient  # noqa: F401 (Fixture)
 
 
 def _stand(pfad):
@@ -307,3 +310,16 @@ def test_users_yaml_nach_dem_start_mit_ordnernamen(umgebung):
     identitaet.REGISTER = None
     erstellen(_einstellungen(umgebung, identitaet_uuid=True))   # zweiter Start
     assert not identitaet.UUID_IN_TEXT.search(umgebung.users.read_text())
+
+
+
+def test_intern_handle_von_ordner(iclient):  # noqa: F811
+    """Upload-Seite (1.5.0, Seb 10.11.2026): Ordnername → aktuelles Handle, nur mit internem Token."""
+    t = {"X-Intern-Token": "geheim"}
+    seb = iclient.als()
+    iclient.get("/api/me", headers=seb)
+    assert iclient.get("/intern/handle/seb").status_code == 403
+    assert iclient.get("/intern/handle/seb", headers=t).json() == {"handle": "seb"}
+    if os.environ.get("TEST_IDENTITAET_UUID") != "0":
+        assert iclient.put("/api/mein/handle", json={"handle": "seb_neu"}, headers=seb).status_code == 200
+        assert iclient.get("/intern/handle/seb", headers=t).json() == {"handle": "seb_neu"}

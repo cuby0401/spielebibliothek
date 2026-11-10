@@ -380,9 +380,11 @@ async function personSeite(c, name) {
 	const [profil, spiele, anfragen] = await Promise.all([
 		p.status === "geloescht" ? null : Bridge.json("GET", "/api/profil/" + encodeURIComponent(p.handle)).catch(() => null),
 		api("GET", "/spiele").catch(() => []), api("GET", "/antraege").catch(() => [])]);
-	const eigeneSpiele = spiele.filter((s) => s.author === p.handle);
-	const gestellt = anfragen.filter((a) => a.player === p.handle);
-	const bekommen = anfragen.filter((a) => a.zustaendig === p.handle && a.player !== p.handle);
+	// Gelöschte heißen alle „gelöschte Person“ – Spiele und Anfragen lassen sich ihnen nicht mehr zuordnen (auch für den Admin anonym)
+	const meins = (wer) => p.status !== "geloescht" && wer === p.handle;
+	const eigeneSpiele = spiele.filter((s) => meins(s.author));
+	const gestellt = anfragen.filter((a) => meins(a.player));
+	const bekommen = anfragen.filter((a) => meins(a.zustaendig) && a.player !== p.handle);
 	const gespielt = profil ? profil.spiele : [];
 
 	// Kopf
@@ -402,7 +404,7 @@ async function personSeite(c, name) {
 			zahlen.length ? h("div", { class: "profil-zahlen zeile" }, ...zahlen.map(([w, t]) => h("div", {}, h("b", { text: String(w) }), h("div", { text: t })))) : null),
 		p.status === "gesperrt" ? h("p", { class: "hinweis-box", text: `Gesperrt: ${p.sperrgrund || "–"}${p.gesperrt_bis ? " · bis " + datumZeit(p.gesperrt_bis) : " · unbefristet"}. Aus Cloudflare entfernt das erst „python3 scripts/cloudflare.py abgleichen --entfernen“ am Mac – hinein kommt die Person aber schon jetzt nicht mehr.` }) : null,
 		p.status === "eingeladen" && !p.erste_anmeldung ? h("p", { class: "hinweis-box", text: `Eingeladen${p.einladung_gesendet ? " (Mail " + datumZeit(p.einladung_gesendet) + ")" : ""}, hat sich noch nie angemeldet. Häufigster Grund: Der E-Mail-Code kommt nicht an – dann fehlt die Adresse in der Cloudflare-Richtlinie „Kollegen“.` }) : null,
-		p.status === "geloescht" ? h("p", { class: "hinweis-box", text: "Endgültig gelöscht (anonymisiert). In Bestenlisten und an Spielständen steht überall „gelöschte Person“. Erreichbar nur noch über die Nummer " + pnr(p.nr) + "." }) : null);
+		p.status === "geloescht" ? h("p", { class: "hinweis-box", text: "Endgültig gelöscht (anonymisiert). Überall – auch hier im Admin-Bereich – steht „gelöschte Person“, das frühere Handle ist für niemanden mehr frei. Erreichbar nur noch über die Nummer " + pnr(p.nr) + "." }) : null);
 
 	// Schnellaktionen
 	const schnell = [];

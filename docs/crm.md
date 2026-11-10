@@ -33,7 +33,8 @@ arbeiten mit dem Spieleordner.
 - **Rückweg:** `scripts/deploy.sh --zurueck 1.4.1` stellt die Datenbank vorher automatisch zurück (`identitaet-zurueck`).
 - **Innen UUID, außen Handle:** Eine Schicht in `app.py` übersetzt Handles in Adressen (`/api/profil/…`, `/api/admin/personen/…`, auch
   `P-0007`) und `?player=` in die UUID und jede UUID in JSON-Antworten in das aktuelle Handle – auch in Texten. Gelöschte Personen
-  erscheinen als „gelöschte Person“.
+  erscheinen als „gelöschte Person“ – auch im Admin-Bereich (Liste, Karte, Prüfprotokoll, Auskunft: `identitaet.anonymisieren`
+  ersetzt Handle, frühere Handles und Ordnernamen). Spiele-Adressen behalten den Ordnernamen.
 - **Spiele** bekommen über `GameSave.player()` das Handle, nie die UUID.
 - **Tests:** `tests/test_identitaet.py` (Umstellung, Rückweg, keine UUID nach außen), `test_handle.py`, `test_zugriff.py` (fremde IDs).
   Die ganze Sammlung läuft standardmäßig mit UUIDs, mit `TEST_IDENTITAET_UUID=0` wie in 1.4.1.
