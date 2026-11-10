@@ -13,6 +13,12 @@
 #   scripts/deploy.sh --ohne-tests       Tests überspringen (nur im Notfall)
 #   scripts/deploy.sh --zurueck 1.1.0    auf eine früher deployte Version zurück (aus dem Release-Archiv)
 #   scripts/deploy.sh --versionen        aufgehobene Versionen auf der NAS anzeigen
+#   scripts/deploy.sh --design           DESIGN-SPIELWIESE für die neue UI: Kopie der echten Daten, NUR über Tailscale,
+#                                        http://<NAS_GH>:18288 – ohne VERSION/CHANGELOG/Commit-Pflicht, jeder Branch.
+#                                        Nimmt auch nicht committete Dateien mit. NIE eine Cloudflare-Route darauf legen (automatisch seb).
+#   scripts/deploy.sh --design --daten-behalten   Code erneuern, Daten der Spielwiese behalten
+#   scripts/deploy.sh --design --nur-site         nur site/ erneuern (CSS/JS), ohne Neustart – für schnelle Design-Runden
+#   scripts/deploy.sh --design --weg              Spielwiese abbauen
 #   scripts/deploy.sh --notaus           NOT-AUS vom Mac: alle Daten sofort gesperrt, Tunnel aus (auch im Admin-Panel auslösbar)
 #   scripts/deploy.sh --notaus-aus       Not-Aus aufheben – geht NUR hier, nicht im Admin-Panel (mit --probe: in der Probe)
 #   scripts/deploy.sh --notaus-status    Zustand anzeigen
@@ -42,6 +48,9 @@ STARTEN=1
 TESTS=1
 GRUENDLICH=0
 PROBE=0
+DESIGN=0
+NUR_SITE=0
+WEG=0
 OHNE_PROBE=0
 BEHALTEN=""
 PROBE_DIR=/volume1/docker/spielebibliothek-probe
@@ -55,6 +64,9 @@ while [ $# -gt 0 ]; do
 		--ohne-tests) TESTS=0 ;;
 		--gruendlich) GRUENDLICH=1 ;;
 		--probe) PROBE=1 ;;
+		--design) DESIGN=1 ;;
+		--nur-site) NUR_SITE=1 ;;
+		--weg) WEG=1 ;;
 		--ohne-probe) OHNE_PROBE=1 ;;
 		--daten-behalten) BEHALTEN="--daten-behalten" ;;
 		--zurueck) shift; ZURUECK="${1:-}"; [ -n "$ZURUECK" ] || { echo "--zurueck braucht eine Version, z. B. 1.1.0" >&2; exit 2; } ;;
@@ -182,6 +194,32 @@ if [ -n "$ZURUECK" ]; then
 	"
 	if [ "$STARTEN" = 1 ]; then ssh "$NAS" "$STARTBEFEHL"; fi
 	echo "✓ Zentrale läuft wieder mit Version $ZURUECK. Datenbank-Sicherung von vorher: data/backup/vor-deploy/vor-zurueck-$ZURUECK-*.db"
+	exit 0
+fi
+
+# ---------- Design-Spielwiese (neue UI, 10.11.2026) ----------
+# Bewusst ohne die Prüfungen für live/Probe: Hier wird ausprobiert, nichts davon geht ungeprüft live.
+if [ "$DESIGN" = 1 ]; then
+	DESIGN_URL=http://<NAS_GH>:18288
+	if [ "$WEG" = 1 ]; then ssh "$NAS" "ART=design sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh down"; exit 0; fi
+	COMMIT="$(git rev-parse --short HEAD)"; [ -n "$(git status --porcelain)" ] && COMMIT="$COMMIT+"
+	VERSION_DESIGN="$(tr -d ' \n' < VERSION)-design"
+	# verfolgte und neue (nicht ignorierte) Dateien – auch noch nicht committete Arbeit kommt mit
+	if [ "$NUR_SITE" = 1 ]; then
+		{ git ls-files -co --exclude-standard site; echo VERSION; echo CHANGELOG.md; } | sort -u | while read -r f; do [ -f "$f" ] && echo "$f"; done \
+			| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+			set -e; rm -rf /tmp/sb-design-repo && mkdir -p /tmp/sb-design-repo && tar -xf - -C /tmp/sb-design-repo
+			ART=design ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh site /tmp/sb-design-repo
+			rm -rf /tmp/sb-design-repo"
+		echo "✓ site/ der Design-Spielwiese erneuert: $DESIGN_URL"; exit 0
+	fi
+	echo "→ Design-Spielwiese (Commit $COMMIT) mit ${BEHALTEN:+bisherigen Daten}${BEHALTEN:-frischer Kopie der echten Daten}"
+	git ls-files -co --exclude-standard | grep -vx -e '.env' -e 'config/users.yaml' | while read -r f; do [ -f "$f" ] && echo "$f"; done \
+		| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+		set -e; rm -rf /tmp/sb-design-repo && mkdir -p /tmp/sb-design-repo && tar -xf - -C /tmp/sb-design-repo
+		ART=design ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /tmp/sb-design-repo/scripts/teststand.sh up /tmp/sb-design-repo $BEHALTEN
+		rm -rf /tmp/sb-design-repo"
+	echo "✓ Design-Spielwiese läuft: $DESIGN_URL  (nur über Tailscale, automatisch als seb)"
 	exit 0
 fi
 

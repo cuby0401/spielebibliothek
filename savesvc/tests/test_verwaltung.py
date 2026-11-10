@@ -50,7 +50,8 @@ def test_me_admin(client):
 def test_einstellungen(client):
     assert client.get("/api/einstellungen", headers=client.als()).json()["sortierung"] == "alphabetisch"
     r = client.put("/api/einstellungen", json={"sortierung": "zuletzt", "favoriten": ["seb/zaehler"], "grossansicht": True}, headers=client.als())
-    assert r.json() == {"sortierung": "zuletzt", "favoriten": ["seb/zaehler"], "grossansicht": True, "bestenliste": True, "gesehen": {}}
+    d = r.json(); d.pop("aussehen"); d.pop("startseite")   # neue UI, eigener Test: test_einstellungen_aussehen.py
+    assert d == {"sortierung": "zuletzt", "favoriten": ["seb/zaehler"], "grossansicht": True, "bestenliste": True, "gesehen": {}}
     assert client.put("/api/einstellungen", json={"sortierung": "zufall"}, headers=client.als()).status_code == 422
     assert client.get("/api/einstellungen", headers=client.als(PAUL)).json()["favoriten"] == []   # je Spieler getrennt
 
@@ -194,7 +195,7 @@ def test_ansicht_als_spieler(client, upload):
     client.patch("/api/admin/spiele/paul/snake", json={"versteckt": True}, headers=client.als())
     h = {**client.als(), "X-Ansicht": "spieler"}
     me = client.get("/api/me", headers=h).json()
-    assert isinstance(me.pop("sitzungBis"), int) and me.pop("probe") is False
+    assert isinstance(me.pop("sitzungBis"), int) and me.pop("probe") is False and me.pop("design") is False
     me.pop("anzeigename"); me.pop("namen")
     assert me.pop("konto") == "seb"
     assert me == {"player": "seb", "uploader": False, "admin": False, "ansicht": "spieler", "echterAdmin": True, "tester": False}

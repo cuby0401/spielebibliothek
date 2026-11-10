@@ -25,6 +25,32 @@ from .auth import BENUTZER_MUSTER, Benutzerliste
 log = logging.getLogger("savesvc.verwaltung")
 
 SORTIERUNGEN = ("alphabetisch", "zuletzt", "neu", "meistgespielt")
+# Aussehen und Startseite (neue UI, 10.11.2026). Jeder Spieler stellt das selbst ein. Die Farbwerte der Akzente stehen in
+# site/ui/tokens.css; „standard“ ist der Akzent, den Seb mit Claude Design als Standard wählt.
+THEMEN = ("auto", "hell", "dunkel")
+AKZENTE = ("standard", "blau", "gruen", "tuerkis", "violett", "rosa", "orange")
+DICHTEN = ("kompakt", "normal", "luftig")
+KACHELN = ("klein", "mittel", "gross")
+AUSSEHEN_STANDARD = {"thema": "auto", "akzent": "standard", "dichte": "normal", "kachelgroesse": "mittel"}
+AUSSEHEN_WERTE = {"thema": THEMEN, "akzent": AKZENTE, "dichte": DICHTEN, "kachelgroesse": KACHELN}
+ABSCHNITTE = ("weiterspielen", "favoriten", "neu", "spiel-der-woche", "alle")
+
+
+def aussehen_bereinigen(a: Any) -> dict:
+    """Immer vollständig: unbekannte oder fehlende Werte werden zum Standard."""
+    a = a if isinstance(a, dict) else {}
+    return {k: (a.get(k) if a.get(k) in AUSSEHEN_WERTE[k] else v) for k, v in AUSSEHEN_STANDARD.items()}
+
+
+def abschnitte_bereinigen(liste: Any) -> list[dict]:
+    """Reihenfolge und Sichtbarkeit der Startseite: Unbekanntes und Doppeltes fällt weg, Fehlendes kommt sichtbar ans Ende.
+    So können später neue Abschnitte dazukommen, ohne dass jemand etwas umstellen muss."""
+    aus, gesehen = [], set()
+    for x in liste if isinstance(liste, list) else []:
+        if isinstance(x, dict) and x.get("id") in ABSCHNITTE and x["id"] not in gesehen:
+            gesehen.add(x["id"])
+            aus.append({"id": x["id"], "sichtbar": x.get("sichtbar") is not False})
+    return aus + [{"id": i, "sichtbar": True} for i in ABSCHNITTE if i not in gesehen]
 ARTEN = {
     "fehler": "Fehler melden",
     "wunsch": "Wunsch / Idee",
@@ -170,6 +196,10 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
             # Spiel-ID → „geaendert“ der Version, die der Spieler zuletzt geöffnet hat (Marke „Aktualisiert“)
             "gesehen": {k: v for k, v in (d.get("gesehen") or {}).items() if isinstance(k, str) and isinstance(v, str)}
                        if isinstance(d.get("gesehen"), dict) else {},
+            # neue UI: Aussehen und Startseite. Immer vollständig, weil „schreiben“ auf „lesen“ aufbaut.
+            "aussehen": aussehen_bereinigen(d.get("aussehen")),
+            "startseite": {"abschnitte": abschnitte_bereinigen((d.get("startseite") or {}).get("abschnitte")
+                                                               if isinstance(d.get("startseite"), dict) else None)},
         }
 
     @app.put("/api/einstellungen")
@@ -191,6 +221,25 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
                 raise HTTPException(422, "gesehen: Objekt Spiel-ID → Zeitpunkt")
             zusammen = {**d["gesehen"], **g}
             d["gesehen"] = dict(list(zusammen.items())[-300:])
+        if "aussehen" in body:   # wird je Schlüssel zusammengeführt
+            a = body["aussehen"]
+            if not isinstance(a, dict):
+                raise HTTPException(422, "aussehen: Objekt mit thema, akzent, dichte, kachelgroesse")
+            for k, v in a.items():
+                if k not in AUSSEHEN_WERTE:
+                    raise HTTPException(422, f"aussehen: unbekannte Einstellung „{k}“")
+                if v not in AUSSEHEN_WERTE[k]:
+                    raise HTTPException(422, f"aussehen.{k}: {', '.join(AUSSEHEN_WERTE[k])}")
+            d["aussehen"] = {**d["aussehen"], **a}
+        if "startseite" in body:
+            st = body["startseite"]
+            ab = st.get("abschnitte") if isinstance(st, dict) else None
+            if (not isinstance(ab, list) or len(ab) > 10
+                    or not all(isinstance(x, dict) and x.get("id") in ABSCHNITTE and isinstance(x.get("sichtbar", True), bool)
+                               for x in ab)
+                    or len({x["id"] for x in ab}) != len(ab)):
+                raise HTTPException(422, f"startseite.abschnitte: Liste aus {{id, sichtbar}}, id eine von {', '.join(ABSCHNITTE)}")
+            d["startseite"] = {"abschnitte": abschnitte_bereinigen(ab)}
         for k in ("grossansicht", "bestenliste"):
             if k in body:
                 if not isinstance(body[k], bool):

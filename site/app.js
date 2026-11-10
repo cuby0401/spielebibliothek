@@ -813,6 +813,10 @@ async function start() {
 		el("upload-link").hidden = !ich.uploader;
 		el("probe-band").hidden = !ich.probe;
 		if (ich.probe) document.title = "🧪 " + document.title;
+		if (ich.design) {   // Design-Spielwiese (neue UI, nur über Tailscale): gleiches Band, eigener Text
+			el("probe-band").textContent = "🎨 Design-Spielwiese – eine Kopie nur über Tailscale. Nichts hier ist live.";
+			el("probe-band").hidden = false; document.title = "🎨 " + document.title;
+		}
 		menueEinrichten();
 		glockeEinrichten();
 		sdwZeigen();
