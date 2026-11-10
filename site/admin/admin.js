@@ -369,6 +369,27 @@ async function personenSeite(c) {
 		}) : h("p", { class: "leise", text: "Noch keine Anmeldungen aufgezeichnet." }));
 }
 
+// Mauerwerk (Seb, 10.11.2026): Die Blöcke kommen der Reihe nach in die jeweils kürzeste Spalte. So entstehen keine Lücken unter
+// kurzen Blöcken (wie im Raster, wo jede Zeile so hoch ist wie ihr längster Block), und die wichtigsten bleiben oben.
+// Spaltenzahl nach Fensterbreite; Blöcke mit „breit“ gehen über die ganze Breite darunter. Eingaben und Klicks bleiben beim Umlegen erhalten.
+function mauerwerk(raster, bloecke, spaltenBreite = 360) {
+	const breit = bloecke.filter((b) => b.classList.contains("breit"));
+	const schmal = bloecke.filter((b) => !b.classList.contains("breit"));
+	let n = 0;
+	const legen = () => {
+		if (!raster.isConnected) return beobachter.disconnect();
+		const neu = Math.max(1, Math.floor((raster.clientWidth + 16) / (spaltenBreite + 16)));
+		if (neu === n) return;
+		n = neu;
+		const spalten = Array.from({ length: n }, () => h("div", { class: "mauer-spalte" }));
+		raster.replaceChildren(h("div", { class: "mauer" }, ...spalten), ...breit);
+		for (const b of schmal) spalten.reduce((k, s) => (s.offsetHeight < k.offsetHeight ? s : k)).append(b);
+	};
+	const beobachter = new ResizeObserver(legen);
+	legen();
+	beobachter.observe(raster);
+}
+
 async function personSeite(c, name) {
 	const p = await api("GET", "/personen/" + encodeURIComponent(name));
 	// Für alle weiteren Aufrufe die Nummer: gilt auch für gelöschte Personen und nach einem Handle-Wechsel
@@ -434,13 +455,15 @@ async function personSeite(c, name) {
 		for (const k of ["anzeigename", "vorname", "nachname"]) f[k] = h("input", { value: p[k] || "", maxlength: k === "anzeigename" ? "40" : "60" });
 		f.geburtstag = h("input", { type: "date", value: p.geburtstag || "", min: "1900-01-01", max: new Date().toISOString().slice(0, 10) });
 		const tag = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+		const leerMarken = () => f.geburtstag.classList.toggle("leer", !f.geburtstag.value);
+		f.geburtstag.addEventListener("input", leerMarken); leerMarken();
 		f.angelegt = h("input", { type: "date", value: p.angelegt ? tag(p.angelegt) : "", min: "2020-01-01", max: tag(new Date().toISOString()) });
 		bloecke.push(h("form", { class: "karte crm-block", onsubmit: (e) => { e.preventDefault();
 			const daten = { anzeigename: f.anzeigename.value, vorname: f.vorname.value, nachname: f.nachname.value, geburtstag: f.geburtstag.value || null };
 			if (f.angelegt.value && f.angelegt.value !== tag(p.angelegt)) daten.angelegt = f.angelegt.value;
 			tun(() => api("PATCH", pfad, daten), "Gespeichert."); } },
 			h("h3", { text: "Stammdaten" }),
-			h("div", { class: "zeile" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag),
+			h("div", { class: "felder" }, h("label", {}, "Anzeigename ", f.anzeigename), h("label", {}, "Vorname ", f.vorname), h("label", {}, "Nachname ", f.nachname), h("label", {}, "Geburtstag ", f.geburtstag),
 				h("label", { title: "Wann das Konto angelegt wurde – „dabei seit“ im Profil. Korrigieren, wenn du es besser weißt." }, "Angelegt am ", f.angelegt)),
 			h("p", { class: "leise", text: `Nummer ${pnr(p.nr)} · Handle @${p.handle}${p.handle_seit ? " (geändert " + datumZeit(p.handle_seit) + ")" : ""} · Spieleordner ${p.alt_name || p.handle} · angelegt ${datumZeit(p.angelegt)}${p.eingeladen_von ? " von " + p.eingeladen_von : ""} · erste Anmeldung ${datumZeit(p.erste_anmeldung)} · Datenschutzhinweis ${p.datenschutz_bestaetigt ? "bestätigt " + datumZeit(p.datenschutz_bestaetigt) : "noch nicht bestätigt"}` }),
 			h("div", {}, h("button", { type: "submit", class: "knopf klein", text: "Speichern" }))));
@@ -546,7 +569,9 @@ async function personSeite(c, name) {
 		tabelle(["Zeit", "Art", ""], p.sicherheit.map((z) => h("tr", {}, h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.art }), h("td", { text: z.text }))))));
 	if (p.zeitleiste.length) bloecke.push(h("section", { class: "karte crm-block breit" }, h("h3", { text: "Zeitleiste" }),
 		tabelle(["Zeit", "Was", ""], p.zeitleiste.map((z) => h("tr", {}, h("td", { text: datumZeit(z.zeit) }), h("td", { text: z.art }), h("td", { text: z.text + (z.von ? ` (${z.von})` : "") }))))));
-	c.append(h("div", { class: "crm-raster" }, ...bloecke));
+	const raster = h("div", { class: "crm-raster" });
+	c.append(raster);
+	mauerwerk(raster, bloecke);
 	if (p.protokoll.length) c.append(h("details", {}, h("summary", { text: `Prüfprotokoll zu ${wer} (${p.protokoll.length})` }), protokollTabelle(p.protokoll)));
 }
 

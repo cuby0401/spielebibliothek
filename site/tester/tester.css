@@ -1,5 +1,5 @@
 /* Tester-Panel (Zentrale 1.4.0, E76) */
-.tester { max-width: 900px; }
+.tester { max-width: none; }
 .test-zusammenfassung { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.5rem 0 1.2rem; }
 .test-zusammenfassung span { padding: 0.25rem 0.7rem; border-radius: 999px; border: 1px solid var(--linie); font-weight: 600; }
 .test-zusammenfassung .ok, .test.ok .test-status { color: var(--akzent); border-color: var(--akzent); }

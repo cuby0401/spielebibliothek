@@ -1,4 +1,4 @@
-.admin { max-width: 1150px; }
+.admin { max-width: none; }
 .reiter { display: flex; gap: 0.3rem; flex-wrap: wrap; border-bottom: 1px solid var(--linie); margin-bottom: 1rem; }
 .reiter a { padding: 0.5rem 0.9rem; text-decoration: none; border-radius: 6px 6px 0 0; color: var(--leise); }
 .reiter a.aktiv { color: var(--text); background: var(--flaeche); border: 1px solid var(--linie); border-bottom-color: var(--flaeche); margin-bottom: -1px; font-weight: 600; }
@@ -43,11 +43,23 @@ tr.klickbar:hover td { background: var(--grund); }
 .crm-kopf h2 { margin: 0; font-size: 1.35rem; }
 .crm-kopf .profil-zahlen { margin-left: auto; }
 .crm-aktionen { margin: 0.8rem 0; }
-.crm-raster { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); align-items: start; margin-bottom: 1rem; }
-.crm-raster .breit { grid-column: 1 / -1; }
+/* Mauerwerk (Seb, 10.11.2026): jeder Block in die gerade kürzeste Spalte – keine Lücken unter kurzen Blöcken, Wichtiges bleibt oben */
+.crm-raster { margin-bottom: 1rem; }
+.mauer { display: flex; gap: 1rem; align-items: flex-start; }
+.mauer-spalte { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1rem; }
+.crm-raster .karte { margin: 0; }
+.crm-raster > .breit.karte { margin-top: 1rem; }
+/* Eingaben füllen ihren Block statt fester Breite */
+.felder { display: grid; gap: 0.5rem 0.75rem; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); margin-bottom: 0.5rem; }
+.felder label { display: grid; gap: 0.2rem; font-size: 0.85rem; }
+.felder input { width: 100%; box-sizing: border-box; }
+.crm-block .zeile > textarea, .crm-block .zeile > input[type=email], .crm-block .zeile > label > input:not([type]) { flex: 1 1 12rem; min-width: 0; width: auto; }
+.crm-block .zeile > label:has(> input:not([type])) { display: flex; gap: 0.4rem; align-items: center; flex: 1 1 14rem; }
+/* Safari zeigt in leeren Datumsfeldern grau das heutige Datum – sieht aus wie ein Wert */
+input.leer:not(:focus)::-webkit-datetime-edit { color: transparent; }
 .crm-block h3 { margin: 0 0 0.6rem; font-size: 1rem; }
 .crm-block .tabelle-rahmen { max-height: 28rem; overflow: auto; }
 ul.einfach { list-style: none; padding: 0; margin: 0; }
 ul.einfach li { padding: 0.35rem 0; border-bottom: 1px solid var(--linie); }
 ul.einfach li:last-child { border-bottom: 0; }
-@media (max-width: 640px) { .crm-raster { grid-template-columns: 1fr; } .crm-kopf .profil-zahlen { margin-left: 0; } }
+@media (max-width: 640px) { .crm-kopf .profil-zahlen { margin-left: 0; } }
