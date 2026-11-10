@@ -28,8 +28,9 @@
 #meldung.fehler { border-color: var(--warn); }
 
 /* CRM (Zentrale 1.5.0, Klick-Muster 09.11.2026) */
-.suche-zeile { margin: 0.4rem 0 0.8rem; }
-.admin input.crm-suche { width: 100%; font-size: 1.1rem; padding: 0.6rem 0.8rem; border-radius: 8px; }
+.crm-titel { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+.crm-titel h2 { margin: 0; }
+.admin input.crm-suche { width: 17rem; max-width: 100%; }
 button.kennzahl { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 button.kennzahl:hover { border-color: var(--akzent); }
 .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-bottom: 0.9rem; }

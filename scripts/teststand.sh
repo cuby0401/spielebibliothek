@@ -84,6 +84,10 @@ up)
 		setfacl -R -d -m u:10020:rX,u:10022:rX,u:10021:rwX "$T/spiele" 2>/dev/null || true
 	fi
 	cp -r "$2"/. "$T/repo"
+	# Neue Kennung je Bau, sonst mischt der Browser alte und neue Skripte (10.11.2026: Safari nahm eine alte konto.js zur
+	# neuen admin.js → „Can't find variable: anzeige“). Live setzt nas-deploy.sh die Kennung genauso.
+	CACHE="${ZENTRALE_COMMIT:-test}-$(date +%s)"
+	find "$T/repo/site" -name '*.html' -exec sh -c 'if sed --version >/dev/null 2>&1; then sed -i "$0" "$@"; else sed -i "" "$0" "$@"; fi' "s/__VERSION__/$CACHE/g" {} +
 	find "$T/repo/site" "$T/repo/lib" "$T/repo/examples" -type f \( -name '*.js' -o -name '*.html' \) \
 		-exec sh -c 'if sed --version >/dev/null 2>&1; then sed -i "$0" "$@"; else sed -i "" "$0" "$@"; fi' "s#https://games.cuby0401.uk#$G#g; s#https://play.cuby0401.uk#$P#g; s#https://upload.cuby0401.uk#$U#g" {} +
 	sed -e "s#https://games.cuby0401.uk#$G#g" -e "s#https://play.cuby0401.uk#$P#g" -e "s#https://upload.cuby0401.uk#$U#g" \

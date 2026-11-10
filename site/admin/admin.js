@@ -306,7 +306,9 @@ async function personenSeite(c) {
 
 	const sichtbar = d.personen.filter((p) => !RAUS(p.status));
 	const inaktiv = (p) => p.status !== "eingeladen" && !p.nieAngemeldet && tageHer(p.zuletzt) > 30;
-	const suche = h("input", { type: "search", class: "crm-suche", placeholder: "Nummer (P-0003), Name, @handle oder E-Mail …", value: crmFilter.q, "aria-label": "Person suchen" });
+	// Klein oben rechts, ohne Autofokus (Seb, 10.11.): sonst sprang der Cursor hinein und Safari bot sofort E-Mail-Adressen an
+	const suche = h("input", { type: "search", class: "crm-suche", placeholder: "Suchen: Nr., Name, @handle …", value: crmFilter.q, "aria-label": "Person suchen",
+		title: "Nummer (P-0003), Name, @handle (auch frühere) oder Login-Adresse – Enter öffnet die Karte, wenn es genau einen Treffer gibt", autocomplete: "off", name: "crm-suche", spellcheck: "false" });
 	const treffer = () => {
 		const q = crmFilter.q.trim().toLowerCase().replace(/^@/, "");
 		const nur = crmFilter.status === "auffaellig" ? null : crmFilter.status;
@@ -339,8 +341,7 @@ async function personenSeite(c) {
 	const kachel = (wert, text, f) => h("button", { type: "button", class: "kennzahl", onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false }, f); neuZeigen(); } },
 		h("div", { class: "wert", text: String(wert) }), h("div", { class: "text", text }));
 	const chip = (text, an, setzen) => h("button", { type: "button", class: "chip" + (an ? " an" : ""), text, onclick: () => { setzen(); neuZeigen(); } });
-	c.append(h("h2", { text: `CRM (${sichtbar.length})` }),
-		h("div", { class: "suche-zeile" }, suche),
+	c.append(h("div", { class: "crm-titel" }, h("h2", { text: `CRM (${sichtbar.length})` }), suche),
 		h("div", { class: "kacheln-klein" },
 			kachel(sichtbar.length, "Personen", {}),
 			kachel(sichtbar.filter((p) => tageHer(p.zuletzt) <= 30).length, "aktiv in 30 Tagen", {}),
@@ -359,7 +360,6 @@ async function personenSeite(c) {
 		d.mail ? null : h("p", { class: "leise", text: "E-Mail-Versand nicht eingerichtet (SMTP_* in der .env) – Einladungen dann selbst verschicken." }),
 		h("p", {}, h("a", { href: "#protokoll", text: "Prüfprotokoll aller Änderungen →" })));
 	fuellen();
-	suche.focus();
 	const liste = await api("GET", "/anmeldungen");
 	c.append(h("h2", { text: "Letzte Anmeldungen" }),
 		h("p", { class: "leise", text: "Je Cloudflare-Sitzung und Gerät. Unbekanntes Gerät? „Trennen“ meldet es bei der nächsten Anfrage ab (neuer E-Mail-Code nötig)." }),

@@ -65,6 +65,9 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await eval_(`[...document.querySelectorAll("#reiter a")].some(a=>a.textContent.trim()==="CRM")`), "Reiter heißt „CRM“");
   ok(await eval_(`${ZEILEN}.length>=2 && ${ZEILEN}.every(t=>/^P-\\d{4}$/.test(t.querySelector("td.nr").textContent))`), "Jede Person hat eine Nummer P-0000");
   ok(await eval_(OHNE_UUID) && await eval_(OHNE_NULL), "CRM-Liste ohne UUID und ohne „null“");
+  // Sebs Test 10.11.: Suche klein oben rechts ohne Autofokus; jeder Bau mit eigener Kennung an den Skripten (sonst alte Skripte im Cache)
+  ok(await eval_(`document.activeElement!==document.querySelector("input.crm-suche") && !!document.querySelector(".crm-titel input.crm-suche")`), "Suche oben rechts, ohne Autofokus");
+  ok(await eval_(`[...document.scripts].filter(s=>s.src).every(s=>!s.src.includes("__VERSION__"))`), "Skripte mit Versionskennung (kein __VERSION__)");
   // 2) Suche: Name, Nummer, Enter öffnet die Karte
   await tippen("input.crm-suche", "paul");
   ok(await bis(`${ZEILEN}.length===1 && ${ZEILEN}[0].dataset.handle==="paul"`), "Suche „paul“ → genau paul");
