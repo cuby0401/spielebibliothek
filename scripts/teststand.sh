@@ -88,6 +88,10 @@ up)
 	# neuen admin.js → „Can't find variable: anzeige“). Live setzt nas-deploy.sh die Kennung genauso.
 	CACHE="${ZENTRALE_COMMIT:-test}-$(date +%s)"
 	find "$T/repo/site" -name '*.html' -exec sh -c 'if sed --version >/dev/null 2>&1; then sed -i "$0" "$@"; else sed -i "" "$0" "$@"; fi' "s/__VERSION__/$CACHE/g" {} +
+	# Version und Änderungsprotokoll fürs Admin-Panel wie live (sonst „Version unbekannt“, 10.11.2026)
+	printf '{"version": "%s", "commit": "%s", "zeit": "%s"}\n' "${ZENTRALE_VERSION:-$(cat "$T/repo/VERSION" 2>/dev/null)}" "${ZENTRALE_COMMIT:-test}" \
+		"$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" > "$T/repo/site/zentrale.json"
+	cp "$T/repo/CHANGELOG.md" "$T/repo/site/admin/CHANGELOG.md" 2>/dev/null || true
 	find "$T/repo/site" "$T/repo/lib" "$T/repo/examples" -type f \( -name '*.js' -o -name '*.html' \) \
 		-exec sh -c 'if sed --version >/dev/null 2>&1; then sed -i "$0" "$@"; else sed -i "" "$0" "$@"; fi' "s#https://games.cuby0401.uk#$G#g; s#https://play.cuby0401.uk#$P#g; s#https://upload.cuby0401.uk#$U#g" {} +
 	sed -e "s#https://games.cuby0401.uk#$G#g" -e "s#https://play.cuby0401.uk#$P#g" -e "s#https://upload.cuby0401.uk#$U#g" \
