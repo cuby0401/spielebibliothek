@@ -213,7 +213,8 @@ if [ "$DESIGN" = 1 ]; then
 			rm -rf /tmp/sb-design-repo"
 		echo "✓ site/ der Design-Spielwiese erneuert: $DESIGN_URL"; exit 0
 	fi
-	echo "→ Design-Spielwiese (Commit $COMMIT) mit ${BEHALTEN:+bisherigen Daten}${BEHALTEN:-frischer Kopie der echten Daten}"
+	if [ -n "$BEHALTEN" ]; then DATEN="bisherigen Daten"; else DATEN="frischer Kopie der echten Daten"; fi
+	echo "→ Design-Spielwiese (Commit $COMMIT) mit $DATEN"
 	git ls-files -co --exclude-standard | grep -vx -e '.env' -e 'config/users.yaml' | while read -r f; do [ -f "$f" ] && echo "$f"; done \
 		| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
 		set -e; rm -rf /tmp/sb-design-repo && mkdir -p /tmp/sb-design-repo && tar -xf - -C /tmp/sb-design-repo
