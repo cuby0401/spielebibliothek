@@ -128,6 +128,9 @@
 					UI.laden({}), UI.laden({ art: "skelett", zeilen: 3 }), UI.laden({ art: "skelett", form: "kacheln", zeilen: 4 })),
 				block("Angaben", UI.angaben([["Handle", "@cuby0401"], ["Anzeigename", "Seb"], ["Dabei seit", "03.11.2026"], ["Rollen", UI.leiste([UI.marke({ text: "Admin", art: "akzent" }), UI.marke({ text: "Entwickler" })])]])),
 				block("Startseite anordnen", startseite),
+				block("Lesetext und Bilder", UI.lesetext([UI.h("h3", { text: "So testest du" }), UI.h("p", { text: "Lange Texte (Hilfe, Handbuch, Anleitungen) setzt der Lesetext einheitlich." }),
+					UI.h("ol", {}, ["Spiel öffnen", "Einmal speichern", "Neu laden"].map((t) => UI.h("li", { text: t }))), UI.h("pre", { text: "await GameSave.save(\"spielstand\", { level: 3 });" })]),
+					UI.bilder([{ src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'/%3E", alt: "Leeres Bild", unter: "12 KB" }], { format: "breit" })),
 			] }),
 	);
 	window.uiTestBereit = true;

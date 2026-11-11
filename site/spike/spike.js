@@ -16,6 +16,23 @@ const spielId = SPIELE[spielName];
 const ablage = "spike-saves:" + spielId;
 const $ = (id) => document.getElementById(id);
 
+// Gerüst aus den Bausteinen
+(function geruest() {
+	const knopfLink = (id, text, aktiv) => { const k = UI.knopf({ art: "standard", text, id, href: "?" }); k.setAttribute("aria-pressed", String(aktiv)); return k; };
+	const buehne = UI.buehne({ id: "buehne", rahmenId: "rahmen" });
+	buehne.ohneSeite(true);
+	$("app").replaceWith(UI.kopfleiste({ marke: { text: "Spielebibliothek", href: "/" }, rechts: [UI.marke({ text: "Sandbox-Spike (Phase 3)" })] }),
+		UI.h("main", { class: "b-seite" },
+			UI.h("div", { class: "b-seite__kopf" }, UI.h("h1", { class: "b-seite__titel", text: "Sandbox-Spike" }), UI.text("", { id: "ua", art: "klein" })),
+			UI.leiste([knopfLink("k-test", "Technik-Test", spielName === "spike"), knopfLink("k-keks", "Keks-Klicker (localStorage)", spielName !== "spike"),
+				UI.knopf({ art: "primaer", text: "Neu laden", ikon: "aktualisieren", id: "neu" }), UI.knopf({ art: "gefahr-leise", text: "Gespeichertes löschen", ikon: "loeschen", id: "loeschen" })]),
+			UI.hinweis({ id: "summe-hinweis", art: "info", inhalt: UI.h("strong", { id: "summe", text: "Test läuft …" }) }),
+			buehne,
+			UI.h("div", { id: "tabelle", class: "b-stapel" }),
+			UI.abschnitt({ titel: "Gespeichert (in dieser Testseite)", untertitel: "Stellvertretend für den späteren Speicher-Dienst: Die Testseite bewahrt die Werte in ihrem eigenen localStorage auf.",
+				inhalt: UI.text("", { id: "gespeichert", tag: "pre", art: "vorformatiert" }) })));
+})();
+
 function lesen() {
 	try { return JSON.parse(localStorage.getItem(ablage)) || {}; } catch { return {}; }
 }
@@ -41,7 +58,7 @@ function starten() {
 	iframe.setAttribute("allow", "fullscreen; gamepad; autoplay");
 	iframe.name = "gamesave:" + JSON.stringify(lesen()); // Vorladen ohne Warten
 	iframe.src = (modus === "b" ? PLAY : "") + "/play/" + spielId + "/index.html";
-	$("rahmen").className = "rahmen " + (spielName === "spike" ? "klein" : "spiel");
+	$("buehne").toggleAttribute("data-flach", spielName === "spike");
 	$("rahmen").replaceChildren(iframe);
 	eigeneFenster.add(iframe.contentWindow);
 
@@ -119,30 +136,23 @@ async function zeigeErgebnisse(liste) {
 		liste.splice(1, 0, { gruppe: "0 Bibliotheksseite", name: "angemeldet für play.cuby0401.uk", ok: true, detail: sprungInfo });
 	}
 
-	const tab = document.createElement("table");
-	let gruppe = null;
+	const gruppen = new Map();
 	let ok = 0, nein = 0;
 	for (const e of liste) {
-		if (e.gruppe !== gruppe) {
-			gruppe = e.gruppe;
-			const tr = tab.insertRow();
-			const th = document.createElement("th");
-			th.colSpan = 3; th.className = "gruppe"; th.textContent = gruppe;
-			tr.append(th);
-		}
-		const tr = tab.insertRow();
-		const s = tr.insertCell(); s.className = "s";
-		s.textContent = e.ok === true ? "✓" : e.ok === false ? "✗" : "…";
-		tr.insertCell().textContent = e.name;
-		const d = tr.insertCell(); d.className = "d"; d.textContent = e.detail;
+		if (!gruppen.has(e.gruppe)) gruppen.set(e.gruppe, []);
+		gruppen.get(e.gruppe).push(e);
 		if (e.ok === true) ok++; else if (e.ok === false) nein++;
 	}
-	$("tabelle").replaceChildren(tab);
+	$("tabelle").replaceChildren(...[...gruppen].map(([gruppe, eintraege]) => UI.abschnitt({ titel: gruppe, ebene: "h3", inhalt: UI.tabelle({ titel: gruppe, zeilen: eintraege, spalten: [
+		{ titel: "", breite: "6rem", wert: (e) => UI.marke({ text: e.ok === true ? "ok" : e.ok === false ? "Fehler" : "…", art: e.ok === true ? "erfolg" : e.ok === false ? "gefahr" : "neutral", punkt: true }) },
+		{ titel: "Test", feld: "name" },
+		{ titel: "Detail", wert: (e) => UI.text(e.detail || "", { art: "klein" }) },
+	] }) })));
 	$("summe").textContent = `${ok} ✓ · ${nein} ✗ · ${new Date().toLocaleString("de-DE")}`;
+	$("summe-hinweis").className = "b-hinweis b-hinweis--" + (nein ? "gefahr" : "erfolg");
 }
 
 $("ua").textContent = "Modus " + modus.toUpperCase() + " · " + navigator.userAgent;
-$(spielName === "spike" ? "k-test" : "k-keks").classList.add("an");
 for (const [id, wert] of [["k-test", null], ["k-keks", "legacy-localstorage"]]) {
 	const q = new URLSearchParams();
 	if (wert) q.set("spiel", wert);

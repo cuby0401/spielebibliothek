@@ -53,11 +53,16 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
 
   // 1.5.0: Zeilen der CRM-Liste tragen das Handle (fett steht dort der Anzeigename)
-  const ZEILE = (name) => `document.querySelector('tbody tr[data-handle=${JSON.stringify(name)}]')`;
+  const ZEILE = (name) => `document.querySelector('tbody tr[data-schluessel=${JSON.stringify(name)}]')`;
   // Kein leeres „null“ als Text auf der Seite (1.4.1, Nachtest 09.11.: Admin-Panel Personen und Tester-Panel)
   const OHNE_NULL = `(()=>{const w=document.createTreeWalker(document.getElementById("inhalt"),NodeFilter.SHOW_TEXT);
     while(w.nextNode()) if(w.currentNode.nodeValue.trim()==="null") return false; return true})()`;
   const KNOPF = (text) => `[...document.querySelectorAll("#inhalt button")].find(b=>b.textContent===${JSON.stringify(text)})`;
+  // Admin-Panel aus Bausteinen (E85): Meldungen unten (UI.meldung), Rückfragen als eigener Dialog statt confirm()/prompt()
+  const MELDUNG = `[...document.querySelectorAll(".b-meldung__text")].map(m=>m.textContent).join(" | ")`;
+  const JA = `document.querySelector("dialog.b-dialog[open] .b-dialog__fuss .b-knopf:last-child").click()`;
+  const STATUS = `document.getElementById("person-status")?.textContent`;
+  const DIALOG_OFFEN = `!!document.querySelector("dialog.b-dialog[open]")`;
 
   // 1) Personen-Liste: übernommen aus users.yaml, alte Adresse #benutzer leitet um
   await gehe(G + "/admin/#benutzer", 4000);
@@ -67,68 +72,72 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await eval_(OHNE_NULL), "Personen-Liste ohne „null“");
 
   // 2) Einladen
-  await eval_(`{ const f=document.querySelector("details.karte form"); const i=f.querySelectorAll("input");
-    i[0].value="lea@example.com"; i[1].value="lea"; i[2].value="Lea"; f.requestSubmit(); } true`);
-  ok(await bis(`location.hash==="#person/lea" && document.querySelector("#inhalt h2")?.textContent.includes("eingeladen")`), "lea eingeladen → eigene Seite, Status eingeladen");
+  await eval_(`{ document.getElementById("einladen-mail").value="lea@example.com"; document.getElementById("einladen-handle").value="lea";
+    document.getElementById("einladen-vorname").value="Lea"; document.querySelector("#einladen form").requestSubmit(); } true`);
+  ok(await bis(`location.hash==="#person/lea" && ${STATUS}==="eingeladen"`), "lea eingeladen → eigene Seite, Status eingeladen");
   ok(await eval_(`document.body.textContent.includes("lea@example.com")`), "Login-E-Mail steht auf der Seite");
   ok(await eval_(OHNE_NULL), "Personen-Seite ohne „null“ unter dem Namen");
 
   // 3) Notiz, verwarnen
-  await eval_(`document.querySelector("#inhalt textarea").value="E2E: interne Notiz"; (${KNOPF("Notiz speichern")}).click(); true`);
+  await eval_(`document.getElementById("notiz-text").value="E2E: interne Notiz"; (${KNOPF("Notiz speichern")}).click(); true`);
   ok(await bis(`document.body.textContent.includes("E2E: interne Notiz")`), "Notiz gespeichert und angezeigt");
-  await eval_(`document.querySelector('#inhalt input[placeholder^="Grund"]').value="E2E-Verwarnung"; (${KNOPF("Verwarnen")}).click(); true`);
-  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("verwarnt")`), "Verwarnt");
+  await eval_(`document.getElementById("massnahme-grund").value="E2E-Verwarnung"; (${KNOPF("Verwarnen")}).click(); true`);
+  ok(await bis(`${STATUS}==="verwarnt"`), "Verwarnt");
 
   // 4) Sperren und entsperren
   await bis(`!!(${KNOPF("Sperren")})`);
-  await eval_(`document.querySelector('#inhalt input[placeholder^="Grund"]').value="E2E-Sperre"; (${KNOPF("Sperren")}).click(); true`);
-  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("gesperrt") && document.body.textContent.includes("Gesperrt: E2E-Sperre")`), "Gesperrt, Grund angezeigt");
+  await eval_(`document.getElementById("massnahme-grund").value="E2E-Sperre"; (${KNOPF("Sperren")}).click(); true`);
+  ok(await bis(DIALOG_OFFEN), "Sperren fragt im eigenen Dialog nach (kein Browser-Fenster)");
+  await eval_(`${JA}; true`);
+  ok(await bis(`${STATUS}==="gesperrt" && document.body.textContent.includes("Gesperrt: E2E-Sperre")`), "Gesperrt, Grund angezeigt");
   await eval_(`(${KNOPF("Entsperren")}).click(); true`);
-  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("eingeladen")`), "Entsperrt → wieder eingeladen (lea hat sich nie angemeldet)");
+  ok(await bis(`${STATUS}==="eingeladen"`), "Entsperrt → wieder eingeladen (lea hat sich nie angemeldet)");
   ok(await eval_(`[...document.querySelectorAll("#inhalt td")].some(t=>t.textContent==="sperre")`), "Zeitleiste zeigt die Sperre");
 
   // 5) Stammdaten und Rolle Tester
-  await eval_(`{ const i=document.querySelectorAll("#inhalt form.karte input"); i[0].value="Lea E2E"; i[0].closest("form").requestSubmit(); } true`);
-  ok(await bis(`document.getElementById("meldung").textContent==="Gespeichert."`), "Stammdaten gespeichert");
-  await eval_(`{ const l=[...document.querySelectorAll("#inhalt label.haken")].find(x=>x.textContent.includes("Tester")); l.querySelector("input").click(); (${KNOPF("Rollen speichern")}).click(); } true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("+Tester")`), "Rolle Tester vergeben");
+  await eval_(`{ const i=document.querySelectorAll("#stammdaten input"); i[0].value="Lea E2E"; document.getElementById("stammdaten").requestSubmit(); } true`);
+  ok(await bis(`${MELDUNG}.includes("Gespeichert.")`), "Stammdaten gespeichert");
+  await eval_(`{ const l=[...document.querySelectorAll("#inhalt .b-haken")].find(x=>x.textContent.includes("Tester")); l.querySelector("input").click(); (${KNOPF("Rollen speichern")}).click(); } true`);
+  ok(await bis(`${MELDUNG}.includes("+Tester")`), "Rolle Tester vergeben");
 
   // 5b) Entwickler geben, nehmen, wieder geben (1.4.0, Nachtest 08.11., Sebs Test seb-crm-massnahmen): Der Spieleordner bleibt nach dem
   //     Entziehen stehen – der Haken darf trotzdem nicht hängen bleiben
-  const ENTW = `[...document.querySelectorAll("#inhalt label.haken")].find(x=>x.textContent.includes("Entwickler")).querySelector("input")`;
+  const ENTW = `[...document.querySelectorAll("#inhalt .b-haken")].find(x=>x.textContent==="Entwickler").querySelector("input")`;
   const rolleKlicken = async () => { await eval_(`(${ENTW}).click(); (${KNOPF("Rollen speichern")}).click(); true`); };
   await rolleKlicken();
-  ok(await bis(`document.getElementById("meldung").textContent.includes("+Entwickler")`) && await bis(`!!document.querySelector(".passwort-box")`, 3000),
+  ok(await bis(`${MELDUNG}.includes("+Entwickler")`) && await bis(`!!document.getElementById("passwort-hinweis")`, 3000),
     "Entwickler vergeben, Upload-Passwort angezeigt");
   await bis(`(${ENTW}).checked`);
   await rolleKlicken();
-  ok(await bis(`document.getElementById("meldung").textContent.includes("−Entwickler")`), "Entwickler entzogen");
+  ok(await bis(`${MELDUNG}.includes("−Entwickler")`), "Entwickler entzogen");
   await gehe(G + "/admin/?neu=2#person/lea", 3500);
   ok(await bis(`!!(${ENTW}) && !(${ENTW}).checked`), "Nach dem Neuladen: Haken bei Entwickler ist weg");
   await rolleKlicken();
-  ok(await bis(`document.getElementById("meldung").textContent.includes("+Entwickler")`), "Entwickler erneut vergeben");
+  ok(await bis(`${MELDUNG}.includes("+Entwickler")`), "Entwickler erneut vergeben");
 
   // 5c) Einladung ohne E-Mail-Versand (1.4.0, Nachtest 08.11.): Die Meldung muss sichtbar sein, auch wenn der Knopf weit unten steht
   await eval_(`scrollTo(0, document.body.scrollHeight); (${KNOPF("Einladung senden")}).click(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("nicht eingerichtet")`), "Einladung ohne SMTP: verständliche Meldung");
-  ok(await eval_(`{ const r=document.getElementById("meldung").getBoundingClientRect(); r.top>=0 && r.bottom<=innerHeight && r.height>0 }`),
+  ok(await bis(`${MELDUNG}.includes("nicht eingerichtet")`), "Einladung ohne SMTP: verständliche Meldung");
+  ok(await eval_(`{ const r=[...document.querySelectorAll(".b-meldung")].pop().getBoundingClientRect(); r.top>=0 && r.bottom<=innerHeight && r.height>0 }`),
     "Die Meldung steht im sichtbaren Bereich (unten gescrollt)");
 
   // 5d) Archivieren ist rückgängig zu machen, endgültig löschen ein eigener Schritt (Sebs Test 08.11.2026)
   await gehe(G + "/admin/?neu=3#person/lea", 3500);
   await bis(`!!(${KNOPF("Archivieren …")})`);
   await eval_(`(${KNOPF("Archivieren …")}).click(); true`);
-  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("archiviert") && !!(${KNOPF("Wiederherstellen")})`), "Archiviert → Knopf „Wiederherstellen“");
+  await bis(DIALOG_OFFEN); await eval_(`${JA}; true`);
+  ok(await bis(`${STATUS}==="archiviert" && !!(${KNOPF("Wiederherstellen")})`), "Archiviert → Knopf „Wiederherstellen“");
   ok(await eval_(`document.body.textContent.includes("lea@example.com") && document.body.textContent.includes("E2E: interne Notiz")`), "Archiviert: E-Mail und Notiz bleiben");
   await eval_(`(${KNOPF("Wiederherstellen")}).click(); true`);
-  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("eingeladen") && !!document.querySelector(".passwort-box")`), "Wiederhergestellt: eingeladen (nie angemeldet), Entwickler bekommt neues Upload-Passwort");
+  ok(await bis(`${STATUS}==="eingeladen" && !!document.getElementById("passwort-hinweis")`), "Wiederhergestellt: eingeladen (nie angemeldet), Entwickler bekommt neues Upload-Passwort");
   await eval_(`(${KNOPF("Archivieren …")}).click(); true`);
+  await bis(DIALOG_OFFEN); await eval_(`${JA}; true`);
   await bis(`!!(${KNOPF("Endgültig löschen (anonymisieren) …")})`);
-  eingabe = "lea";
   await eval_(`(${KNOPF("Endgültig löschen (anonymisieren) …")}).click(); true`);
-  ok(await bis(`document.querySelector("#inhalt h2")?.textContent.includes("gelöscht") && !document.body.textContent.includes("lea@example.com") && !(${KNOPF("Wiederherstellen")})`),
+  await bis(DIALOG_OFFEN);
+  await eval_(`document.querySelector("dialog.b-dialog[open] input").value="lea"; ${JA}; true`);
+  ok(await bis(`${STATUS}==="gelöscht" && !document.body.textContent.includes("lea@example.com") && !(${KNOPF("Wiederherstellen")})`),
     "Endgültig gelöscht: E-Mail nirgends mehr auf der Seite (auch nicht im Protokoll), kein „Wiederherstellen“");
-  eingabe = "";
 
   // 6) Prüfprotokoll
   await gehe(G + "/admin/#protokoll", 3000);
@@ -145,11 +154,11 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await eval_(`document.querySelector('#angaben input[type="checkbox"]').disabled`), "Datenschutzhinweis bestätigt");
   ok(await eval_(`fetch("/api/mein/konto").then(r=>r.text()).then(t=>!t.includes("Notiz") && !t.includes("protokoll"))`), "Mein Konto ohne Admin-Felder");
 
-  ok(await eval_(`document.querySelector(".profil-kopf strong").textContent==="Seb E2E"`), "Profilkopf zeigt den Anzeigenamen");
+  ok(await eval_(`document.querySelector("#profil-name").textContent==="Seb E2E"`), "Profilkopf zeigt den Anzeigenamen");
   // 1.4.1, Nachtest 09.11. (Seb): Anzeigename oben rechts, „dabei seit“ mit Tag, „gespielt“ statt „Spiele“
   ok(await eval_(`document.getElementById("benutzer").textContent==="Seb E2E" && document.getElementById("benutzer").title==="@seb"`), "Oben rechts steht der Anzeigename");
-  ok(await eval_(`/dabei seit \\d\\d\\.\\d\\d\\.\\d{4}/.test(document.querySelector(".profil-kopf").textContent)`), "„dabei seit“ mit vollem Datum");
-  ok(await eval_(`[...document.querySelectorAll(".profil-zahlen div")].some(d=>d.textContent.endsWith("gespielt"))`), "Profil: „gespielt“ statt „Spiele“");
+  ok(await eval_(`/dabei seit \\d\\d\\.\\d\\d\\.\\d{4}/.test(document.querySelector("#profil-kopf").textContent)`), "„dabei seit“ mit vollem Datum");
+  ok(await eval_(`[...document.querySelectorAll(".b-kennzahl__label")].some(d=>d.textContent==="gespielt")`), "Profil: „gespielt“ statt „Spiele“");
   ok(await eval_(`fetch("/api/me").then(r=>r.json()).then(m=>m.anzeigename==="Seb E2E" && m.namen.seb==="Seb E2E")`), "/api/me liefert die Anzeigenamen");
   // CRM: übernommene Personen „von seb“, „Angelegt am“ nur durch den Admin korrigierbar
   ok(await eval_(`fetch("/api/admin/personen/paul").then(r=>r.json()).then(p=>p.eingeladen_von==="seb")`), "Übernommene Person: angelegt von seb");
@@ -162,41 +171,41 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(Number.isInteger(nr), "Fehler der Bibliothek bekommt eine Nummer: " + nr);
   await gehe(G + "/admin/", 3500);
   // Seit 1.5.0 (Seb, 10.11.): in der Übersicht nur eine rote Zeile, die Liste öffnet sich im eigenen Fenster
-  ok(await bis(`document.querySelector(".fehler-zeile")?.textContent.includes("1 Fehler in der Bibliothek") && !document.querySelector("dialog.fenster").open`), "Admin-Übersicht: rote Zeile „1 Fehler in der Bibliothek“, Fenster zu");
-  await eval_(`document.querySelector(".fehler-zeile").click(); true`);
-  ok(await bis(`document.querySelector("dialog.fenster").open && document.querySelector("dialog.fenster").textContent.includes("TypeError: E2E-Test")`), "Klick öffnet das Fenster mit dem Fehler");
-  await eval_(`[...document.querySelectorAll("dialog.fenster button")].find(b=>b.textContent==="Erledigt").click(); true`);
-  ok(await bis(`document.querySelector("dialog.fenster")?.textContent.includes("Alle erledigt")`), "„Erledigt“ entfernt den Fehler im Fenster");
-  await eval_(`document.querySelector("dialog.fenster").close(); true`);
-  ok(await bis(`!document.querySelector(".fehler-zeile") && document.body.textContent.includes("Keine Fehler in der Bibliothek")`), "Nach dem Schließen: keine rote Zeile mehr");
+  ok(await bis(`document.getElementById("fehler-zeile")?.textContent.includes("1 Fehler in der Bibliothek") && !document.getElementById("fehler-fenster")`), "Admin-Übersicht: rote Zeile „1 Fehler in der Bibliothek“, Fenster zu");
+  await eval_(`document.querySelector("#fehler-zeile button").click(); true`);
+  ok(await bis(`document.getElementById("fehler-fenster")?.open && document.getElementById("fehler-fenster").textContent.includes("TypeError: E2E-Test")`), "Klick öffnet das Fenster mit dem Fehler");
+  await eval_(`[...document.querySelectorAll("#fehler-fenster button")].find(b=>b.textContent==="Erledigt").click(); true`);
+  ok(await bis(`document.getElementById("fehler-fenster")?.textContent.includes("Alle erledigt")`), "„Erledigt“ entfernt den Fehler im Fenster");
+  await eval_(`document.getElementById("fehler-fenster").close(); true`);
+  ok(await bis(`!document.getElementById("fehler-zeile") && document.body.textContent.includes("Keine Fehler in der Bibliothek")`), "Nach dem Schließen: keine rote Zeile mehr");
 
   // 8b) Tester-Panel (1.4.0, E76): Plan aus tests/manuell, Ergebnis eintragen, Zusammenfassung
   await gehe(G + "/tester/", 3500);
-  ok(await bis(`document.querySelectorAll(".test").length>=5`), "Tester-Panel zeigt den Testplan");
+  ok(await bis(`document.querySelectorAll("#inhalt [data-test]").length>=5`), "Tester-Panel zeigt den Testplan");
   ok(await eval_(OHNE_NULL), "Tester-Panel: kein leeres „null“");
-  await eval_(`document.querySelector(".test .knopf.nein").click(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");
-  const offenVorher = await eval_(`document.querySelectorAll("#inhalt > .test").length`);
-  await eval_(`document.querySelector(".test .knopf.ja").click(); true`);
-  ok(await bis(`document.querySelector(".test-zusammenfassung .ok").textContent.startsWith("✓ 1 ")`), "„Hat geklappt“ zählt als bestanden");
+  await eval_(`document.querySelector('#inhalt [data-test] [data-ergebnis="nein"]').click(); true`);
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");
+  const offenVorher = await eval_(`document.querySelectorAll('#inhalt [data-zustand="offen"]').length`);
+  await eval_(`document.querySelector('#inhalt [data-test] [data-ergebnis="ja"]').click(); true`);
+  ok(await bis(`document.querySelector('[data-zahl="bestanden"] .b-kennzahl__wert').textContent==="1"`), "„Hat geklappt“ zählt als bestanden");
   // 1.4.1 (Seb): eingetragene Tests verschwinden aus „Offen“ und stehen im Archiv „Bestanden“ bzw. „Abgelehnt“, mit Verlauf und Fotos
-  ok(await bis(`document.querySelectorAll("#inhalt > .test").length===${offenVorher}-1`), "Bestandener Test verschwindet aus „Offen“");
-  await eval_(`(async()=>{const t=document.querySelector("#inhalt > article.test textarea");t.value="E2E: geht nicht";
-    t.closest(".test").querySelector(".knopf.nein").click()})(); true`);
-  ok(await bis(`document.querySelectorAll("#inhalt > .test").length===${offenVorher}-2`), "Abgelehnter Test verschwindet aus „Offen“");
+  ok(await bis(`document.querySelectorAll('#inhalt [data-zustand="offen"]').length===${offenVorher}-1`), "Bestandener Test verschwindet aus „Offen“");
+  await eval_(`(async()=>{const t=document.querySelector('#inhalt [data-zustand="offen"] textarea');t.value="E2E: geht nicht";
+    t.closest("[data-test]").querySelector('[data-ergebnis="nein"]').click()})(); true`);
+  ok(await bis(`document.querySelectorAll('#inhalt [data-zustand="offen"]').length===${offenVorher}-2`), "Abgelehnter Test verschwindet aus „Offen“");
   const foto = await eval_(`fetch("/api/tester/plan").then(r=>r.json()).then(d=>{const x=d.verlauf.find(x=>!x.ok);
     const c=document.createElement("canvas");c.width=c.height=8;
     return fetch("/api/tester/ergebnis/"+x.id+"/bilder",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},
       body:JSON.stringify({bild:c.toDataURL("image/png")})}).then(r=>r.status)})`);
   ok(foto === 201, "Foto an das abgelehnte Ergebnis angefügt");
   await gehe(G + "/tester/#abgelehnt", 3500);
-  ok(await bis(`document.querySelectorAll("#inhalt > details.test").length===1`), "Reiter „Abgelehnt“ zeigt den Test eingeklappt");
-  await eval_(`document.querySelector("#inhalt > details.test").open=true; true`);
+  ok(await bis(`document.querySelectorAll("#inhalt details[data-test]").length===1`), "Reiter „Abgelehnt“ zeigt den Test eingeklappt");
+  await eval_(`document.querySelector("#inhalt details[data-test]").open=true; true`);
   // Bilder laden „lazy“ – erst ins Bild scrollen, sonst lädt Chrome sie je nach Fenstergröße nicht (wackelte im Mac-Auftrag 09.11.)
-  ok(await bis(`(()=>{const i=document.querySelector("details.test .test-ergebnisse img");i?.scrollIntoView();return !!i && i.complete && i.naturalWidth===8})()`, 15000),
+  ok(await bis(`(()=>{const i=document.querySelector("details[data-test] .b-liste img");i?.scrollIntoView();return !!i && i.complete && i.naturalWidth===8})()`, 15000),
     "Archiv zeigt Verlauf mit Foto");
   await gehe(G + "/tester/#bestanden", 3500);
-  ok(await bis(`document.querySelectorAll("#inhalt > details.test").length===1 && document.querySelector(".test-reiter .aktiv").textContent.startsWith("Bestanden")`),
+  ok(await bis(`document.querySelectorAll("#inhalt details[data-test]").length===1 && document.querySelector('#tester-reiter [aria-selected="true"]').textContent.startsWith("Bestanden")`),
     "Reiter „Bestanden“ zeigt den Test");
 
   // 8c) Handy (1.4.0, Nachtest 08.11., Sebs Test konto-handy): nichts ragt über den rechten Rand, das Initialen-Bild ist ganz zu sehen.
@@ -205,9 +214,9 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
     await cdp("Emulation.setDeviceMetricsOverride", { width: breite, height: 844, deviceScaleFactor: 3, mobile: true }, S);
     for (const seite of ["sicherheit", "profil"]) {
       await gehe(G + `/?handy=${breite}${seite}#/${seite}`, 3500);
-      await bis(`!!document.querySelector(".konto-leiste")`);
+      await bis(`!!document.querySelector("#konto-leiste")`);
       const m = await eval_(`({ breit: document.documentElement.scrollWidth,
-        raus: [...document.querySelectorAll(".kopf a, .kopf button, .marke, #avatar")].filter(x=>x.offsetParent && x.getBoundingClientRect().right > ${breite} + 0.5)
+        raus: [...document.querySelectorAll("#kopf a, #kopf button, #avatar")].filter(x=>x.offsetParent && x.getBoundingClientRect().right > ${breite} + 0.5)
           .map(x=>x.id || x.textContent.trim() || x.className) })`);
       // Nicht mit innerWidth vergleichen: Ist die Seite zu breit, zoomt der Browser heraus und innerWidth wächst mit
       ok(m.breit <= breite && !m.raus.length, `Handy ${breite} px #/${seite}: Seite ${m.breit} px breit` + (m.raus.length ? `, über den Rand: ${m.raus.join(", ")}` : ", nichts über den Rand"));
@@ -217,7 +226,7 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
 
   // 9) Not-Aus (1.4.0) – als Letztes, danach antwortet der Teststand absichtlich nicht mehr
   await gehe(G + "/admin/", 3500);
-  ok(await eval_(`!!document.querySelector("details.notaus summary")`), "Not-Aus-Feld in der Übersicht");
+  ok(await bis(`!!document.querySelector("details#notaus summary") && !document.querySelector("#notaus").open`), "Not-Aus-Feld in der Übersicht (eingeklappt)");
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
   const na = await eval_(`fetch("/api/admin/notaus",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({bestaetigung:"NOT-AUS",grund:"E2E"})}).then(r=>r.status)`);
   ok(na === 200, "Not-Aus ausgelöst");

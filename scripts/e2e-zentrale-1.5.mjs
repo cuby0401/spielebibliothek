@@ -56,66 +56,70 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   const OHNE_UUID = `!${UUID}.test(document.body.innerText)`;
   const OHNE_NULL = `(()=>{const w=document.createTreeWalker(document.getElementById("inhalt"),NodeFilter.SHOW_TEXT);
     while(w.nextNode()) if(w.currentNode.nodeValue.trim()==="null") return false; return true})()`;
-  const ZEILEN = `[...document.querySelectorAll("tbody tr[data-handle]")]`;
+  const ZEILEN = `[...document.querySelectorAll("tbody tr[data-schluessel]")]`;
   const tippen = (sel, text) => eval_(`{ const i=document.querySelector(${JSON.stringify(sel)}); i.value=${JSON.stringify(text)}; i.dispatchEvent(new Event("input")); } true`);
 
   // 1) CRM-Liste: Reiter heißt CRM, Nummern, Handles, keine UUID
   await gehe(G + "/admin/#crm", 4000);
   ok(await bis(`location.hash==="#personen" && document.querySelector("#inhalt h2")?.textContent.startsWith("CRM")`), "#crm öffnet das CRM (Reiter „CRM“)");
+  ok(await eval_(`document.querySelector("#reiter [aria-current=page]")?.textContent==="CRM"`), "Seitenleiste: CRM ist markiert");
   ok(await eval_(`[...document.querySelectorAll("#reiter a")].some(a=>a.textContent.trim()==="CRM")`), "Reiter heißt „CRM“");
-  ok(await eval_(`${ZEILEN}.length>=2 && ${ZEILEN}.every(t=>/^P-\\d{4}$/.test(t.querySelector("td.nr").textContent))`), "Jede Person hat eine Nummer P-0000");
+  ok(await eval_(`${ZEILEN}.length>=2 && ${ZEILEN}.every(t=>/^P-\\d{4}$/.test(t.querySelector("td").textContent))`), "Jede Person hat eine Nummer P-0000");
   ok(await eval_(OHNE_UUID) && await eval_(OHNE_NULL), "CRM-Liste ohne UUID und ohne „null“");
   // Sebs Test 10.11.: Suche klein oben rechts ohne Autofokus; jeder Bau mit eigener Kennung an den Skripten (sonst alte Skripte im Cache)
-  ok(await eval_(`document.activeElement!==document.querySelector("input.crm-suche") && !!document.querySelector(".crm-titel input.crm-suche")`), "Suche oben rechts, ohne Autofokus");
+  ok(await eval_(`document.activeElement!==document.getElementById("crm-suche") && !!document.querySelector(".b-abschnitt__aktionen #crm-suche")`), "Suche oben rechts, ohne Autofokus");
   ok(await eval_(`[...document.scripts].filter(s=>s.src).every(s=>!s.src.includes("__VERSION__"))`), "Skripte mit Versionskennung (kein __VERSION__)");
   // 2) Suche: Name, Nummer, Enter öffnet die Karte
-  await tippen("input.crm-suche", "paul");
-  ok(await bis(`${ZEILEN}.length===1 && ${ZEILEN}[0].dataset.handle==="paul"`), "Suche „paul“ → genau paul");
-  const nrPaul = await eval_(`${ZEILEN}[0].querySelector("td.nr").textContent`);
-  await tippen("input.crm-suche", nrPaul);
-  ok(await bis(`${ZEILEN}.length===1 && ${ZEILEN}[0].dataset.handle==="paul"`), `Suche nach Nummer ${nrPaul} → paul`);
-  await eval_(`document.querySelector("input.crm-suche").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter"})); true`);
-  ok(await bis(`location.hash==="#person/paul" && !!document.querySelector(".crm-kopf h2")`), "Enter öffnet die Personenkarte");
-  ok(await eval_(`document.querySelector(".crm-kopf").textContent.includes(${JSON.stringify(nrPaul)})`), "Karte zeigt die Nummer");
-  ok(await eval_(`[...document.querySelectorAll(".crm-block h3")].some(x=>x.textContent==="Stammdaten")`), "Block „Stammdaten“");
-  ok(await eval_(`![...document.querySelectorAll(".crm-block h3")].some(x=>x.textContent.startsWith("Sicherheitsprotokoll"))`), "Leerer Block „Sicherheitsprotokoll“ fehlt");
+  await tippen("#crm-suche", "paul");
+  ok(await bis(`${ZEILEN}.length===1 && ${ZEILEN}[0].dataset.schluessel==="paul"`), "Suche „paul“ → genau paul");
+  const nrPaul = await eval_(`${ZEILEN}[0].querySelector("td").textContent`);
+  await tippen("#crm-suche", nrPaul);
+  ok(await bis(`${ZEILEN}.length===1 && ${ZEILEN}[0].dataset.schluessel==="paul"`), `Suche nach Nummer ${nrPaul} → paul`);
+  await eval_(`document.getElementById("crm-suche").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter"})); true`);
+  ok(await bis(`location.hash==="#person/paul" && !!document.querySelector("#crm-kopf h2")`), "Enter öffnet die Personenkarte");
+  ok(await eval_(`document.getElementById("crm-kopf").textContent.includes(${JSON.stringify(nrPaul)})`), "Karte zeigt die Nummer");
+  ok(await bis(`[...document.querySelectorAll("#crm-bloecke .b-karte__titel")].some(x=>x.textContent==="Stammdaten")`), "Block „Stammdaten“");
+  ok(await eval_(`![...document.querySelectorAll("#crm-bloecke .b-karte__titel")].some(x=>x.textContent.startsWith("Sicherheitsprotokoll"))`), "Leerer Block „Sicherheitsprotokoll“ fehlt");
   ok(await eval_(OHNE_UUID) && await eval_(OHNE_NULL), "Personenkarte ohne UUID und ohne „null“");
   await gehe(G + "/admin/#person/" + nrPaul, 3500);
-  ok(await bis(`document.querySelector(".crm-kopf")?.textContent.includes("@paul") || document.querySelector(".crm-kopf h2")?.textContent.includes("paul")`), "Adresse #person/P-… öffnet die Karte");
+  ok(await bis(`document.getElementById("crm-kopf")?.textContent.includes("paul")`), "Adresse #person/P-… öffnet die Karte");
   await gehe(G + "/admin/#personen", 3500);
-  ok(await bis(`document.querySelector("input.crm-suche")?.value===${JSON.stringify(nrPaul)}`), "Suche bleibt beim Zurückgehen erhalten");
+  ok(await bis(`document.getElementById("crm-suche")?.value===${JSON.stringify(nrPaul)}`), "Suche bleibt beim Zurückgehen erhalten");
 
   // 3) Handle ändern im eigenen Konto (seb), mit Frist und alter Adresse
   await gehe(G + "/#/profil", 3500);
   ok(await bis(`[...document.querySelectorAll("#angaben h3")].some(x=>x.textContent==="Handle")`), "Konto: Abschnitt „Handle“");
   await eval_(`{ const f=[...document.querySelectorAll("#angaben form")].find(f=>f.querySelector("h3")?.textContent==="Handle"); f.querySelector("input").value="seb_e2e"; f.requestSubmit(); } true`);
+  // Rückfrage im Dialog der Bausteine (statt Browser-confirm, 11.11.2026)
+  await bis(`!!document.querySelector("dialog.b-dialog[open]")`);
+  await eval_(`[...document.querySelectorAll("dialog.b-dialog[open] button")].find(b=>b.textContent==="Ändern").click(); true`);
   ok(await bis(`fetch("/api/me").then(r=>r.json()).then(m=>m.player==="seb_e2e" && m.konto==="seb")`, 8000), "Handle geändert: @seb_e2e, Konto bleibt seb");
   await gehe(G + "/?neu=1#/profil", 4000);
   ok(await bis(`document.getElementById("benutzer").title==="@seb_e2e"`), "Oben rechts: @seb_e2e");
   ok(await bis(`[...document.querySelectorAll("#angaben form")].find(f=>f.querySelector("h3")?.textContent==="Handle")?.querySelector("input").disabled===true`), "Danach gesperrt (30 Tage)");
   ok(await eval_(`document.body.textContent.includes("Wieder änderbar ab")`), "Hinweis „Wieder änderbar ab …“");
   await gehe(G + "/#/profil/seb", 3500);
-  ok(await bis(`document.querySelector(".profil-kopf")?.textContent.includes("@seb_e2e")`), "Alte Profil-Adresse #/profil/seb zeigt @seb_e2e");
+  ok(await bis(`document.querySelector("#profil-kopf")?.textContent.includes("@seb_e2e")`), "Alte Profil-Adresse #/profil/seb zeigt @seb_e2e");
   ok(await eval_(OHNE_UUID), "Bibliothek ohne UUID");
   // Admin setzt zurück (ohne Frist); das alte Handle bleibt reserviert
   ok(await eval_(`fetch("/api/admin/personen/seb_e2e/handle",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({handle:"seb"})}).then(r=>r.json()).then(p=>p.handle==="seb")`), "Admin setzt @seb zurück (ohne Frist)");
   await gehe(G + "/admin/#person/seb", 3500);
-  ok(await bis(`document.querySelector(".crm-kopf")?.textContent.includes("früher @seb_e2e")`), "Karte: „früher @seb_e2e“");
+  ok(await bis(`document.getElementById("crm-kopf")?.textContent.includes("früher @seb_e2e")`), "Karte: „früher @seb_e2e“");
   ok(await eval_(`fetch("/api/mein/handle",{method:"PUT",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({handle:"paul"})}).then(r=>r.status)`) === 409, "Fremdes Handle @paul: abgelehnt");
 
   // 4) Sicherheitsprotokoll: abgelehnter Zugriff (in „Ansicht als Spieler“ ist das Admin-Panel gesperrt)
   await eval_(`fetch("/api/admin/personen",{headers:{"X-Ansicht":"spieler"}}).then(r=>r.status)`);
   await gehe(G + "/admin/?neu=2#person/seb", 3500);
-  ok(await bis(`[...document.querySelectorAll(".crm-block h3")].some(x=>x.textContent.startsWith("Sicherheitsprotokoll"))`), "Karte: Block „Sicherheitsprotokoll“");
+  ok(await bis(`[...document.querySelectorAll("#crm-bloecke .b-karte__titel")].some(x=>x.textContent.startsWith("Sicherheitsprotokoll"))`), "Karte: Block „Sicherheitsprotokoll“");
   ok(await eval_(`document.body.textContent.includes("GET /api/admin/personen → 403")`), "Abgelehnter Zugriff steht darin");
   ok(await eval_(OHNE_UUID) && await eval_(OHNE_NULL), "Karte von seb ohne UUID und ohne „null“");
 
   // 5) Kacheln filtern, Admin-Anmeldungen zeigen Handles (in 1.4.1 war die Spalte leer)
   await gehe(G + "/admin/#personen", 3500);
-  await tippen("input.crm-suche", "");
-  await eval_(`[...document.querySelectorAll("button.kennzahl")].find(b=>b.textContent.includes("verwarnt oder gesperrt")).click(); true`);
+  await tippen("#crm-suche", "");
+  await eval_(`[...document.querySelectorAll("button.b-kennzahl")].find(b=>b.textContent.includes("verwarnt oder gesperrt")).click(); true`);
   ok(await bis(`${ZEILEN}.length===0 || ${ZEILEN}.every(t=>/verwarnt|gesperrt/.test(t.textContent))`), "Kachel „verwarnt oder gesperrt“ filtert");
-  ok(await eval_(`(()=>{const h=[...document.querySelectorAll("h2")].find(x=>x.textContent==="Letzte Anmeldungen"); const t=h?.nextElementSibling?.nextElementSibling; return !t || [...t.querySelectorAll("tbody tr td:first-child")].every(td=>td.textContent.trim().length>0)})()`), "Letzte Anmeldungen: Spalte Spieler gefüllt");
+  ok(await bis(`!!document.getElementById("anmeldungen")`) && await eval_(`[...document.querySelectorAll("#anmeldungen tbody tr td:first-child")].every(td=>td.textContent.trim().length>0)`), "Letzte Anmeldungen: Spalte Spieler gefüllt");
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
   console.log(ergebnis.join("\n"));
   chrome.kill(); process.exit();

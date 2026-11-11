@@ -1,13 +1,5 @@
 "use strict";
-// Hilfe für alle Spieler. Alles für Entwickler steht im Entwickler-Handbuch (/handbuch/).
-
-// Zurück dorthin, wo man herkam (sonst zur Übersicht)
-document.getElementById("zurueck").addEventListener("click", () => {
-	try {
-		if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) return history.back();
-	} catch { /* egal */ }
-	location.href = "/";
-});
+// Hilfe für alle Spieler. Alles für Entwickler steht im Entwickler-Handbuch (/handbuch/). Kopfleiste und Reiter: hilfe-rahmen.js.
 
 // Hilfe je nach Rolle: Spieler sehen nur, was sie brauchen. Bei Fehlern bleibt alles sichtbar.
 (async () => {
@@ -19,10 +11,7 @@ document.getElementById("zurueck").addEventListener("click", () => {
 		const ich = await r.json();
 		const entwickler = ich.uploader || ich.admin;
 		for (const e of document.querySelectorAll('[data-rolle="entwickler"]')) e.hidden = !entwickler;
-		if (ich.ansicht) {
-			const h = document.getElementById("ansicht-hinweis");
-			h.textContent = `Ansicht als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"}: Du siehst die Hilfe so, wie Kollegen mit dieser Rolle sie sehen.`;
-			h.hidden = false;
-		}
+		if (ich.ansicht) document.getElementById("hilfe-reiter").after(UI.hinweis({ id: "ansicht-hinweis", art: "akzent",
+			text: `Ansicht als ${ich.ansicht === "spieler" ? "Spieler" : "Entwickler"}: Du siehst die Hilfe so, wie Kollegen mit dieser Rolle sie sehen.` }));
 	} catch { /* Hilfe bleibt vollständig */ }
 })();

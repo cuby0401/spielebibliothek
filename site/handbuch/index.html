@@ -4,29 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Entwickler-Handbuch – Spielebibliothek</title>
-  <link rel="stylesheet" href="/style.css?v=__VERSION__">
-  <link rel="stylesheet" href="/hilfe/hilfe.css?v=__VERSION__">
+  <script src="/ui/thema-frueh.js?v=__VERSION__"></script>
+  <link rel="stylesheet" href="/ui/tokens.css?v=__VERSION__">
+  <link rel="stylesheet" href="/ui/bausteine.css?v=__VERSION__">
 </head>
-<body>
-  <header class="kopf">
-    <a class="marke" href="/">Spielebibliothek</a>
-    <nav>
-      <button id="zurueck" class="knopf leise" type="button" title="Zurück, wo du herkamst">← Zurück</button>
-    </nav>
-  </header>
-
-  <main class="hilfe">
-    <nav class="hilfe-reiter" aria-label="Hilfe-Center">
-      <a href="/hilfe/">Spielen</a>
-      <a href="/handbuch/" class="aktiv" aria-current="page">Spiele entwickeln</a>
-      <a href="/#/antraege">Fehler melden / Idee</a>
-    </nav>
+<body class="b-ui">
+  <!-- Kopfleiste und Reiter des Hilfe-Centers baut /handbuch/handbuch.js aus den Bausteinen -->
+<main id="inhalt" class="b-lesetext b-lesetext--seite">
     <h1>Entwickler-Handbuch</h1>
     <p>Alles, was du brauchst, um Spiele für die Spielebibliothek zu bauen, hochzuladen und zu aktualisieren –
       so, dass bei allen Spielen alles gleich funktioniert und kein Spielstand verloren geht.
       Für Spieler gibt es die kürzere <a href="/hilfe/">Hilfe</a>.</p>
 
-    <nav class="inhalt" aria-label="Inhalt">
+    <nav class="b-lesetext__inhalt" aria-label="Inhalt">
       <ol>
         <li><a href="#start">Schnellstart in 6 Schritten</a></li>
         <li><a href="#ki">KI-Paket: Startvorlage und Prompt-Block</a></li>
@@ -47,7 +37,7 @@
     </nav>
 
     <h2 id="start">1. Schnellstart in 6 Schritten</h2>
-    <ol class="schritte">
+    <ol>
       <li><strong>Startvorlage laden</strong> – <a href="/handbuch/startvorlage.zip" download>startvorlage.zip</a>. Darin: ein lauffähiges Grundgerüst
         (<code>index.html</code>, <code>game.json</code>, Vorschaubild) und <code>KI-ANWEISUNG.txt</code>.</li>
       <li><strong>Spiel bauen</strong> – am einfachsten mit KI: <code>KI-ANWEISUNG.txt</code>, <code>index.html</code> und <code>game.json</code> an die KI geben
@@ -63,7 +53,7 @@
       <li><strong>Veröffentlichen …</strong> – öffnet das <a href="#updates">Update-Fenster</a>: Art des Updates wählen, Änderungen prüfen,
         die <a href="#pruefung">Prüfung</a> lesen, veröffentlichen. Dein Spiel bekommt seine Versionsnummer, alle Spieler sehen es.</li>
     </ol>
-    <p class="hinweis">Hochladen können nur Entwickler mit Upload-Konto – bei Seb melden.</p>
+    <p data-hinweis="info">Hochladen können nur Entwickler mit Upload-Konto – bei Seb melden.</p>
 
     <h2 id="ki">2. KI-Paket: Startvorlage und Prompt-Block</h2>
     <p>Die Spiele entstehen meist mit KI. Damit die KI alles richtig macht, bekommt sie <strong>immer dieselben zwei Dinge</strong>:</p>
@@ -73,14 +63,11 @@
         Die KI baut darauf auf, statt alles neu zu erfinden.</li>
       <li><strong>Den Prompt-Block</strong> – steht auch als <code>KI-ANWEISUNG.txt</code> in der Startvorlage. Bei jedem Update wieder mitgeben.</li>
     </ul>
-    <div class="prompt-kopf">
-      <span class="leise">In deinen KI-Prompt einfügen, zusätzlich zur Beschreibung deines Spiels.</span>
-      <button id="kopieren" class="knopf" type="button">Kopieren</button>
-    </div>
+    <p id="prompt-kopf" class="b-text b-text--leise">In deinen KI-Prompt einfügen, zusätzlich zur Beschreibung deines Spiels.</p>
     <pre id="prompt-text">Lade …</pre>
 
     <h2 id="regeln">3. Regeln</h2>
-    <ol class="regeln">
+    <ol>
       <li><strong>Ein Ordner pro Spiel</strong>, <code>index.html</code> direkt darin. Im ZIP darf der Ordner drumherum sein – das wird erkannt.</li>
       <li><strong>Nur relative Pfade:</strong> <code>./sprites/held.png</code>, nicht <code>/sprites/held.png</code>. Einzige Ausnahme: <code>/lib/gamesave.js</code>.</li>
       <li><strong>Nur fertige Dateien.</strong> Mit Vite/React: den Ordner <code>dist/</code> hochladen, vorher <code>base: './'</code> setzen.</li>
@@ -122,7 +109,7 @@ GameSave.available                               // false beim lokalen Testen</c
 
     <h2 id="updates">5. Updates: Versionen, Spielstände, Update-Fenster</h2>
     <h3>Zwei Nummern – nicht verwechseln</h3>
-    <div class="tabelle-rahmen"><table class="tabelle">
+    <div class="b-tabelle"><table>
       <thead><tr><th></th><th>Versionsnummer, z. B. <code>2.1.4</code></th><th><code>saveVersion</code>, z. B. <code>3</code></th></tr></thead>
       <tbody>
         <tr><td>Wofür?</td><td>Für Spieler: welche Version läuft, was ist neu</td><td>Für Spielstände: in welchem Aufbau ein Stand gespeichert ist</td></tr>
@@ -132,7 +119,7 @@ GameSave.available                               // false beim lokalen Testen</c
     </table></div>
 
     <h3>Welche Art von Update?</h3>
-    <div class="tabelle-rahmen"><table class="tabelle">
+    <div class="b-tabelle"><table>
       <thead><tr><th>Art</th><th>Nummer</th><th>Beispiele</th></tr></thead>
       <tbody>
         <tr><td><strong>Patch / Hotfix</strong></td><td>2.1.4 → 2.1.<strong>5</strong></td><td>Fehler behoben, Tippfehler, Balance minimal angepasst</td></tr>
@@ -179,7 +166,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     <h2 id="pruefung">6. Die Prüfung vor dem Veröffentlichen</h2>
     <p>Das Update-Fenster prüft den Entwurf, bevor er live geht. <strong>✗ Fehler</strong> verhindern das Veröffentlichen,
       <strong>⚠ Warnungen</strong> musst du bestätigen, <strong>ℹ Hinweise</strong> und <strong>✓</strong> sind zur Info.</p>
-    <div class="tabelle-rahmen"><table class="tabelle">
+    <div class="b-tabelle"><table>
       <thead><tr><th>Prüfung</th><th>Stufe</th><th>Was tun?</th></tr></thead>
       <tbody>
         <tr><td><code>index.html</code> fehlt, <code>game.json</code> kaputt</td><td>✗</td><td>ZIP bzw. JSON reparieren, neu hochladen</td></tr>
@@ -234,7 +221,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     <h2 id="steckbrief">8b. Beschreibung und Vorschaubild</h2>
     <p>Was in der Bibliothek auf der Kachel deines Spiels steht – <strong>Titel</strong>, <strong>Beschreibung</strong> (der Text unter dem Namen)
       und das <strong>Vorschaubild</strong> – stellst du direkt auf der <a href="https://upload.cuby0401.uk" target="_blank" rel="noopener">Upload-Seite</a> ein:</p>
-    <ol class="schritte">
+    <ol>
       <li>Bei deinem Spiel auf <strong>„Beschreibung und Vorschaubild“</strong> klicken.</li>
       <li>Titel und Beschreibung eintragen (ein, zwei Sätze, max. 300 Zeichen) und <strong>„Speichern“</strong>.</li>
       <li><strong>„Bild wählen …“</strong> – PNG, JPG oder WebP, max. 2 MB, am besten im Format 16:9 (z. B. 640 × 360 Pixel).
@@ -243,7 +230,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     <p>Das gilt <strong>sofort</strong> – ohne Entwurf, ohne neue Version – und bleibt bei jedem Update erhalten.
       Leere Felder bzw. kein eigenes Bild: Dann gilt, was in der <a href="#gamejson"><code>game.json</code></a> steht
       (<code>title</code>, <code>description</code>, <code>thumbnail</code>). Was du auf der Upload-Seite einträgst, hat Vorrang.</p>
-    <p class="hinweis">Ohne Beschreibung bleibt die Kachel leer, ohne Bild zeigt sie nur ein Platzhalter-Symbol. Beides gehört zu jedem Spiel dazu.</p>
+    <p data-hinweis="info">Ohne Beschreibung bleibt die Kachel leer, ohne Bild zeigt sie nur ein Platzhalter-Symbol. Beides gehört zu jedem Spiel dazu.</p>
 
     <h2 id="gamejson">9. <code>game.json</code></h2>
 <pre><code>{
@@ -253,7 +240,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
   "saveVersion": 1,
   "leaderboard": { "enabled": true, "order": "desc", "label": "Punkte" }
 }</code></pre>
-    <div class="tabelle-rahmen"><table class="tabelle">
+    <div class="b-tabelle"><table>
       <thead><tr><th>Feld</th><th>Pflicht?</th><th>Bedeutung</th></tr></thead>
       <tbody>
         <tr><td><code>title</code></td><td>ja</td><td>Name auf der Kachel (sonst der Ordnername), max. 80 Zeichen. Auf der Upload-Seite änderbar (<a href="#steckbrief">Steckbrief</a>)</td></tr>
@@ -267,7 +254,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
         <tr><td><s><code>version</code></s></td><td>–</td><td>Nicht eintragen – die Nummer vergibt die Bibliothek</td></tr>
       </tbody>
     </table></div>
-    <p class="leise">Der Autor kommt immer aus deinem Benutzernamen, nicht aus der <code>game.json</code>.</p>
+    <p class="b-text b-text--leise">Der Autor kommt immer aus deinem Benutzernamen, nicht aus der <code>game.json</code>.</p>
 
     <h2 id="erfolge">9b. Erfolge, Kategorien, Spiel der Woche</h2>
     <h3>Erfolge</h3>
@@ -300,7 +287,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     </ul>
 
     <h2 id="selbst">10. Was du selbst einstellen kannst – und was nicht</h2>
-    <div class="tabelle-rahmen"><table class="tabelle">
+    <div class="b-tabelle"><table>
       <thead><tr><th>Selbst</th><th>Nur über Anfrage an Seb (Konto → Anfragen)</th></tr></thead>
       <tbody><tr>
         <td><ul>
@@ -341,7 +328,7 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     </ol>
 
     <h2 id="checkliste">12. Checkliste vor jedem Update</h2>
-    <ul class="checkliste">
+    <ul class="b-lesetext__abhaken">
       <li>☐ Derselbe Ordnername wie bisher</li>
       <li>☐ Aufbau des Spielstands geändert? → <code>saveVersion</code> +1 und <code>migration</code>-Schritt</li>
       <li>☐ Neue Felder stehen in <code>standard</code></li>
@@ -376,6 +363,9 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       <dd>Sie haben noch keine Nummer. Die nächste Veröffentlichung macht daraus 1.0.0.</dd>
     </dl>
   </main>
+  <script src="/ui/ikonen.js?v=__VERSION__"></script>
+  <script src="/ui/bausteine.js?v=__VERSION__"></script>
+  <script src="/hilfe/hilfe-rahmen.js?v=__VERSION__"></script>
   <script src="/handbuch/handbuch.js?v=__VERSION__"></script>
 </body>
 </html>

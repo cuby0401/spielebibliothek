@@ -14,6 +14,13 @@ const lesen = (p) => readFileSync(new URL(p, wurzel), "utf8");
 // Seite: HTML-Datei und die Skripte, die nur zu ihr gehören
 const UMGEBAUT = [
 	{ html: "site/ui-test/index.html", js: ["site/ui-test/test.js"] },
+	{ html: "site/upload/index.html", js: ["site/upload/upload.js"] },
+	{ html: "site/tester/index.html", js: ["site/tester/tester.js"] },
+	{ html: "site/hilfe/index.html", js: ["site/hilfe/hilfe-rahmen.js", "site/hilfe/hilfe.js"] },
+	{ html: "site/handbuch/index.html", js: ["site/hilfe/hilfe-rahmen.js", "site/handbuch/handbuch.js"] },
+	{ html: "site/index.html", js: ["site/app.js", "site/konto.js"] },
+	{ html: "site/spike/index.html", js: ["site/spike/spike.js"] },
+	{ html: "site/admin/index.html", js: ["site/admin/admin.js"] },
 ];
 const PFLICHT = ["/ui/thema-frueh.js", "/ui/tokens.css", "/ui/bausteine.css", "/ui/ikonen.js", "/ui/bausteine.js"];
 
@@ -32,7 +39,13 @@ for (const m of bcss.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/(^|[\s,{}>+~(])\
 // 2. tokens.css
 for (const m of lesen("site/ui/tokens.css").matchAll(/^\s*--([\w-]+):/gm)) if (!m[1].startsWith("b-")) melde("site/ui/tokens.css", 0, `Token ohne Präfix b-: --${m[1]}`);
 
-// 3. umgebaute Seiten
+// 3. Jede Seite der Zentrale muss in UMGEBAUT stehen – keine Seite darf an den Bausteinen vorbei gebaut werden (Seb, 11.11.2026)
+import { readdirSync } from "node:fs";
+const alleSeiten = (dir) => readdirSync(new URL(dir, wurzel), { withFileTypes: true }).flatMap((e) =>
+	e.isDirectory() ? alleSeiten(dir + e.name + "/") : e.name.endsWith(".html") ? [dir + e.name] : []);
+for (const html of alleSeiten("site/")) if (!UMGEBAUT.some((u) => u.html === html)) melde(html, 0, "Seite nicht in UMGEBAUT – jede Seite wird aus den Bausteinen gebaut und hier eingetragen");
+
+// 4. umgebaute Seiten
 for (const seite of UMGEBAUT) {
 	if (!existsSync(new URL(seite.html, wurzel))) { melde(seite.html, 0, "Datei fehlt"); continue; }
 	const html = lesen(seite.html);

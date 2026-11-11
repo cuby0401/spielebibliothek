@@ -310,13 +310,15 @@
 		if (o.bild) bild.append(h("img", { src: o.bild, alt: "", loading: "lazy", decoding: "async" }));
 		else bild.append(ikon(o.ikon || "spiel", { groesse: "xl" }));
 		if (o.marken && o.marken.length) bild.append(h("div", { class: "b-kachel__marken" }, o.marken.map((m) => marke(typeof m === "string" ? { text: m } : { ...m, klein: true }))));
-		const ziel = h(o.href ? "a" : "button", { class: "b-kachel__ziel", href: o.href || null, type: o.href ? null : "button", onclick: o.onclick || null,
+		const ziel = o.deaktiviert ? null : h(o.href ? "a" : "button", { class: "b-kachel__ziel", href: o.href || null, type: o.href ? null : "button", onclick: o.onclick || null,
 			"aria-label": o.untertitel ? `${o.titel}, ${o.untertitel}` : o.titel });
 		const text = h("div", { class: "b-kachel__text" },
 			h("span", { class: "b-kachel__titel", text: o.titel }),
 			o.untertitel ? h("span", { class: "b-kachel__untertitel", text: o.untertitel }) : null,
-			o.fortschritt != null ? fortschritt({ wert: o.fortschritt, max: 1, label: o.fortschrittLabel || "Fortschritt", klein: true }) : null);
-		const k = h("article", { class: klassen("b-kachel", o.klasse), id: o.id, "data-id": o.spielId || null }, bild, text, ziel);
+			o.beschreibung ? h("span", { class: "b-kachel__beschreibung", text: o.beschreibung }) : null,
+			o.fortschritt != null ? fortschritt({ wert: o.fortschritt, max: 1, label: o.fortschrittLabel || "Fortschritt", klein: true }) : null,
+			o.fuss ? h("div", { class: "b-kachel__fuss" }, o.fuss) : null);
+		const k = h("article", { class: klassen("b-kachel", o.deaktiviert && "b-kachel--aus", o.klasse), id: o.id, "data-id": o.spielId || null, title: o.deaktiviert && typeof o.deaktiviert === "string" ? o.deaktiviert : null }, bild, text, ziel);
 		if (o.favorit !== undefined) {
 			const stern = knopf({ art: "leise", groesse: "s", nurIkon: true, ikon: "stern", label: o.favorit ? "Aus Favoriten entfernen" : "Zu Favoriten", klasse: "b-kachel__stern" });
 			stern.setAttribute("aria-pressed", String(!!o.favorit));
@@ -338,6 +340,10 @@
 			(zeilen || []).map((z) => h("li", { class: "b-liste__eintrag" }, z instanceof Node ? z : zeile(z))));
 	}
 	function zeile(o = {}) {
+		if (o.aktionen) {   // Knöpfe neben der Zeile (Archiv, Löschen) – nie innerhalb eines Links
+			const { aktionen, ...rest } = o;
+			return h("div", { class: "b-zeile-mit-aktionen" }, zeile(rest), h("div", { class: "b-zeile__aktionen" }, aktionen));
+		}
 		const tag = o.href ? "a" : o.onclick ? "button" : "div";
 		return h(tag, { class: klassen("b-zeile", tag !== "div" && "b-zeile--klickbar", o.gefahr && "b-zeile--gefahr", o.ungelesen && "b-zeile--neu", o.klasse),
 			href: o.href || null, type: tag === "button" ? "button" : null, onclick: o.onclick || null, id: o.id },
@@ -431,6 +437,13 @@
 	// Reiter. eintraege: [{id, text, zahl, ikon}], aktiv, onwechsel(id). Pfeiltasten wie bei echten Tabs.
 	function reiter(o = {}) {
 		const leiste = h("div", { class: klassen("b-reiter", o.klasse), role: "tablist", "aria-label": o.label || null, id: o.id });
+		// Einträge mit href: Navigation zwischen Seiten (Hilfe-Center) – echte Links, die aktuelle Seite mit aria-current
+		if (o.eintraege.some((e) => e.href)) {
+			leiste.setAttribute("role", "navigation");
+			leiste.append(...o.eintraege.map((e) => h("a", { class: "b-reiter__eintrag", href: e.href, "data-id": e.id, "aria-current": e.id === o.aktiv ? "page" : null },
+				e.ikon ? ikon(e.ikon) : null, h("span", { text: e.text }), e.zahl ? h("span", { class: "b-zahl", text: String(e.zahl) }) : null)));
+			return leiste;
+		}
 		const knoepfe = o.eintraege.map((e) => {
 			const k = h("button", { type: "button", role: "tab", class: "b-reiter__eintrag", id: (o.id || "reiter") + "-" + e.id, "data-id": e.id,
 				"aria-controls": e.panel || null }, e.ikon ? ikon(e.ikon) : null, h("span", { text: e.text }), e.zahl ? h("span", { class: "b-zahl", text: String(e.zahl) }) : null);
@@ -464,6 +477,12 @@
 			nav.append(h("div", { class: "b-seitenleiste__gruppe" }, g.titel ? h("p", { class: "b-seitenleiste__titel", text: g.titel }) : null, ul));
 		}
 		nav.setzen = (id) => { for (const a of nav.querySelectorAll(".b-seitenleiste__eintrag")) if (a.dataset.id === id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); };
+		// Zahl an einem Eintrag setzen oder entfernen (0/leer = weg), z. B. offene Anfragen
+		nav.zahlSetzen = (id, zahl) => {
+			const a = [...nav.querySelectorAll(".b-seitenleiste__eintrag")].find((x) => x.dataset.id === id); if (!a) return;
+			let z = a.querySelector(".b-zahl"); if (!zahl) { if (z) z.remove(); return; }
+			if (!z) { z = h("span", { class: "b-zahl" }); a.append(z); } z.textContent = String(zahl);
+		};
 		return nav;
 	}
 	// Kopfleiste oben (Milchglas, klebt). marke {text, href}, mitte (z. B. Suche), rechts [Elemente]
@@ -499,6 +518,15 @@
 		function oeffnen() {
 			if (offenesMenue && offenesMenue !== api) offenesMenue.schliessen(false);
 			feld.hidden = false; o.ausloeser.setAttribute("aria-expanded", "true"); offenesMenue = api;
+			// In Tabellen (scrollen waagerecht) würde das Menü abgeschnitten: dort schwebt es fest am Knopf (am Handy: Blatt unten, per CSS)
+			if (o.ausloeser.closest(".b-tabelle") && matchMedia("(min-width: 481px)").matches) {
+				const r = o.ausloeser.getBoundingClientRect();
+				feld.dataset.schwebend = "";
+				const oben = r.bottom + 6 + feld.offsetHeight > innerHeight && r.top > feld.offsetHeight + 6;
+				feld.style.top = oben ? `${r.top - 6 - feld.offsetHeight}px` : `${r.bottom + 6}px`;
+				feld.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+				addEventListener("scroll", schliessenBeimScrollen, { capture: true, once: true });
+			}
 			if (o.onoeffnen) o.onoeffnen();
 			const erstes = eintraege[0] || feld.querySelector("button, a, input, [tabindex]");
 			if (erstes) setTimeout(() => erstes.focus(), 0);
@@ -506,9 +534,11 @@
 		function schliessen(fokusZurueck) {
 			if (feld.hidden) return;
 			feld.hidden = true; o.ausloeser.setAttribute("aria-expanded", "false");
+			if (feld.dataset.schwebend !== undefined) { delete feld.dataset.schwebend; feld.style.top = ""; feld.style.right = ""; removeEventListener("scroll", schliessenBeimScrollen, { capture: true }); }
 			if (offenesMenue === api) offenesMenue = null;
 			if (fokusZurueck) o.ausloeser.focus();
 		}
+		const schliessenBeimScrollen = (ev) => { if (!feld.contains(ev.target)) schliessen(false); };
 		o.ausloeser.addEventListener("click", (ev) => { ev.stopPropagation(); if (feld.hidden) oeffnen(); else schliessen(false); });
 		feld.addEventListener("keydown", (ev) => {
 			if (ev.key === "Escape") { ev.preventDefault(); schliessen(true); }
@@ -549,7 +579,7 @@
 	const raster = (kinder, o = {}) => h("div", { class: klassen("b-raster", o.art && `b-raster--${o.art}`, o.klasse), id: o.id }, kinder);
 	const reihe = (kinder, o = {}) => h("div", { class: klassen("b-reihe", o.klasse), id: o.id, role: "list" }, [kinder].flat().map((k) => { k.setAttribute("role", "listitem"); return k; }));
 	// Senkrechter Stapel mit gleichem Abstand; abstand: s | m | l
-	const stapel = (kinder, o = {}) => h("div", { class: klassen("b-stapel", o.abstand && `b-stapel--${o.abstand}`, o.klasse), id: o.id }, kinder);
+	const stapel = (kinder, o = {}) => h(o.tag || "div", { class: klassen("b-stapel", o.abstand && `b-stapel--${o.abstand}`, o.klasse), id: o.id }, kinder);
 	// Waagerecht nebeneinander, bricht um; verteilt = links/rechts auseinander
 	const leiste = (kinder, o = {}) => h("div", { class: klassen("b-leiste", o.verteilt && "b-leiste--verteilt", o.klasse), id: o.id }, kinder);
 	// Seitengerüst: Titel, Untertitel, Zurück-Link, Aktionen rechts, dann Inhalt (max. Breite)
@@ -569,10 +599,55 @@
 		return h("dl", { class: klassen("b-angaben", o.klasse) }, paare.filter(Boolean).map(([k, v]) => [h("dt", { text: k }), h("dd", {}, v instanceof Node ? v : (v ?? "–"))]));
 	}
 	function text(inhalt, o = {}) { return h(o.tag || "p", { class: klassen("b-text", o.art && `b-text--${o.art}`, o.klasse), id: o.id, text: inhalt }); }
+	// Lesetext (Hilfe, Handbuch, lange Erklärungen): setzt Überschriften, Absätze, Listen, Code, Tabellen und Begriffe einheitlich.
+	// Für feste HTML-Seiten reicht die Klasse b-lesetext am Container; hier die Fabrik für Inhalte aus Skripten.
+	const lesetext = (kinder, o = {}) => h(o.tag || "div", { class: klassen("b-lesetext", o.klasse), id: o.id }, kinder);
+	// Aufklappen (natives <details>): Selteneres oder Gefährliches eingeklappt. titel, inhalt, offen, art: gefahr, zahl/rechts (Text rechts im Kopf)
+	function aufklappen(o = {}) {
+		const d = h("details", { class: klassen("b-aufklappen", o.art && `b-aufklappen--${o.art}`, o.klasse), id: o.id, open: !!o.offen },
+			h("summary", { class: "b-aufklappen__kopf" }, ikon("winkel-rechts"), h("span", { class: "b-aufklappen__titel", text: o.titel }),
+				o.rechts ? h("span", { class: "b-aufklappen__rechts", text: o.rechts }) : null),
+			h("div", { class: "b-aufklappen__inhalt" }, o.inhalt));
+		if (o.onoeffnen) d.addEventListener("toggle", () => { if (d.open) o.onoeffnen(d); });
+		d.inhalt = d.lastElementChild;
+		return d;
+	}
+	// Technischer Text in Festbreitenschrift: block = eigener Kasten (Log, JSON, Stacktrace, scrollt), sonst im Satz.
+	// kopieren: Knopf „Kopieren“ (z. B. Passwort). gross: große Schrift (Passwort zum Abtippen)
+	function code(inhalt, o = {}) {
+		const c = h(o.block ? "pre" : "code", { class: klassen("b-code", o.block && "b-code--block", o.gross && "b-code--gross", o.klasse), id: o.id, text: inhalt });
+		if (!o.kopieren) return c;
+		const k = knopf({ art: "standard", groesse: "s", ikon: "kopieren", text: "Kopieren", onclick: async () => {
+			try { await navigator.clipboard.writeText(inhalt); meldung("Kopiert.", { art: "erfolg" }); } catch (_) { meldung("Kopieren ging nicht – bitte markieren und selbst kopieren.", { art: "fehler" }); }
+		} });
+		return h("div", { class: "b-leiste" }, c, k);
+	}
+	// Mauerwerk: Karten der Reihe nach in die gerade kürzeste Spalte (keine Lücken unter kurzen Karten, Wichtiges bleibt oben).
+	// Spaltenzahl folgt der Breite (spalte = Mindestbreite in px). breit: Elemente über die ganze Breite darunter.
+	function mauer(bloecke, o = {}) {
+		const spalte = o.spalte || 360;
+		const m = h("div", { class: klassen("b-mauer", o.klasse), id: o.id });
+		const breit = o.breit || [];
+		let n = 0;
+		const legen = () => {
+			if (!m.isConnected) { if (n) beobachter.disconnect(); return; }
+			const abstand = parseFloat(getComputedStyle(m).columnGap) || 16;
+			const neu = Math.max(1, Math.floor((m.clientWidth + abstand) / (spalte + abstand)));
+			if (neu === n) return;
+			n = neu;
+			const spalten = Array.from({ length: n }, () => h("div", { class: "b-mauer__spalte" }));
+			m.replaceChildren(h("div", { class: "b-mauer__spalten" }, spalten), ...breit);
+			for (const b of bloecke) spalten.reduce((k, s) => (s.offsetHeight < k.offsetHeight ? s : k)).append(b);
+		};
+		const beobachter = new ResizeObserver(legen);
+		beobachter.observe(m);
+		return m;
+	}
 
 	// ---------- Rückmeldung ----------
 	// Meldung unten in der Mitte (Snackbar). art: info | erfolg | fehler. Fehler bleiben, bis man sie schließt.
 	let stapelMeldungen = null;
+	const verlaufMeldungen = [];   // die letzten 20 Texte – für Tests und „was stand da gerade?“ (UI.meldungsVerlauf())
 	function meldung(textInhalt, o = {}) {
 		if (!stapelMeldungen) {
 			stapelMeldungen = h("div", { class: "b-meldungen", "aria-live": "polite", "aria-relevant": "additions" });
@@ -586,6 +661,7 @@
 			o.aktion ? h("button", { type: "button", class: "b-meldung__aktion", text: o.aktion.text, onclick: () => { weg(); o.aktion.onclick(); } }) : null,
 			h("button", { type: "button", class: "b-meldung__zu", "aria-label": "Meldung schließen", onclick: weg }, ikon("schliessen")));
 		stapelMeldungen.append(m);
+		verlaufMeldungen.push(textInhalt); if (verlaufMeldungen.length > 20) verlaufMeldungen.shift();
 		while (stapelMeldungen.children.length > 3) stapelMeldungen.firstElementChild.remove();
 		const dauer = o.dauer ?? (art === "fehler" ? 0 : o.aktion ? 8000 : 5000);
 		if (dauer) setTimeout(weg, dauer);
@@ -663,6 +739,7 @@
 		const ja = knopf({ art: o.gefahr ? "gefahr" : "primaer", text: o.ja || "OK", onclick: () => api.schliessen(true) });
 		const nein = knopf({ art: "standard", text: o.nein || "Abbrechen", onclick: () => api.schliessen(false) });
 		api = dialog({ titel: o.titel || "Sicher?", text: o.text, inhalt: o.inhalt, gefahr: o.gefahr, aktionen: [nein, ja] });
+		api.element.dataset.art = "bestaetigen";
 		if (o.gefahr) nein.setAttribute("autofocus", "");   // bei Gefährlichem steht der Fokus auf „Abbrechen“
 		return api.oeffnen().then((w) => w === true);
 	}
@@ -682,6 +759,7 @@
 		ok.addEventListener("click", (ev) => { ev.preventDefault(); form.requestSubmit(); });
 		api = dialog({ titel: o.titel, text: o.text, inhalt: form, gefahr: o.gefahr,
 			aktionen: [knopf({ art: "standard", text: o.nein || "Abbrechen", onclick: () => api.schliessen(null) }), ok] });
+		api.element.dataset.art = "eingabe";
 		return api.oeffnen().then((w) => (typeof w === "string" ? w : null));
 	}
 	// Ersetzt alert(): await UI.hinweisDialog({titel, text})
@@ -763,6 +841,61 @@
 		return mitLabel(ul, o, neueId("sortierliste"), "div");
 	}
 
+	// ---------- Bibliothek: Band, Bühne, Rangliste, Fußzeile (11.11.2026) ----------
+	// Band über die ganze Breite unter der Kopfleiste (Probe/Design-Spielwiese, „Ansicht als …“, Anmeldung abgelaufen).
+	// art: info | akzent | warnung | gefahr. aktion: Element oder {text, onclick, href}
+	function band(o = {}) {
+		const art = o.art || "info";
+		return h("div", { class: klassen("b-band", `b-band--${art}`, o.klasse), id: o.id, role: art === "gefahr" || art === "warnung" ? "alert" : "status", hidden: !!o.versteckt },
+			h("div", { class: "b-band__innen" }, o.ikon !== false ? ikon(o.ikon || (art === "gefahr" ? "fehler" : art === "warnung" ? "warnung" : "info")) : null,
+				h("span", { class: "b-band__text", id: o.id ? o.id + "-text" : null, text: o.text || "" }),
+				o.aktion ? (o.aktion instanceof Node ? o.aktion : knopf({ art: "standard", groesse: "s", ...o.aktion })) : null));
+	}
+	// Bühne für ein laufendes Spiel: großer Rahmen links (rahmenId bekommt das iframe), schmale Spalte rechts (seite). Handy: untereinander.
+	// Am Element: .gross(an) → füllt die Fensterhöhe, .ohneSeite(an) → Spalte weg
+	function buehne(o = {}) {
+		const rahmen = h("div", { class: "b-buehne__rahmen", id: o.rahmenId || null });
+		const seite = h("aside", { class: "b-buehne__seite", "aria-label": o.seiteLabel || null }, o.seite || []);
+		const b = h("div", { class: klassen("b-buehne", o.klasse), id: o.id }, rahmen, seite);
+		b.rahmen = rahmen; b.seite = seite;
+		b.gross = (an) => b.toggleAttribute("data-gross", !!an);
+		b.ohneSeite = (an) => b.toggleAttribute("data-ohne-seite", !!an);
+		return b;
+	}
+	// Rangliste (Bestenlisten): spalten [{titel}] für die Werte, eintraege [{platz, name, href, titel, werte: [Text], ich}], rang = Index der Rangspalte
+	function rangliste(o = {}) {
+		const spalten = o.spalten || [];
+		const ol = h("ol", { class: klassen("b-rangliste", spalten.length > 1 && "b-rangliste--mehr", o.klasse), id: o.id, "aria-label": o.label || null });
+		if (spalten.length > 1) ol.append(h("li", { class: "b-rangliste__kopf", "aria-hidden": "true" }, h("span"), h("span"),
+			h("span", { class: "b-rangliste__werte" }, spalten.map((s) => h("span", { class: "b-rangliste__wert", text: s.titel })))));
+		for (const e of o.eintraege || []) {
+			ol.append(h("li", { class: "b-rangliste__eintrag", "data-ich": e.ich ? "" : null },
+				h("span", { class: "b-rangliste__platz", text: e.platz + "." }),
+				e.href ? h("a", { class: "b-rangliste__name", href: e.href, title: e.titel || null, text: e.name }) : h("span", { class: "b-rangliste__name", text: e.name }),
+				h("span", { class: "b-rangliste__werte" }, (e.werte || []).map((w, i) => h("span", { class: klassen("b-rangliste__wert", i === (o.rang || 0) && "b-rangliste__wert--rang"),
+					title: (spalten[i] || {}).titel || null, text: w })))));
+		}
+		return ol;
+	}
+	// Bilder nebeneinander (Screenshots an Anfragen, Fotos an Testergebnissen, Vorschaubild eines Spiels).
+	// bilder: [{src, alt, href, unter, aktion: Element}]. Klick auf das Bild öffnet href (neuer Tab).
+	// o.format: "breit" = 16:9 (Vorschaubild), o.sofort: nicht erst beim Hinscrollen laden, o.onentfernen(i): Entfernen-Knopf je Bild
+	function bilder(liste, o = {}) {
+		return h("div", { class: klassen("b-bilder", o.format === "breit" && "b-bilder--breit", o.klasse), id: o.id }, (liste || []).map((b, i) => {
+			const img = h("img", { src: b.src, alt: b.alt || "", loading: o.sofort ? null : "lazy" });
+			const weg = o.onentfernen ? knopf({ art: "gefahr-leise", groesse: "s", text: "Entfernen", onclick: () => o.onentfernen(i) }) : null;
+			return h("figure", { class: "b-bilder__bild" }, b.href ? h("a", { href: b.href, target: "_blank", rel: "noopener" }, img) : img,
+				b.unter || b.aktion || weg ? h("figcaption", { class: "b-bilder__unter" }, b.unter ? h("span", { text: b.unter }) : null, b.aktion || null, weg) : null);
+		}));
+	}
+	// Fußzeile: Links links, leiser Text rechts (z. B. Version). links: [{text, href}]
+	function fusszeile(o = {}) {
+		return h("footer", { class: klassen("b-fusszeile", o.klasse), id: o.id },
+			h("div", { class: "b-fusszeile__innen" },
+				h("nav", { class: "b-fusszeile__links", "aria-label": o.label || "Fußzeile" }, (o.links || []).map((l) => h("a", { href: l.href, text: l.text }))),
+				h("span", { class: "b-fusszeile__rechts", id: o.rechtsId || null, text: o.rechts || "" })));
+	}
+
 	window.UI = Object.freeze({
 		version: "1.0.0",
 		h, anhaengen, ikon, klassen,
@@ -770,9 +903,11 @@
 		feld, textbereich, auswahl, schalter, haken, radio, datei, suche, formular, sortierliste,
 		karte, spielkachel, liste, zeile, tabelle, kennzahl, fortschritt, marke, avatar, angaben, text,
 		reiter, seitenleiste, kopfleiste, menue, abschnitt,
-		raster, reihe, stapel, leiste, seite, bereich,
+		raster, reihe, stapel, leiste, seite, bereich, aufklappen, code, mauer, lesetext, bilder,
 		meldung, hinweis, leer, laden,
 		dialog, bestaetigen, eingabe, hinweisDialog,
 		aussehenAnwenden, AUSSEHEN,
+		band, buehne, rangliste, fusszeile, bilder,
+		meldungsVerlauf: () => verlaufMeldungen.slice(),
 	});
 })();

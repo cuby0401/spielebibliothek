@@ -3,6 +3,9 @@
 // Neues Icon: hier eintragen, in docs/ui-bausteine.md unter „Icons“ ergänzen.
 "use strict";
 window.UI_IKONEN = Object.freeze({
+	vollbild: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+	archiv: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+	"schloss-offen": '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
 	suche: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
 	glocke: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
 	daumen: '<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3Z"/><path d="M7 10l4-7a2 2 0 0 1 3.2 2.3L13 9h5.3a2 2 0 0 1 2 2.4l-1.5 7.2A2 2 0 0 1 16.8 20H7"/>',

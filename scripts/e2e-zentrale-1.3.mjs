@@ -40,7 +40,7 @@ async function hochladen(datei, neu) {
   await cdp("DOM.setFileInputFiles", { nodeId: n.nodeId, files: [`${DIR}/${datei}`] }, S);
   await eval_(`document.getElementById("ordner").value="e2e"; document.getElementById("neu").value=${JSON.stringify(neu)};
     document.getElementById("uploadform").requestSubmit(); true`);
-  return bis(`document.getElementById("meldung").textContent.includes("als Entwurf hochgeladen")`);
+  return bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("als Entwurf hochgeladen")`);
 }
 async function updateFensterOeffnen() {
   await bis(`[...document.querySelectorAll("button")].some(b=>b.textContent==="Veröffentlichen …")`);
@@ -63,53 +63,60 @@ const dialoge = [];
   const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
+  // UI-Bausteine (11.11.2026): Rückfragen sind eigene Dialoge (UI.bestaetigen) statt confirm() – wie früher automatisch bestätigen, Text in window.__dialoge
+  await cdp("Page.addScriptToEvaluateOnNewDocument", { source: `new MutationObserver(() => { for (const d of document.querySelectorAll('dialog[data-art="bestaetigen"][open]:not([data-e2e])')) {
+    d.dataset.e2e = "1"; (window.__dialoge = window.__dialoge || []).push(d.textContent);
+    setTimeout(() => d.querySelector(".b-dialog__fuss .b-knopf--primaer, .b-dialog__fuss .b-knopf--gefahr").click(), 50); } }).observe(document, { subtree: true, childList: true, attributes: true });` }, S);
 
-  // 1) Konto (1.4.0): Name führt direkt ins Profil, kein Aufklappmenü; Admin-Link oben; Symbole
+  // 1) Konto (seit 11.11.2026 wieder mit Kontextmenü aus den Bausteinen, wie im Admin-Panel); Admin-Link oben; Symbole
   await gehe(G + "/", 3500);
-  ok(await eval_(`!document.getElementById("menue") && document.getElementById("menue-knopf").getAttribute("href")==="#/profil"`), "Name führt direkt ins Profil (kein Kontextmenü)");
+  await eval_(`document.getElementById("menue-knopf").click(); true`);
+  ok(await bis(`!document.getElementById("konto-menue").hidden && [...document.querySelectorAll("#konto-menue a")].some(a=>a.getAttribute("href")==="#/profil")`), "Konto-Menü mit Link ins Profil");
+  await eval_(`document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"})); document.body.click(); true`);
   ok(await eval_(`/^[A-Z]{1,2}$/.test(document.getElementById("avatar").textContent) && !document.getElementById("admin-link").hidden`), "Initialen-Bild und Admin-Link für Admins");
-  ok(await eval_(`!!document.querySelector("#glocke-knopf svg.ikon") && !/🔔/.test(document.getElementById("glocke-knopf").textContent)`), "Glocke als SVG, ohne Emoji");
-  ok(await eval_(`!!document.querySelector(".kachel .daumen svg.ikon") && ![...document.querySelectorAll(".daumen")].some(d=>/👍/.test(d.textContent))`), "Daumen als SVG, ohne Emoji");
+  ok(await eval_(`!!document.querySelector("#glocke-knopf svg.b-ikon") && !/🔔/.test(document.getElementById("glocke-knopf").textContent)`), "Glocke als SVG, ohne Emoji");
+  ok(await eval_(`!!document.querySelector(".b-kachel [data-daumen] svg.b-ikon") && ![...document.querySelectorAll("[data-daumen]")].some(d=>/👍/.test(d.textContent))`), "Daumen als SVG, ohne Emoji");
 
   // 2) Profil: Spiele, Spielstände, Anmeldungen; Spike zählt nicht
   await eval_(`fetch("/api/save/seb/zaehler/stand",{method:"PUT",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({data:1})}).then(r=>r.status)`);
   await eval_(`fetch("/api/spielzeit/seb/spike",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({sekunden:60})}).then(r=>r.status)`);
   await eval_(`fetch("/api/admin/spiele/seb/spike",{method:"PATCH",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({testspiel:true})}).then(r=>r.status)`);
   await gehe(G + "/#/profil", 3500);
-  const leiste = await eval_(`[...document.querySelectorAll(".konto-leiste a")].map(a=>a.textContent).join("|")`);
+  const leiste = await eval_(`[...document.querySelectorAll("#konto-leiste a")].map(a=>a.textContent).join("|")`);
   ok(leiste === "Profil|Meine Spiele|Meine Spielstände|Anfragen|Einstellungen|Sicherheit|Admin-Panel|Abmelden", "Konto-Leiste (1.4.0): " + leiste);
-  ok(await eval_(`document.querySelector(".konto-leiste a.aktiv").textContent==="Profil" && !!document.querySelector(".profil-kopf .avatar.gross")`), "Profil aktiv, Kopf mit Bild");
+  ok(await eval_(`document.querySelector("#konto-leiste a[aria-current=page]").textContent==="Profil" && !!document.querySelector("#profil-kopf .b-avatar--xl")`), "Profil aktiv, Kopf mit Bild");
   const h2 = await eval_(`[...document.querySelectorAll("#seite h2")].map(h=>h.textContent).join("|")`);
   ok(h2 === "Meine Angaben|Gespielte Spiele mit Plätzen und Erfolgen", "Profil: Meine Angaben, gespielte Spiele: " + h2);
   ok(await eval_(`!document.querySelector("#seite table").textContent.includes("Sandbox-Spike")`), "Profil: Testspiel Spike zählt nicht");
   ok(await eval_(`[...document.querySelectorAll("#seite table thead th")].map(t=>t.textContent).join("|")==="Spiel|von|Spielzeit|Platz (aktuelle Season)|Erfolge"
     && [...document.querySelectorAll("#seite table tbody td:nth-child(2)")].some(t=>t.textContent==="dir")`), "Profil (1.4.1): Spalte „von“, eigene Spiele „dir“");
   await gehe(G + "/#/spielstaende", 3000);
-  ok(await eval_(`document.querySelector("#spielstaende").textContent.includes("Zähler") && document.querySelector(".konto-leiste a.aktiv").textContent==="Meine Spielstände"`), "Meine Spielstände: Zähler");
+  ok(await eval_(`document.querySelector("#spielstaende").textContent.includes("Zähler") && document.querySelector("#konto-leiste a[aria-current=page]").textContent==="Meine Spielstände"`), "Meine Spielstände: Zähler");
   await gehe(G + "/#/sicherheit", 3000);
   ok(await eval_(`document.querySelector("#anmeldungen").textContent.includes("dieses Gerät")`), "Sicherheit: Anmeldung dieses Geräts");
   ok(await eval_(`document.querySelector("#anmeldungen").textContent.includes("Probe/Teststand – keine echte Anmeldung")`), "Teststand: Anmeldung als „keine echte Anmeldung“ markiert, ohne Docker-IP");
   await gehe(G + "/#/anmeldungen", 2500);
   ok(await eval_(`location.hash`) === "#/sicherheit", "Alte Adresse #/anmeldungen → Sicherheit");
   await gehe(G + "/#/profil/paul", 3000);
-  ok(await eval_(`!document.querySelector(".konto-leiste") && document.querySelector("#seite h1").textContent.startsWith("Profil von")`), "Fremdes Profil ohne Konto-Leiste");
+  ok(await eval_(`!document.querySelector("#konto-leiste") && document.querySelector("#seite h1").textContent.startsWith("Profil von")`), "Fremdes Profil ohne Konto-Leiste");
 
   // 3) Glocke: archivieren, Archiv, löschen
   await eval_(`fetch("/api/admin/spiel-der-woche/paul/raetsel",{method:"PUT",headers:{"X-Bibliothek":"1"}}).then(r=>r.status)`);
   await gehe(G + "/", 3500);
   await eval_(`document.getElementById("glocke-knopf").click(); true`);
-  await bis(`document.querySelectorAll("#glocke-liste .meldung-zeile").length>0`);
-  const vorher = await eval_(`document.querySelectorAll("#glocke-liste .meldung-zeile").length`);
-  await eval_(`[...document.querySelectorAll("#glocke-liste .aktionen button")].find(b=>b.textContent==="Archiv").click(); true`);
-  ok(await bis(`document.querySelectorAll("#glocke-liste .meldung-zeile").length===${vorher}-1`), "Meldung archiviert, Liste bleibt offen");
-  await eval_(`[...document.querySelectorAll(".glocke-fuss button")].find(b=>b.textContent==="Archiv ansehen").click(); true`);
-  ok(await bis(`document.querySelectorAll("#glocke-liste .meldung-zeile").length===1`), "Archiv zeigt die Meldung");
-  await eval_(`[...document.querySelectorAll("#glocke-liste .aktionen button")].find(b=>b.textContent==="Löschen").click(); true`);
+  await bis(`document.querySelectorAll("#glocke-liste .b-zeile-mit-aktionen").length>0`);
+  const vorher = await eval_(`document.querySelectorAll("#glocke-liste .b-zeile-mit-aktionen").length`);
+  await eval_(`[...document.querySelectorAll("#glocke-liste .b-zeile__aktionen button")].find(b=>b.getAttribute("aria-label")==="Archivieren").click(); true`);
+  ok(await bis(`document.querySelectorAll("#glocke-liste .b-zeile-mit-aktionen").length===${vorher}-1`), "Meldung archiviert, Liste bleibt offen");
+  await eval_(`[...document.querySelectorAll("#glocke-liste button")].find(b=>b.textContent==="Archiv ansehen").click(); true`);
+  ok(await bis(`document.querySelectorAll("#glocke-liste .b-zeile-mit-aktionen").length===1`), "Archiv zeigt die Meldung");
+  await eval_(`[...document.querySelectorAll("#glocke-liste .b-zeile__aktionen button")].find(b=>b.getAttribute("aria-label")==="Löschen").click(); true`);
   ok(await bis(`document.getElementById("glocke-liste").textContent.includes("Archiv ist leer")`), "Gelöscht – Archiv leer");
 
   // 4) Größen mit passender Einheit
   await gehe(G + "/admin/", 3000);
-  const frei = await eval_(`[...document.querySelectorAll(".kennzahl")].find(k=>k.textContent.includes("frei auf der NAS")).querySelector(".wert").textContent`);
+  await bis(`!!document.querySelector(".b-kennzahl")`);
+  const frei = await eval_(`[...document.querySelectorAll(".b-kennzahl")].find(k=>k.textContent.includes("frei auf der NAS")).querySelector(".b-kennzahl__wert").textContent`);
   ok(/ (GB|TB|PB)$/.test(frei), "Freier NAS-Speicher in GB/TB: " + frei);
   const kont = await eval_(`document.body.textContent.includes("1 GB")`);
   ok(kont, "Kontingent als „1 GB“");

@@ -2,108 +2,22 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Spielebibliothek</title>
+  <!-- Oberfläche nur aus den UI-Bausteinen (docs/ui-bausteine.md). Kein eigenes Stylesheet, alles baut app.js mit UI.* -->
   <script src="/ui/thema-frueh.js?v=__VERSION__"></script>
-  <link rel="stylesheet" href="/style.css?v=__VERSION__">
   <link rel="stylesheet" href="/ui/tokens.css?v=__VERSION__">
   <link rel="stylesheet" href="/ui/bausteine.css?v=__VERSION__">
-  <link rel="stylesheet" href="/ui/bruecke.css?v=__VERSION__">
 </head>
-<body>
-  <!-- Taskleiste -->
-  <header class="kopf">
-    <a class="marke" href="#/">Spielebibliothek</a>
-    <nav>
-      <a class="knopf leise" id="upload-link" href="https://upload.cuby0401.uk" target="_blank" rel="noopener" hidden>Spiel hochladen</a>
-      <div class="menue glocke" id="glocke" hidden>
-        <button id="glocke-knopf" class="knopf leise glocke-knopf" type="button" aria-haspopup="true" aria-label="Meldungen"><span id="glocke-ikon"></span><span id="glocke-zahl" class="zahl-marke" hidden></span></button>
-        <div id="glocke-liste" class="menue-liste glocke-liste" hidden></div>
-      </div>
-      <a class="knopf leise" href="/hilfe/">Hilfe</a>
-      <a class="knopf leise" id="admin-link" href="/admin/" hidden>Admin</a>
-      <!-- Konto (Zentrale 1.4.0): Klick auf den Namen öffnet das eigene Profil, die Bereiche stehen dort in der Leiste -->
-      <a id="menue-knopf" class="benutzer-knopf" href="#/profil" title="Mein Konto" hidden>
-        <span id="avatar" class="avatar" aria-hidden="true"></span><span id="benutzer"></span>
-      </a>
-    </nav>
-  </header>
-
-  <p id="probe-band" class="probe-band" hidden>
-    🧪 <strong>Probe-Zentrale</strong> – eine Kopie zum Testen. Nichts hier ist live, alle Änderungen bleiben hier.
-    <a href="/admin/">Getestet? Im Admin-Panel für Live freigeben</a>
-  </p>
-  <p id="ansicht-band" class="ansicht-band" hidden>
-    <span id="ansicht-text"></span>
-    <button id="ansicht-ende" class="knopf klein" type="button">Ansicht beenden</button>
-  </p>
-
-  <p id="abgelaufen" class="abgelaufen" hidden>
-    Deine Anmeldung ist abgelaufen. Du kannst weiterspielen – dein Fortschritt wird auf diesem Gerät gesichert
-    und nach der nächsten Anmeldung automatisch übertragen.
-    <a href="">Jetzt neu anmelden</a>
-  </p>
-
-  <main>
-    <p id="meldung" class="meldung" hidden></p>
-
-    <section id="uebersicht">
-      <section id="sdw" class="sdw" hidden></section>
-      <div class="werkzeug">
-        <input id="suche" class="suche" type="search" placeholder="Spiele suchen …" aria-label="Spiele suchen">
-        <div id="tag-filter" class="tag-filter"></div>
-        <label class="leise">Sortieren
-          <select id="sortierung">
-            <option value="alphabetisch">alphabetisch</option>
-            <option value="zuletzt">zuletzt gespielt</option>
-            <option value="neu">neueste zuerst</option>
-            <option value="meistgespielt">meistgespielt</option>
-          </select>
-        </label>
-      </div>
-      <div id="kacheln" class="kacheln"></div>
-    </section>
-
-    <section id="seite" class="seite" hidden></section>
-
-    <section id="spielansicht" hidden>
-      <p id="entwurf-hinweis" class="entwurf-hinweis" hidden></p>
-      <p id="neu-hinweis" class="neu-hinweis" hidden>
-        <span id="neu-text"></span>
-        <button id="neu-zu" class="neu-zu" type="button" aria-label="Hinweis schließen">×</button>
-      </p>
-      <div class="spielleiste">
-        <a class="knopf leise" id="spiel-zurueck" href="#/">← Übersicht</a>
-        <h1 id="spieltitel"></h1>
-        <button id="version-knopf" class="version-knopf" type="button" hidden title="Versionsverlauf anzeigen"></button>
-        <button id="daumen" class="knopf leise daumen" type="button" hidden></button>
-        <button id="vollbild" class="knopf" type="button">Vollbild</button>
-      </div>
-      <div id="versionen-panel" class="versionen-panel" hidden></div>
-      <div class="spielbereich">
-        <div id="rahmen" class="rahmen"></div>
-        <aside class="bestenliste">
-          <h2 id="bl-titel">Bestenliste</h2>
-          <label class="bl-season" id="bl-season-wahl" hidden>Season
-            <select id="bl-season"></select>
-          </label>
-          <ol id="bl-liste" class="bl-liste"></ol>
-          <p id="bl-hinweis" class="leise"></p>
-          <div id="erfolge" class="erfolge" hidden></div>
-        </aside>
-      </div>
-    </section>
+<body class="b-ui">
+  <div id="kopf-ort"></div>
+  <div id="baender"></div>
+  <main id="haupt" class="b-haupt">
+    <section id="uebersicht" class="b-seite"></section>
+    <section id="seite" class="b-seite" hidden></section>
+    <section id="spielansicht" class="b-seite" hidden></section>
   </main>
-
-  <div id="toast" class="toast" role="status" hidden></div>
-  <div id="alarm" class="alarm-box" role="alert" hidden></div>
-
-  <footer class="fuss">
-    <a href="/hilfe/">Hilfe</a>
-    <a href="/handbuch/">Entwickler-Handbuch</a>
-    <a href="#/antraege">Fehler melden / Idee</a>
-    <span id="zentrale-version" class="leise"></span>
-  </footer>
+  <div id="fuss-ort"></div>
 
   <script src="/ui/ikonen.js?v=__VERSION__"></script>
   <script src="/ui/bausteine.js?v=__VERSION__"></script>

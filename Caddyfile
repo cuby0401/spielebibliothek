@@ -98,7 +98,8 @@
 		handle /api/upload/* {
 			reverse_proxy upload:8000
 		}
-		handle /style.css {
+		# UI-Bausteine (Tokens, Aussehen, Icons, window.UI) – dieselben Dateien wie in der Bibliothek
+		handle /ui/* {
 			root * /srv/site
 			file_server
 		}

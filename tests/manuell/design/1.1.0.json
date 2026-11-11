@@ -1,0 +1,135 @@
+{
+  "version": "1.1.0",
+  "hinweis": "Phase 2 auf der Design-Spielwiese (http://<NAS_GH>:18288, nur über Tailscale, Kopie der echten Daten). Neu: ALLE Seiten sind jetzt aus denselben Bausteinen gebaut – Bibliothek, Konto, Admin-Panel, Upload, Tester-Panel, Hilfe und Handbuch. Die Kachelgröße wirkt jetzt auf der echten Startseite, und die Startseite zeigt deine Bereiche in deiner Reihenfolge. Nichts davon ist live.",
+  "tests": [
+    {
+      "id": "kachelgroesse-startseite",
+      "bereich": "Startseite",
+      "titel": "Kachelgröße wirkt auf der Startseite",
+      "schritte": [
+        "Öffne Konto-Menü oben rechts → Einstellungen → Aussehen → „Größe der Spielkacheln“: tippe auf „Klein“.",
+        "Klick oben links auf „Spielebibliothek“ und schau dir „Alle Spiele“ an.",
+        "Zurück in die Einstellungen, „Groß“ wählen, wieder zur Startseite. Danach „Mittel“."
+      ],
+      "erwartet": "Bei „Klein“ stehen deutlich mehr Spiele nebeneinander, bei „Groß“ weniger und größere. Das gilt auch für die Reihen (Weiterspielen, Favoriten, Neu) und auf dem iPhone."
+    },
+    {
+      "id": "startseite-reihen",
+      "bereich": "Startseite",
+      "titel": "Startseite in Reihen, in deiner Reihenfolge",
+      "schritte": [
+        "Öffne die Startseite.",
+        "Einstellungen → Startseite: schieb „Favoriten“ ganz nach oben und nimm den Haken bei „Neu in der Bibliothek“ weg.",
+        "Zurück zur Startseite."
+      ],
+      "erwartet": "Die Startseite zeigt Bereiche untereinander (z. B. Weiterspielen, Favoriten, Neu in der Bibliothek, Spiel der Woche, Alle Spiele). Nach der Änderung stehen die Favoriten oben und „Neu in der Bibliothek“ fehlt. Weiterspielen/Favoriten/Neu lassen sich seitlich wischen. „Alle Spiele“ ist immer da."
+    },
+    {
+      "id": "suche-kategorien",
+      "bereich": "Startseite",
+      "titel": "Suchen und Kategorien",
+      "schritte": [
+        "Tippe oben in „Spiele suchen …“ einen Teil eines Spielnamens.",
+        "Lösch die Suche mit dem kleinen × und tippe auf eine Kategorie (z. B. „Puzzle“), dann noch einmal darauf."
+      ],
+      "erwartet": "Beim Suchen verschwinden die Reihen, es steht „… Spiele gefunden“ mit nur den Treffern. Die Kategorie ist dunkel hervorgehoben, solange sie aktiv ist. Ein zweiter Tipp hebt sie wieder auf und die Reihen kommen zurück."
+    },
+    {
+      "id": "konto-menue",
+      "bereich": "Kopfleiste",
+      "titel": "Konto-Menü oben rechts",
+      "schritte": [
+        "Tippe oben rechts auf dein Bild/deinen Namen.",
+        "Schließ das Menü mit Esc bzw. durch Tippen daneben. Öffne es noch einmal und wähle „Meine Spielstände“."
+      ],
+      "erwartet": "Ein Menü klappt auf: dein Name, Profil, (Meine Spiele), Meine Spielstände, Anfragen, Einstellungen, Sicherheit, darunter Admin-Panel/Tester-Panel, Hilfe und rot „Abmelden“. Es sieht genauso aus wie die Glocke daneben. Auf dem iPhone kommt es unten als Blatt herein."
+    },
+    {
+      "id": "glocke",
+      "bereich": "Kopfleiste",
+      "titel": "Glocke mit Archiv",
+      "schritte": [
+        "Tippe auf die Glocke.",
+        "Archiviere eine Meldung mit dem Kasten-Symbol, tippe unten auf „Archiv ansehen“ und hol sie mit dem Pfeil zurück."
+      ],
+      "erwartet": "Die Meldungen stehen als Liste mit Datum, ungelesene mit Punkt, wichtige rot. Archivieren und Zurückholen klappt, das Menü bleibt dabei offen."
+    },
+    {
+      "id": "spielansicht",
+      "bereich": "Spiel",
+      "titel": "Ein Spiel spielen",
+      "schritte": [
+        "Öffne ein Spiel mit Bestenliste.",
+        "Gib einen Daumen, tippe auf die Versionsnummer neben dem Titel, dann auf „Vollbild“ (Esc beendet es)."
+      ],
+      "erwartet": "Oben „‹ Übersicht“, Titel, Version, Daumen und Vollbild in einer Zeile. Das Spiel steht groß mit runden Ecken, rechts die Bestenliste (dein Name in deiner Farbe) und darunter die Erfolge mit Pokal- bzw. Schloss-Symbol. Der Versionsverlauf klappt als Karte auf."
+    },
+    {
+      "id": "konto-seiten",
+      "bereich": "Konto",
+      "titel": "Konto-Bereich einheitlich",
+      "schritte": [
+        "Konto-Menü → Profil. Klick dich links durch alle Einträge (Profil, Meine Spiele, Meine Spielstände, Anfragen, Einstellungen, Sicherheit)."
+      ],
+      "erwartet": "Jede Seite hat links dieselbe Leiste (aktive Seite farbig hinterlegt), oben einen großen Titel, darunter Karten und Tabellen im selben Stil. Das Profil zeigt dein Bild, Rollen als Marken und Spielzeit/gespielt/Erfolge als große Zahlen."
+    },
+    {
+      "id": "dialoge-statt-popups",
+      "bereich": "Konto",
+      "titel": "Eigene Dialoge statt Browser-Fenster",
+      "schritte": [
+        "Konto → Sicherheit: falls vorhanden, tippe bei einem anderen Gerät auf „Trennen“ und dann auf „Abbrechen“.",
+        "Konto → Meine Spielstände: tippe bei einem Spiel auf „Neu anfangen“ und dann auf „Abbrechen“."
+      ],
+      "erwartet": "Statt des grauen Browser-Fensters erscheint ein eigener Dialog in der Mitte (iPhone: unten), mit rotem Knopf für das Gefährliche. Esc oder „Abbrechen“ schließt ihn, es passiert nichts."
+    },
+    {
+      "id": "anfrage-mit-bild",
+      "bereich": "Konto",
+      "titel": "Anfrage mit Bild",
+      "schritte": [
+        "Konto → Anfragen: Art wählen, Beschreibung schreiben, ein Bild in die gestrichelte Fläche ziehen oder antippen und auswählen.",
+        "„Anfrage senden“, dann bei der Anfrage auf „Öffnen“."
+      ],
+      "erwartet": "Das Bild erscheint als Vorschau mit „Entfernen“. Nach dem Senden kommt unten eine Meldung, die Anfrage steht unter „Meine Anfragen“ mit gelbem Status „offen“. Geöffnet zeigt sie Text, Bild und den Bereich „Antwort“."
+    },
+    {
+      "id": "admin-einheitlich",
+      "bereich": "Admin-Panel",
+      "titel": "Admin-Panel sieht aus wie die Bibliothek",
+      "schritte": [
+        "Konto-Menü → Admin-Panel.",
+        "Klick dich links durch die Bereiche, öffne das Konto-Menü oben rechts und probier eine Aktion mit Rückfrage (z. B. abbrechen)."
+      ],
+      "erwartet": "Gleiche Kopfleiste, gleiches Konto-Menü, gleiche Seitenleiste, gleiche Karten, Tabellen, Knöpfe und Dialoge wie in der Bibliothek. Thema und Farbe aus deinen Einstellungen gelten auch hier."
+    },
+    {
+      "id": "upload-einheitlich",
+      "bereich": "Upload",
+      "titel": "Upload-Seite im selben Look",
+      "schritte": [
+        "Öffne über „Hochladen“ oben die Upload-Seite (auf der Spielwiese: http://<NAS_UH>:18290).",
+        "Melde dich an und schau dir deine Spiele an."
+      ],
+      "erwartet": "Dieselben Felder, Knöpfe, Karten und Dialoge wie in der Bibliothek, mit Datei-Fläche zum Ziehen. Sie folgt dem hellen/dunklen Modus deines Geräts."
+    },
+    {
+      "id": "tester-hilfe-einheitlich",
+      "bereich": "Tester-Panel, Hilfe",
+      "titel": "Tester-Panel, Hilfe und Handbuch",
+      "schritte": [
+        "Öffne /tester/ (dieses Panel), dann die Hilfe (Fragezeichen oben) und das Entwickler-Handbuch (unten in der Fußzeile)."
+      ],
+      "erwartet": "Alle drei im selben Stil: gleiche Kopfleiste, gleiche Reiter, gleiche Schrift und Abstände. Lange Texte sind gut lesbar und nicht zu breit."
+    },
+    {
+      "id": "handy-alle-seiten",
+      "bereich": "Handy",
+      "titel": "Auf dem iPhone",
+      "schritte": [
+        "Öffne auf dem iPhone die Startseite, ein Spiel, das Profil, das Admin-Panel und die Upload-Seite."
+      ],
+      "erwartet": "Nirgends ragt etwas über den Rand, man muss nicht seitlich scrollen. Die Seitenleisten werden zu einer wischbaren Leiste oben, Menüs und Dialoge kommen unten als Blatt herein."
+    }
+  ]
+}
