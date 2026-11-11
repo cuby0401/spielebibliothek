@@ -119,7 +119,8 @@
 	--b-fokus-breite: 2px;
 
 	--b-kachel-min: 180px;
-	--b-inhalt-max: 1200px;      /* Breite des Inhalts auf großen Bildschirmen */
+	--b-inhalt-max: none;        /* volle Fensterbreite (Seb, 10./11.11.2026) – nur Fließtext bleibt schmal (--b-text-max, b-lesetext, b-seite--schmal) */
+	--b-rand: var(--b-abstand-4); /* Abstand des Inhalts zum Fensterrand */
 	--b-text-max: 68ch;
 
 	--b-dauer-kurz: 120ms; --b-dauer-mittel: 200ms; --b-kurve: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -140,3 +141,5 @@
 /* Finger: Knöpfe und Felder nie kleiner als 44 px, auch in „kompakt“ */
 @media (pointer: coarse) { :root:not([data-dichte="luftig"]) { --b-steuer: 44px; --b-steuer-s: 36px; } }
 @media (prefers-reduced-motion: reduce) { :root { --b-dauer-kurz: 0ms; --b-dauer-mittel: 0ms; } }
+/* Breite Fenster: etwas mehr Rand, damit der Inhalt nicht am Rand klebt */
+@media (min-width: 900px) { :root { --b-rand: var(--b-abstand-6); } }

@@ -25,6 +25,17 @@
       "erwartet": "Die Startseite zeigt Bereiche untereinander (z. B. Weiterspielen, Favoriten, Neu in der Bibliothek, Spiel der Woche, Alle Spiele). Nach der Änderung stehen die Favoriten oben und „Neu in der Bibliothek“ fehlt. Weiterspielen/Favoriten/Neu lassen sich seitlich wischen. „Alle Spiele“ ist immer da."
     },
     {
+      "id": "volle-breite",
+      "bereich": "Alle Seiten",
+      "titel": "Ganzer Bildschirm wird genutzt",
+      "schritte": [
+        "Öffne die Bibliothek am Mac im großen Fenster (oder Vollbild).",
+        "Schau dir Startseite, Konto → Meine Spiele und das Admin-Panel (z. B. CRM) an.",
+        "Öffne zum Vergleich die Hilfe und eine einzelne Anfrage."
+      ],
+      "erwartet": "Startseite, Konto und Admin-Panel gehen über die ganze Fensterbreite, mit gleichem Rand links und rechts – kein schmaler Streifen in der Mitte. Auf der Startseite stehen dadurch mehr Spiele nebeneinander, die Kachelgröße bleibt so, wie du sie eingestellt hast. Nur Fließtext (Hilfe, Handbuch, eine Anfrage) bleibt lesbar schmal."
+    },
+    {
       "id": "suche-kategorien",
       "bereich": "Startseite",
       "titel": "Suchen und Kategorien",
