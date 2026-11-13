@@ -4,22 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hilfe – Spielebibliothek</title>
-  <link rel="stylesheet" href="/style.css?v=__VERSION__">
-  <link rel="stylesheet" href="/hilfe/hilfe.css?v=__VERSION__">
+  <script src="/ui/thema-frueh.js?v=__VERSION__"></script>
+  <link rel="stylesheet" href="/ui/tokens.css?v=__VERSION__">
+  <link rel="stylesheet" href="/ui/bausteine.css?v=__VERSION__">
 </head>
-<body>
-  <header class="kopf">
-    <a class="marke" href="/">Spielebibliothek</a>
-    <nav><button id="zurueck" class="knopf leise" type="button" title="Zurück, wo du herkamst">← Zurück</button></nav>
-  </header>
-
-  <main class="hilfe">
-    <nav class="hilfe-reiter" aria-label="Hilfe-Center">
-      <a href="/hilfe/" class="aktiv" aria-current="page">Spielen</a>
-      <a href="/handbuch/">Spiele entwickeln</a>
-      <a href="/#/antraege">Fehler melden / Idee</a>
-    </nav>
-    <p id="ansicht-hinweis" class="hinweis" hidden></p>
+<body class="b-ui">
+  <!-- Kopfleiste und Reiter des Hilfe-Centers baut /hilfe/hilfe.js aus den Bausteinen -->
+<main id="inhalt" class="b-lesetext b-lesetext--seite">
 
     <h1>So funktioniert die Spielebibliothek</h1>
     <ul>
@@ -61,7 +52,7 @@
       <li><strong>Abmelden:</strong> ganz unten in der Leiste, z. B. an einem fremden Rechner. Danach ist ein neuer E-Mail-Code nötig.</li>
     </ul>
 
-    <div class="hilfe-box" data-rolle="entwickler">
+    <div data-hinweis="akzent" data-rolle="entwickler">
       <strong>Du baust selbst Spiele?</strong> Alles dazu – Startvorlage, Prompt-Block für die KI, Updates und Versionen, Bestenliste,
       Fehlersuche – steht im <a href="/handbuch/">Entwickler-Handbuch</a>. In deinem Konto findest du zusätzlich „Meine Spiele“ mit Statistik,
       Fehlerberichten und „Neue Season“.
@@ -103,6 +94,9 @@
       <dd>Sag Seb Bescheid – dann bekommst du ein Upload-Konto. Wie es geht, steht im <a href="/handbuch/">Entwickler-Handbuch</a>.</dd>
     </dl>
   </main>
+  <script src="/ui/ikonen.js?v=__VERSION__"></script>
+  <script src="/ui/bausteine.js?v=__VERSION__"></script>
+  <script src="/hilfe/hilfe-rahmen.js?v=__VERSION__"></script>
   <script src="/hilfe/hilfe.js?v=__VERSION__"></script>
 </body>
 </html>

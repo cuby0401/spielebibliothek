@@ -41,7 +41,7 @@ async function hochladen(datei, neu) {
   await cdp("DOM.setFileInputFiles", { nodeId: n.nodeId, files: [`${DIR}/${datei}`] }, S);
   await eval_(`document.getElementById("ordner").value="e2e"; document.getElementById("neu").value=${JSON.stringify(neu)};
     document.getElementById("uploadform").requestSubmit(); true`);
-  return bis(`document.getElementById("meldung").textContent.includes("als Entwurf hochgeladen")`);
+  return bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("als Entwurf hochgeladen")`);
 }
 async function updateFensterOeffnen() {
   await bis(`[...document.querySelectorAll("button")].some(b=>b.textContent==="Veröffentlichen …")`);
@@ -64,6 +64,10 @@ const dialoge = [];
   const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
+  // UI-Bausteine (11.11.2026): Rückfragen sind eigene Dialoge (UI.bestaetigen) statt confirm() – wie früher automatisch bestätigen, Text in window.__dialoge
+  await cdp("Page.addScriptToEvaluateOnNewDocument", { source: `new MutationObserver(() => { for (const d of document.querySelectorAll('dialog[data-art="bestaetigen"][open]:not([data-e2e])')) {
+    d.dataset.e2e = "1"; (window.__dialoge = window.__dialoge || []).push(d.textContent);
+    setTimeout(() => d.querySelector(".b-dialog__fuss .b-knopf--primaer, .b-dialog__fuss .b-knopf--gefahr").click(), 50); } }).observe(document, { subtree: true, childList: true, attributes: true });` }, S);
 
   await gehe(U + "/");
   await eval_(`document.getElementById("passwort").value=${JSON.stringify(PW)}; document.getElementById("anmeldeform").requestSubmit(); true`);
@@ -71,51 +75,55 @@ const dialoge = [];
   ok(await hochladen("e2e-v1.zip", "Erste Version"), "Spiel e2e hochgeladen (neuer Ordner, Rückfrage bestätigt)");
   await updateFensterOeffnen();
   await eval_(`document.getElementById("uf-gelesen").checked=true; document.getElementById("uf-los").click(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("1.0.0")`), "e2e als 1.0.0 veröffentlicht");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("1.0.0")`), "e2e als 1.0.0 veröffentlicht");
   // Update hochladen
   await bis(`[...document.querySelectorAll("button")].some(b=>b.textContent==="Update hochladen")`);
-  await eval_(`[...document.querySelectorAll(".eintrag")].find(e=>e.textContent.includes("Ordner e2e")).querySelector("button.knopf.klein:not(.leise):not(.gefahr)") && [...[...document.querySelectorAll(".eintrag")].find(e=>e.textContent.includes("Ordner e2e")).querySelectorAll("button")].find(b=>b.textContent==="Update hochladen").click(); true`);
+  await eval_(`[...document.querySelectorAll("#spiel-e2e button")].find(b=>b.textContent==="Update hochladen").click(); true`);
   ok(await eval_(`document.getElementById("ordner").readOnly && document.getElementById("ordner").value==="e2e" && !document.getElementById("update-fuer").hidden`), "„Update hochladen“ legt Ordner e2e fest");
   ok((await eval_(`document.getElementById("update-fuer").textContent`)).includes("Version 1.0.0"), "Hinweis nennt die aktuelle Version");
-  const n0 = dialoge.length;
+  const rueckfragen = () => eval_(`window.__dialoge || []`);
+  const n0 = (await rueckfragen()).length;
   ok(await hochladen("e2e-v2.zip", "Update"), "Update in festgelegten Ordner ohne Rückfrage");
-  ok(dialoge.length === n0, "keine Rückfrage beim Update");
+  ok((await rueckfragen()).length === n0, "keine Rückfrage beim Update");
   // neuer Ordner → Rückfrage
   const doc = await cdp("DOM.getDocument", {}, S);
   const nd = await cdp("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#datei" }, S);
   await cdp("DOM.setFileInputFiles", { nodeId: nd.nodeId, files: [`${DIR}/e2e-v1.zip`] }, S);
   await eval_(`document.getElementById("ordner").value="anderes"; document.getElementById("uploadform").requestSubmit(); true`);
-  await bis(`document.getElementById("meldung").textContent.includes("anderes")`);
-  ok(dialoge.slice(n0).some((t) => t.includes("NEUES Spiel")), "Rückfrage bei neuem Ordnernamen");
+  await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("anderes")`);
+  ok((await rueckfragen()).slice(n0).some((t) => t.includes("NEUES Spiel")), "Rückfrage bei neuem Ordnernamen (eigener Dialog)");
 
   // Bibliothek: Menü, Fußzeile, offline nehmen
   await gehe(G + "/", 3000);
-  ok(await eval_(`![...document.querySelectorAll(".kopf nav a")].some(a=>a.textContent.includes("Handbuch"))`), "Kopfzeile ohne Handbuch");
-  ok(await eval_(`[...document.querySelectorAll(".fuss a")].map(a=>a.textContent).join("|")`) === "Hilfe|Entwickler-Handbuch|Fehler melden / Idee", "Fußzeile: Hilfe · Handbuch · Fehler melden");
+  ok(await eval_(`![...document.querySelectorAll("#kopf a")].some(a=>a.textContent.includes("Handbuch"))`), "Kopfzeile ohne Handbuch");
+  ok(await eval_(`[...document.querySelectorAll(".b-fusszeile a")].map(a=>a.textContent).join("|")`) === "Hilfe|Entwickler-Handbuch|Fehler melden / Idee", "Fußzeile: Hilfe · Handbuch · Fehler melden");
   await gehe(G + "/#/meine-spiele", 3000);
   await bis(`[...document.querySelectorAll("button")].some(b=>b.textContent==="Offline nehmen")`);
-  await eval_(`[...document.querySelectorAll("tr")].find(t=>t.textContent.includes("Ordner e2e")).querySelector("button").click(); true`);
+  await eval_(`[...[...document.querySelectorAll("tr")].find(t=>t.textContent.includes("Ordner e2e")).querySelectorAll("button")].find(b=>b.textContent==="Offline nehmen").click(); true`);
+  // Grund im Dialog der Bausteine (statt Browser-prompt, 11.11.2026)
+  await bis(`!!document.querySelector("dialog.b-dialog[open] input")`);
+  await eval_(`{ const d=document.querySelector("dialog.b-dialog[open]"); d.querySelector("input").value="Test-Grund"; [...d.querySelectorAll("button")].find(b=>b.textContent==="Offline nehmen").click(); } true`);
   ok(await bis(`[...document.querySelectorAll("button")].some(b=>b.textContent==="Wieder online stellen")`), "Meine Spiele: offline genommen");
   ok(await eval_(`document.body.textContent.includes("Test-Grund")`), "Grund wird angezeigt");
   const sim = await eval_(`fetch("/api/games",{headers:{"X-Ansicht":"spieler"}}).then(r=>r.json()).then(l=>l.some(s=>s.id==="seb/e2e"))`);
   ok(sim === false, "Als Spieler unsichtbar");
   await gehe(G + "/", 3000);
-  ok(await eval_(`[...document.querySelectorAll(".kachel")].find(k=>k.querySelector("h2").textContent==="E2E").textContent.includes("offline")`), "Kachel zeigt „offline“ für den Entwickler");
+  ok(await eval_(`[...document.querySelectorAll(".b-kachel")].find(k=>k.querySelector(".b-kachel__titel").textContent==="E2E").textContent.includes("offline")`), "Kachel zeigt „offline“ für den Entwickler");
   await gehe(G + "/#/spiel/seb/e2e", 3000);
   ok(await eval_(`!document.getElementById("entwurf-hinweis").hidden && document.getElementById("entwurf-hinweis").textContent.startsWith("Offline")`), "Spielansicht: Hinweis „Offline“");
 
   // Admin: Zählung
   await eval_(`fetch("/api/admin/spiele/seb/spike",{method:"PATCH",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({testspiel:true})}).then(r=>r.status)`);
   await gehe(G + "/admin/", 3000);
-  const kz = await eval_(`[...document.querySelectorAll(".kennzahl .text")].map(t=>t.textContent).join("|")`);
+  const kz = await eval_(`[...document.querySelectorAll(".b-kennzahl__label")].map(t=>t.textContent).join("|")`);
   ok(/Spiele \(\+1 Testspiele\) · 1 offline/.test(kz), "Admin zählt Testspiele getrennt: " + kz.split("|")[1]);
   ok(await eval_(`document.body.textContent.includes("Zentrale")`), "Admin: Abschnitt „Zentrale“");
 
   // Hilfe-Center
   await gehe(G + "/hilfe/");
-  ok(await eval_(`document.querySelector(".hilfe-reiter a.aktiv").textContent`) === "Spielen", "Hilfe: Reiter „Spielen“ aktiv");
+  ok(await eval_(`document.querySelector('#hilfe-reiter [aria-current="page"]').textContent`) === "Spielen", "Hilfe: Reiter „Spielen“ aktiv");
   await gehe(G + "/handbuch/");
-  ok(await eval_(`document.querySelector(".hilfe-reiter a.aktiv").textContent`) === "Spiele entwickeln", "Handbuch: Reiter „Spiele entwickeln“ aktiv");
+  ok(await eval_(`document.querySelector('#hilfe-reiter [aria-current="page"]').textContent`) === "Spiele entwickeln", "Handbuch: Reiter „Spiele entwickeln“ aktiv");
 
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
   console.log(ergebnis.join("\n"));

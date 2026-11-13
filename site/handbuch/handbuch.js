@@ -1,32 +1,28 @@
 "use strict";
-// Entwickler-Handbuch: Prompt-Block aus prompt.txt (einzige Quelle – steckt auch als KI-ANWEISUNG.txt in der Startvorlage)
+// Entwickler-Handbuch: Prompt-Block aus prompt.txt (einzige Quelle – steckt auch als KI-ANWEISUNG.txt in der Startvorlage).
+// Kopfleiste und Reiter: /hilfe/hilfe-rahmen.js.
+const promptText = document.getElementById("prompt-text");
 (async () => {
-	const ziel = document.getElementById("prompt-text");
 	try {
 		const r = await fetch("/handbuch/prompt.txt", { cache: "no-store" });
-		ziel.textContent = r.ok ? await r.text() : "Prompt-Block nicht ladbar – steht auch in startvorlage.zip (KI-ANWEISUNG.txt).";
+		promptText.textContent = r.ok ? await r.text() : "Prompt-Block nicht ladbar – steht auch in startvorlage.zip (KI-ANWEISUNG.txt).";
 	} catch {
-		ziel.textContent = "Prompt-Block nicht ladbar – steht auch in startvorlage.zip (KI-ANWEISUNG.txt).";
+		promptText.textContent = "Prompt-Block nicht ladbar – steht auch in startvorlage.zip (KI-ANWEISUNG.txt).";
 	}
 })();
 
-document.getElementById("kopieren").addEventListener("click", async (e) => {
-	const knopf = e.currentTarget;
+const kopieren = UI.knopf({ id: "kopieren", art: "primaer", ikon: "kopieren", text: "Kopieren", onclick: async () => {
 	try {
-		await navigator.clipboard.writeText(document.getElementById("prompt-text").textContent);
-		knopf.textContent = "Kopiert ✓";
+		await navigator.clipboard.writeText(promptText.textContent);
+		UI.meldung("Prompt-Block kopiert.", { art: "erfolg" });
 	} catch {
 		const r = document.createRange();
-		r.selectNodeContents(document.getElementById("prompt-text"));
+		r.selectNodeContents(promptText);
 		getSelection().removeAllRanges(); getSelection().addRange(r);
-		knopf.textContent = "Markiert – mit ⌘C/Strg+C kopieren";
+		UI.meldung("Markiert – mit ⌘C bzw. Strg+C kopieren.");
 	}
-	setTimeout(() => { knopf.textContent = "Kopieren"; }, 2500);
-});
-
-document.getElementById("zurueck").addEventListener("click", () => {
-	try {
-		if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) return history.back();
-	} catch { /* egal */ }
-	location.href = "/";
-});
+} });
+const kopf = document.getElementById("prompt-kopf");
+const leiste = UI.leiste([], { verteilt: true });
+kopf.replaceWith(leiste);
+leiste.append(kopf, kopieren);

@@ -98,7 +98,8 @@
 		handle /api/upload/* {
 			reverse_proxy upload:8000
 		}
-		handle /style.css {
+		# UI-Bausteine (Tokens, Aussehen, Icons, window.UI) – dieselben Dateien wie in der Bibliothek
+		handle /ui/* {
 			root * /srv/site
 			file_server
 		}
@@ -140,6 +141,12 @@
 	handle /upload/* {
 		respond 404
 	}
+
+	# Testseite der Bausteine (/ui-test/) nur für die automatischen Tests: live und auf dem Testserver gesperrt.
+	# teststand.sh entfernt die mit NUR-LIVE markierten Zeilen für Teststand und Design-Spielwiese.
+	handle /ui-test* {   # NUR-LIVE
+		respond 404      # NUR-LIVE
+	}                    # NUR-LIVE
 
 	# Bibliotheksseite
 	handle {

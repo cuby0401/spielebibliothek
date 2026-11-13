@@ -61,12 +61,18 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - **Seit 1.4.1 auf dem Mac (NAS entlasten):** Läuft Docker Desktop, steht der Teststand auf dem Mac (Ports nur an 127.0.0.1, Hostnamen `127.0.0.1` / `localhost` / `upload.localhost`), volle Runde ca. 2:35 Min. Sonst wie bisher auf der NAS. Erzwingen: `E2E_ORT=mac` bzw. `E2E_ORT=nas`. `deploy.sh --probe` legt dafür einen Auftrag an. Den holt der Mac (`scripts/auftraege-mac.py`, siehe docs/betrieb.md), das Ergebnis steht unter „Aufgaben“. Log: `~/Library/Logs/spielebibliothek-auftraege.log`.
 - **Warten in den Tests:** `gehe(url, ms)` wartet höchstens `ms`, bis die Seite geladen ist und das DOM 400 ms still steht. Wo echte Zeit vergehen muss (Spielzeit, verzögerte Erfolge), ausdrücklich `warte()` nehmen.
 
+## Oberfläche: nur mit den UI-Bausteinen (seit 10.11.2026)
+
+- **Jede neue oder umgebaute Oberfläche nur mit `UI.*`** aus `site/ui/` (Knöpfe, Felder, Karten, Tabellen, Dialoge, Meldungen …). Kein eigenes `button`/`input`/`select`/`dialog`, kein `confirm`/`prompt`/`alert`, kein eigenes CSS, keine Farben im Skript.
+- Fehlt ein Baustein: **zuerst den Baustein ergänzen** (bausteine.js/.css, Testseite, Claude Design, Liste), dann die Seite.
+- Nachschlagewerk: `docs/ui-bausteine.md`. Wächter: `node scripts/ui-pruefen.mjs` (umgebaute Seiten in der Liste `UMGEBAUT`) und `node scripts/kontrast-pruefen.mjs`, beide laufen in `deploy.sh` mit. Ende-zu-Ende: `scripts/e2e-bausteine.mjs` (Testseite `/ui-test/`, live gesperrt).
+- Ausprobieren auf der **Design-Spielwiese**: `scripts/deploy.sh --design` → `http://<NAS_GH>:18288`, Kopie der echten Daten, nur über Tailscale, automatisch als seb. **Nie eine Cloudflare-Route darauf legen.** Schnelle CSS-Runden: `--design --nur-site`.
+
 ## Probe-Zentrale (E56) – erst testen, dann live
 
 1. `scripts/deploy.sh --probe` (gleiche Prüfungen wie live: committet, neue Nummer, Changelog, Tests) baut auf der NAS eine zweite Zentrale auf:
    - eine **frische Kopie** der echten Spiele, Datenbank, Konten und Upload-Passwörter
-   - erreichbar unter `http://<NAS_GH>:18188`, nur über Tailscale
-   - Angemeldet ist man automatisch als seb.
+   - seit 1.4.0 zugleich der **Testserver** unter `https://test.cuby0401.uk` (Cloudflare Access, echte Anmeldung per E-Mail-Code, kein automatisches seb; die Ports hängen nur an der LAN-Adresse, Tailscale kommt nicht ran)
    - Ein oranges Band zeigt „Probe-Zentrale“.
    - Mit `--daten-behalten` bleiben die Probe-Daten, nur der Code wird erneuert.
 2. Dort testen. Was dort passiert, bleibt dort.

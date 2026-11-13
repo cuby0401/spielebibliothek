@@ -43,7 +43,7 @@ async function hochladen(datei, neu) {
   await cdp("DOM.setFileInputFiles", { nodeId: n.nodeId, files: [`${DIR}/${datei}`] }, S);
   await eval_(`document.getElementById("ordner").value="e2e"; document.getElementById("neu").value=${JSON.stringify(neu)};
     document.getElementById("uploadform").requestSubmit(); true`);
-  return bis(`document.getElementById("meldung").textContent.includes("als Entwurf hochgeladen")`);
+  return bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("als Entwurf hochgeladen")`);
 }
 async function updateFensterOeffnen() {
   await bis(`[...document.querySelectorAll("button")].some(b=>b.textContent==="Veröffentlichen …")`);
@@ -65,6 +65,10 @@ async function updateFensterOeffnen() {
   const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
+  // UI-Bausteine (11.11.2026): Rückfragen sind eigene Dialoge (UI.bestaetigen) statt confirm() – wie früher automatisch bestätigen, Text in window.__dialoge
+  await cdp("Page.addScriptToEvaluateOnNewDocument", { source: `new MutationObserver(() => { for (const d of document.querySelectorAll('dialog[data-art="bestaetigen"][open]:not([data-e2e])')) {
+    d.dataset.e2e = "1"; (window.__dialoge = window.__dialoge || []).push(d.textContent);
+    setTimeout(() => d.querySelector(".b-dialog__fuss .b-knopf--primaer, .b-dialog__fuss .b-knopf--gefahr").click(), 50); } }).observe(document, { subtree: true, childList: true, attributes: true });` }, S);
   await cdp("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, S);
 
   // 1) Upload-Seite: anmelden, v1 hochladen
@@ -75,7 +79,7 @@ async function updateFensterOeffnen() {
   ok(await hochladen("e2e-v1.zip", "Erste Version"), "v1 als Entwurf hochgeladen");
   // Prüfung vor dem Testen: Warnung „noch nicht getestet“
   ok(await updateFensterOeffnen(), "Update-Fenster öffnet");
-  const p0 = await eval_(`[...document.querySelectorAll("#uf-punkte li")].map(l=>l.className+":"+l.textContent).join("\\n")`);
+  const p0 = await eval_(`[...document.querySelectorAll("#uf-punkte li")].map(l=>l.dataset.stufe+":"+l.textContent).join("\\n")`);
   ok(p0.includes("warnung:Entwurf wurde noch nicht getestet"), "Prüfung warnt: Entwurf nicht getestet");
   ok(await eval_(`document.getElementById("uf-version").textContent.includes("1.0.0")`), "Fenster zeigt: erste Veröffentlichung = 1.0.0");
   await eval_(`document.getElementById("update-fenster").close(); true`);
@@ -87,11 +91,11 @@ async function updateFensterOeffnen() {
   // 3) Veröffentlichen über das Fenster
   await gehe(U + "/");
   await updateFensterOeffnen();
-  const p1 = await eval_(`[...document.querySelectorAll("#uf-punkte li")].map(l=>l.className+":"+l.textContent).join("\\n")`);
+  const p1 = await eval_(`[...document.querySelectorAll("#uf-punkte li")].map(l=>l.dataset.stufe+":"+l.textContent).join("\\n")`);
   ok(p1.includes("ok:Entwurf wurde in der Bibliothek getestet"), "Prüfung: Test erkannt (Upload-Dienst → Speicher-Dienst /intern)");
   ok(await eval_(`document.getElementById("uf-aenderungen").value`) === "Erste Version", "Gesammelte Änderung im Fenster");
   await eval_(`document.getElementById("uf-los").click(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("Version 1.0.0 veröffentlicht")`), "Veröffentlicht als 1.0.0");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("Version 1.0.0 veröffentlicht")`), "Veröffentlicht als 1.0.0");
 
   // 4) Bibliothek: spielen (Stand mit saveVersion 1), Versionsnummer + Verlauf
   await gehe(G + "/#/spiel/seb/e2e", 5000);
@@ -107,16 +111,16 @@ async function updateFensterOeffnen() {
   await gehe(G + "/#/entwurf/seb/e2e", 5000);
   await gehe(U + "/");
   await updateFensterOeffnen();
-  const p2 = await eval_(`[...document.querySelectorAll("#uf-punkte li")].map(l=>l.className+":"+l.textContent).join("\\n")`);
+  const p2 = await eval_(`[...document.querySelectorAll("#uf-punkte li")].map(l=>l.dataset.stufe+":"+l.textContent).join("\\n")`);
   ok(p2.includes("ok:Umwandlung auf saveVersion 2 mit deinem Spielstand getestet"), "Prüfung: Migration im Entwurf getestet (gamesave → Bridge → Speicher-Dienst)");
   ok(p2.includes("hinweis:saveVersion steigt (1 → 2)"), "Prüfung: Hinweis saveVersion steigt");
-  ok(await eval_(`document.querySelector('[data-v="minor"]').textContent`) === "→ 1.1.0", "Vorschlag kleines Update: 1.1.0");
+  ok(await eval_(`document.querySelector('input[name="uf-art"][value="minor"]').closest(".b-radio__wahl").textContent.includes("→ 1.1.0")`) === true, "Vorschlag kleines Update: 1.1.0");
   await eval_(`document.querySelector('input[name="uf-art"][value="minor"]').checked=true; document.getElementById("uf-los").click(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("Version 1.1.0 veröffentlicht")`), "Veröffentlicht als 1.1.0");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("Version 1.1.0 veröffentlicht")`), "Veröffentlicht als 1.1.0");
 
   // 6) Bibliothek: „Neu in Version 1.1.0“, Stand umgewandelt
   await gehe(G + "/#/spiel/seb/e2e", 5000);
-  ok(await eval_(`!document.getElementById("neu-hinweis").hidden && document.getElementById("neu-text").textContent`) === "Neu in Version 1.1.0: Neues Feld", "Hinweis „Neu in Version 1.1.0“");
+  ok(await eval_(`!document.getElementById("neu-hinweis").hidden && document.querySelector("#neu-hinweis .b-hinweis__titel").textContent+": "+document.querySelector("#neu-hinweis .b-hinweis__text p").textContent`) === "Neu in Version 1.1.0: Neues Feld", "Hinweis „Neu in Version 1.1.0“");
   const s2 = await eval_(`fetch("/api/save/seb/e2e/stand").then(r=>r.json())`);
   ok(s2.version === 2 && s2.data.neu === true, "Spielstand umgewandelt auf saveVersion 2: " + JSON.stringify(s2.data));
 
@@ -127,7 +131,7 @@ async function updateFensterOeffnen() {
   ok(await bis(`document.getElementById("rollback-fenster").open`), "Rückfrage zu Spielständen erscheint");
   ok((await eval_(`document.getElementById("rb-text").textContent`)).includes("saveVersion 2"), "Rückfrage erklärt saveVersion 2 → 1");
   await eval_(`document.querySelector('#rollback-fenster button[value="zuruecksetzen"]').click(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("1 Spielstände zurückgeholt")`), "1 Spielstand zurückgeholt");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("1 Spielstände zurückgeholt")`), "1 Spielstand zurückgeholt");
   const s3 = await eval_(`fetch("${G}/api/save/seb/e2e/stand",{credentials:"include"}).then(r=>r.json()).catch(e=>({fehler:String(e)}))`).catch(() => null);
   await gehe(G + "/", 2500);
   const s4 = await eval_(`fetch("/api/save/seb/e2e/stand").then(r=>r.json())`);
@@ -138,7 +142,7 @@ async function updateFensterOeffnen() {
   // 8) Testspiel: nicht in der Übersicht
   await eval_(`fetch("/api/admin/spiele/seb/spike",{method:"PATCH",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({testspiel:true})}).then(r=>r.status)`);
   await gehe(G + "/", 3000);
-  const titel = await eval_(`[...document.querySelectorAll("#kacheln h2")].map(h=>h.textContent)`);
+  const titel = await eval_(`[...document.querySelectorAll("#kacheln .b-kachel__titel")].map(h=>h.textContent)`);
   ok(!titel.some((t) => /spike/i.test(t)) && titel.includes("E2E"), "Testspiel „spike“ fehlt in der Übersicht, E2E ist da");
 
   // 9) Hilfe und Handbuch

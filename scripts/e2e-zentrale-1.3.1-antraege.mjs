@@ -60,6 +60,10 @@ writeFileSync(`${DIR}/screenshot.png`, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQA
   const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
+  // UI-Bausteine (11.11.2026): Rückfragen sind eigene Dialoge (UI.bestaetigen) statt confirm() – wie früher automatisch bestätigen, Text in window.__dialoge
+  await cdp("Page.addScriptToEvaluateOnNewDocument", { source: `new MutationObserver(() => { for (const d of document.querySelectorAll('dialog[data-art="bestaetigen"][open]:not([data-e2e])')) {
+    d.dataset.e2e = "1"; (window.__dialoge = window.__dialoge || []).push(d.textContent);
+    setTimeout(() => d.querySelector(".b-dialog__fuss .b-knopf--primaer, .b-dialog__fuss .b-knopf--gefahr").click(), 50); } }).observe(document, { subtree: true, childList: true, attributes: true });` }, S);
 
   // 1) Upload-Seite: anmelden, Entwurf hochladen, „Testen“ im selben Tab
   await gehe(U + "/");
@@ -67,7 +71,7 @@ writeFileSync(`${DIR}/screenshot.png`, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQA
   ok(await bis(`!document.getElementById("bereich").hidden`), "Upload-Seite: angemeldet");
   await datei("#datei", "e2e-v1.zip");
   await eval_(`document.getElementById("ordner").value="e2e"; document.getElementById("neu").value="Erste Version"; document.getElementById("uploadform").requestSubmit(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("als Entwurf hochgeladen")`), "Entwurf hochgeladen");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("als Entwurf hochgeladen")`), "Entwurf hochgeladen");
   const TESTEN = `[...document.querySelectorAll("#spiel-e2e a")].find(a=>a.textContent==="Testen")`;
   ok(await bis(`!!(${TESTEN})`), "Spiel hat die Kennung #spiel-e2e und einen Knopf „Testen“");
   ok(await eval_(`!(${TESTEN}).target`), "„Testen“ öffnet im selben Tab (kein neuer Tab)");
@@ -77,18 +81,18 @@ writeFileSync(`${DIR}/screenshot.png`, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQA
   ok(await bis(`!document.getElementById("entwurf-hinweis").hidden`), "Entwurf läuft");
   const zurueck = await eval_(`({ t: document.getElementById("spiel-zurueck").textContent, h: document.getElementById("spiel-zurueck").href,
     l: document.querySelector("#entwurf-hinweis a")?.href })`);
-  ok(zurueck.t === "← Zurück zum Hochladen", "Zurück-Knopf heißt „← Zurück zum Hochladen“");
+  ok(zurueck.t === "Zurück zum Hochladen", "Zurück-Knopf heißt „Zurück zum Hochladen“");
   ok(zurueck.h.endsWith("/#spiel-e2e") && zurueck.l === zurueck.h, "Zurück-Knopf und Hinweis-Link führen zu …/#spiel-e2e: " + zurueck.h);
   await gehe(U + "/#spiel-e2e", 4000);
-  ok(await bis(`document.getElementById("spiel-e2e")?.classList.contains("hervorgehoben")`), "Upload-Seite: Spiel e2e wird hervorgehoben");
+  ok(await bis(`document.getElementById("spiel-e2e")?.hasAttribute("data-hervorgehoben")`), "Upload-Seite: Spiel e2e wird hervorgehoben");
   ok(await eval_(`[...document.querySelectorAll("#spiel-e2e button")].some(b=>b.textContent==="Veröffentlichen …")`), "… mit „Veröffentlichen …“ direkt dabei");
 
   // 3) Anfrage mit Bild über das Formular
   await gehe(G + "/#/antraege", 3000);
-  await eval_(`document.querySelector("form.karte textarea").value="E2E: Zurück-Knopf im Entwurf"; true`);
-  await datei('form.karte input[type="file"]', "screenshot.png");
-  ok(await bis(`(()=>{const i=document.querySelector("form.karte .antrag-bilder img"); return i && i.complete && i.naturalWidth===4})()`), "Bild-Vorschau im Formular (verkleinert/umgewandelt)");
-  await eval_(`document.querySelector("form.karte").requestSubmit(); true`);
+  await eval_(`document.querySelector("#antrag-formular textarea").value="E2E: Zurück-Knopf im Entwurf"; true`);
+  await datei('#antrag-formular input[type="file"]', "screenshot.png");
+  ok(await bis(`(()=>{const i=document.querySelector("#bild-vorschau img"); return i && i.complete && i.naturalWidth===4})()`), "Bild-Vorschau im Formular (verkleinert/umgewandelt)");
+  await eval_(`document.querySelector("#antrag-formular").requestSubmit(); true`);
   ok(await bis(`document.body.textContent.includes("Anfrage verschickt")`), "Anfrage mit Bild verschickt");
   ok(await bis(`[...document.querySelectorAll("a")].some(a=>a.textContent==="Öffnen · 1 Bild")`), "„Meine Anfragen“: „Öffnen · 1 Bild“");
 
@@ -98,16 +102,16 @@ writeFileSync(`${DIR}/screenshot.png`, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQA
   ok(await bis(`[...document.querySelectorAll("#glocke-liste a")].some(a=>/\\/#\\/antrag\\/\\d+$/.test(a.href))`), "Glocke: Meldung verlinkt auf die Anfrage");
   await eval_(`[...document.querySelectorAll("#glocke-liste a")].find(a=>/\\/#\\/antrag\\/\\d+$/.test(a.href)).click(); true`);
   ok(await bis(`/^Anfrage #\\d+$/.test(document.querySelector("#seite h1")?.textContent || "")`), "Anfrage öffnet sich als eigene Seite");
-  ok(await eval_(`document.querySelector(".antrag-ticket .antrag-text").textContent`) === "E2E: Zurück-Knopf im Entwurf", "Anfragetext steht im Ticket");
-  ok(await bis(`(()=>{const i=document.querySelector("#seite .antrag-bilder img"); return i && i.complete && i.naturalWidth===4})()`), "Bild wird in der Anfrage angezeigt");
-  const art = await eval_(`fetch(document.querySelector("#seite .antrag-bilder img").src).then(r=>r.headers.get("content-type")+"|"+r.headers.get("x-content-type-options"))`);
+  ok(await eval_(`document.querySelector("#antrag-text").textContent`) === "E2E: Zurück-Knopf im Entwurf", "Anfragetext steht im Ticket");
+  ok(await bis(`(()=>{const i=document.querySelector("#antrag-galerie img"); return i && i.complete && i.naturalWidth===4})()`), "Bild wird in der Anfrage angezeigt");
+  const art = await eval_(`fetch(document.querySelector("#antrag-galerie img").src).then(r=>r.headers.get("content-type")+"|"+r.headers.get("x-content-type-options"))`);
   ok(/^image\/(webp|jpeg)\|nosniff$/.test(art), "Bild mit richtigem Typ und nosniff: " + art);
 
   // 5) Antworten im Ticket (Admin-Anfrage → seb darf antworten)
   await eval_(`document.querySelector("#seite textarea").value="E2E erledigt"; [...document.querySelectorAll("#seite button")].find(b=>b.textContent==="Erledigt").click(); true`);
-  ok(await bis(`document.querySelector("#seite .status")?.textContent==="erledigt"`), "Anfrage im Ticket erledigt");
-  ok(await eval_(`document.querySelector("#seite .antwort")?.textContent.includes("E2E erledigt")`), "Antwort steht im Ticket");
-  ok(await eval_(`document.querySelector(".zurueck-pfeil").getAttribute("href")`) === "#/", "Zurück-Pfeil führt dorthin, wo man herkam (Übersicht)");
+  ok(await bis(`document.querySelector("#antrag-status")?.textContent==="erledigt"`), "Anfrage im Ticket erledigt");
+  ok(await eval_(`document.querySelector("#antrag-antwort")?.textContent.includes("E2E erledigt")`), "Antwort steht im Ticket");
+  ok(await eval_(`document.querySelector("#seite-zurueck").getAttribute("href")`) === "#/", "Zurück-Pfeil führt dorthin, wo man herkam (Übersicht)");
 
   // 6) Admin-Panel: „Öffnen“ bei der Anfrage
   await gehe(G + "/admin/#antraege", 3500);

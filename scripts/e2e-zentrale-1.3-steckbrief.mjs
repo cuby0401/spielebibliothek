@@ -45,7 +45,7 @@ writeFileSync(`${DIR}/vorschau.png`, PNG);
 writeFileSync(`${DIR}/boese.svg`, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
 
 // Steckbrief des Spiels „zaehler“ aufklappen
-const BOX = `[...document.querySelectorAll(".eintrag")].find(e=>e.textContent.includes("Ordner zaehler")).querySelector("details.steckbrief")`;
+const BOX = `document.querySelector("#spiel-zaehler [data-steckbrief]")`;
 async function steckbriefOeffnen() {
   await bis(`!!(${BOX})`);
   await eval_(`{ const d=${BOX}; if(!d.open) d.querySelector("summary").click(); } true`);
@@ -73,6 +73,10 @@ async function bildWaehlen(datei) {
   const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
   S = (await cdp("Target.attachToTarget", { targetId, flatten: true })).sessionId;
   await cdp("Page.enable", {}, S); await cdp("Runtime.enable", {}, S); await cdp("DOM.enable", {}, S);
+  // UI-Bausteine (11.11.2026): Rückfragen sind eigene Dialoge (UI.bestaetigen) statt confirm() – wie früher automatisch bestätigen, Text in window.__dialoge
+  await cdp("Page.addScriptToEvaluateOnNewDocument", { source: `new MutationObserver(() => { for (const d of document.querySelectorAll('dialog[data-art="bestaetigen"][open]:not([data-e2e])')) {
+    d.dataset.e2e = "1"; (window.__dialoge = window.__dialoge || []).push(d.textContent);
+    setTimeout(() => d.querySelector(".b-dialog__fuss .b-knopf--primaer, .b-dialog__fuss .b-knopf--gefahr").click(), 50); } }).observe(document, { subtree: true, childList: true, attributes: true });` }, S);
 
   // 1) Upload-Seite: anmelden, Beschreibung eintragen
   await gehe(U + "/");
@@ -83,39 +87,39 @@ async function bildWaehlen(datei) {
   await eval_(`{ const d=${BOX}; d.querySelector('input[type="text"]').value="Zähler Deluxe";
     d.querySelector("textarea").value="E2E-Beschreibung unter der Kachel"; d.querySelector("textarea").dispatchEvent(new Event("input"));
     [...d.querySelectorAll("button")].find(b=>b.textContent==="Speichern").click(); } true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("Beschreibung gespeichert")`), "Beschreibung gespeichert");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("Beschreibung gespeichert")`), "Beschreibung gespeichert");
 
   // 2) Vorschaubild: SVG abgelehnt, PNG angenommen
   await warte(800);
   await steckbriefOeffnen();
   ok(await eval_(`(${BOX}).querySelector("textarea").value`) === "E2E-Beschreibung unter der Kachel", "Beschreibung bleibt nach Neuladen erhalten");
   await bildWaehlen("boese.svg");
-  ok(await bis(`document.getElementById("meldung").textContent.includes("Nur PNG, JPG oder WebP")`), "SVG als Vorschaubild abgelehnt");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("Nur PNG, JPG oder WebP")`), "SVG als Vorschaubild abgelehnt");
   await bildWaehlen("vorschau.png");
-  ok(await bis(`document.getElementById("meldung").textContent.includes("Vorschaubild gespeichert")`), "PNG als Vorschaubild gespeichert");
-  ok(await bis(`(()=>{const i=(${BOX}).querySelector(".vorschau-box img"); return i && i.complete && i.naturalWidth===1})()`), "Vorschau auf der Upload-Seite sichtbar");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("Vorschaubild gespeichert")`), "PNG als Vorschaubild gespeichert");
+  ok(await bis(`(()=>{const i=(${BOX}).querySelector("[data-vorschau] img"); return i && i.complete && i.naturalWidth===1})()`), "Vorschau auf der Upload-Seite sichtbar");
 
   // 3) Bibliothek: Kachel zeigt Titel, Beschreibung und Bild aus dem Steckbrief
   await gehe(G + "/", 3500);
-  const KACHEL = `[...document.querySelectorAll(".kachel")].find(k=>k.querySelector("h2").textContent==="Zähler Deluxe")`;
+  const KACHEL = `[...document.querySelectorAll(".b-kachel")].find(k=>k.querySelector(".b-kachel__titel").textContent==="Zähler Deluxe")`;
   ok(await bis(`!!(${KACHEL})`), "Kachel mit neuem Titel „Zähler Deluxe“");
-  ok(await eval_(`(${KACHEL}).querySelector(".beschreibung").textContent`) === "E2E-Beschreibung unter der Kachel", "Kachel zeigt die Beschreibung");
-  ok(await bis(`(()=>{const i=(${KACHEL}).querySelector(".bild img"); return i && i.src.includes("/api/vorschau/seb/zaehler") && i.complete && i.naturalWidth===1})()`),
+  ok(await eval_(`(${KACHEL}).querySelector(".b-kachel__beschreibung").textContent`) === "E2E-Beschreibung unter der Kachel", "Kachel zeigt die Beschreibung");
+  ok(await bis(`(()=>{const i=(${KACHEL}).querySelector(".b-kachel__bild img"); return i && i.src.includes("/api/vorschau/seb/zaehler") && i.complete && i.naturalWidth===1})()`),
     "Kachel zeigt das Vorschaubild (über /api/vorschau)");
-  const kopf = await eval_(`fetch((${KACHEL}).querySelector(".bild img").src).then(r=>r.headers.get("content-type")+"|"+r.headers.get("x-content-type-options"))`);
+  const kopf = await eval_(`fetch((${KACHEL}).querySelector(".b-kachel__bild img").src).then(r=>r.headers.get("content-type")+"|"+r.headers.get("x-content-type-options"))`);
   ok(kopf === "image/png|nosniff", "Vorschaubild mit richtigem Typ und nosniff: " + kopf);
 
   // 4) Bild entfernen → wieder Platzhalter
   await gehe(U + "/");
   await steckbriefOeffnen();
-  await bis(`!!(${BOX}).querySelector(".vorschau-box img")`);
+  await bis(`!!(${BOX}).querySelector("[data-vorschau] img")`);
   await eval_(`[...(${BOX}).querySelectorAll("button")].find(b=>b.textContent==="Bild entfernen").click(); true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("Vorschaubild entfernt")`), "Vorschaubild entfernt");
+  ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("Vorschaubild entfernt")`), "Vorschaubild entfernt");
 
   // 5) Admin-Panel: „noch nie angemeldet“ und Cloudflare-Abgleich (im Teststand nicht eingerichtet)
   await gehe(G + "/admin/#benutzer", 4000);
-  ok(await bis(`[...document.querySelectorAll("td.warn")].some(t=>t.textContent==="noch nie angemeldet")`), "Admin: „noch nie angemeldet“ bei paul");
-  ok(await eval_(`[...document.querySelectorAll("tr")].find(t=>t.textContent.startsWith("seb"))?.textContent.includes("noch nie angemeldet")`) === false, "Admin: seb ist angemeldet");
+  ok(await bis(`!!document.querySelector('tr[data-schluessel="paul"]')?.textContent.includes("noch nie angemeldet")`), "Admin: „noch nie angemeldet“ bei paul");
+  ok(await eval_(`document.querySelector('tr[data-schluessel="seb"]')?.textContent.includes("noch nie angemeldet")`) === false, "Admin: seb ist angemeldet");
   ok(await eval_(`document.body.textContent.includes("Cloudflare-Abgleich nicht eingerichtet")`), "Admin: Hinweis „Cloudflare-Abgleich nicht eingerichtet“");
   ok(await eval_(`document.body.textContent.includes("scripts/cloudflare.py abgleichen")`), "Admin: Hinweis auf scripts/cloudflare.py beim Anlegen");
 
@@ -127,12 +131,13 @@ async function bildWaehlen(datei) {
   await gehe(G + "/#/antraege", 3000);
   ok(await eval_(`document.body.textContent.includes("geht an paul (Entwickler)")`), "Absender sieht: geht an paul");
   await gehe(G + "/admin/#antraege", 3500);
-  ok(await eval_(`document.getElementById("offen-zahl").hidden`), "Admin-Panel: keine Zahl für Spiel-Anfragen");
+  ok(await bis(`!!document.querySelector("details summary")`) && await eval_(`!document.querySelector('#reiter [data-id="antraege"] .b-zahl')`), "Admin-Panel: keine Zahl für Spiel-Anfragen");
   ok(await eval_(`[...document.querySelectorAll("details summary")].some(s=>s.textContent.includes("Anfragen zu Spielen") && s.textContent.includes("1 offen"))`),
     "Admin-Panel: Spiel-Anfrage nur eingeklappt zur Info");
 
   // 7) Simulation: Beenden führt zurück ins Admin-Panel
   await gehe(G + "/admin/#uebersicht", 3500);
+  await bis(`!![...document.querySelectorAll("button")].find(b=>b.textContent==="Ansicht als Spieler")`);
   await eval_(`[...document.querySelectorAll("button")].find(b=>b.textContent==="Ansicht als Spieler").click(); true`);
   ok(await bis(`location.pathname==="/" && !document.getElementById("ansicht-band").hidden`, 8000), "Simulation startet im Hauptmenü");
   await eval_(`document.getElementById("ansicht-ende").click(); true`);
@@ -140,11 +145,11 @@ async function bildWaehlen(datei) {
 
   // 8) Aufgaben: Auftragsdienst nicht eingerichtet, Auftrag anlegen, Zeitplan
   await gehe(G + "/admin/#aufgaben", 3500);
-  ok(await eval_(`document.body.textContent.includes("Noch nicht eingerichtet")`), "Aufgaben: Hinweis „Auftragsdienst noch nicht eingerichtet“");
+  ok(await bis(`document.body.textContent.includes("Noch nicht eingerichtet")`), "Aufgaben: Hinweis „Auftragsdienst noch nicht eingerichtet“");
   await eval_(`[...document.querySelectorAll("button")].find(b=>b.textContent==="Jetzt starten").click(); true`);
   ok(await bis(`[...document.querySelectorAll("td")].some(t=>t.textContent==="wartet")`), "Aufgaben: Unit-Tests gestartet (wartet)");
   await eval_(`{ const i=document.querySelector('input[type="time"]'); i.value="03:30"; i.closest("td").querySelector("button").click(); } true`);
-  ok(await bis(`document.getElementById("meldung").textContent.includes("täglich um 03:30")`), "Aufgaben: Zeitplan täglich 03:30");
+  ok(await bis(`[...document.querySelectorAll(".b-meldung__text")].some(m=>m.textContent.includes("täglich um 03:30"))`), "Aufgaben: Zeitplan täglich 03:30");
 
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
   console.log(ergebnis.join("\n"));

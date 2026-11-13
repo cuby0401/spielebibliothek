@@ -1,32 +1,19 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin – Spielebibliothek</title>
-  <link rel="stylesheet" href="/style.css?v=__VERSION__">
-  <link rel="stylesheet" href="/admin/admin.css?v=__VERSION__">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin – Spielebibliothek</title>
+<script src="/ui/thema-frueh.js?v=__VERSION__"></script>
+<link rel="stylesheet" href="/ui/tokens.css?v=__VERSION__">
+<link rel="stylesheet" href="/ui/bausteine.css?v=__VERSION__">
+<script src="/ui/ikonen.js?v=__VERSION__" defer></script>
+<script src="/ui/bausteine.js?v=__VERSION__" defer></script>
+<script src="/lib/bridge.js?v=__VERSION__" defer></script>
+<script src="/konto.js?v=__VERSION__" defer></script>
+<script src="/admin/admin.js?v=__VERSION__" defer></script>
 </head>
-<body>
-  <header class="kopf">
-    <a class="marke" href="/">Spielebibliothek · Admin</a>
-    <nav><a class="knopf leise" href="/">← Zur Bibliothek</a></nav>
-  </header>
-  <p id="abgelaufen" class="abgelaufen" hidden>Deine Anmeldung ist abgelaufen. <a href="">Seite neu laden</a></p>
-  <main class="admin">
-    <nav class="reiter" id="reiter">
-      <a href="#uebersicht">Übersicht</a>
-      <a href="#spiele">Spiele</a>
-      <a href="#personen">CRM</a>
-      <a href="#spielstaende">Spielstände</a>
-      <a href="#antraege">Anfragen <span id="offen-zahl" class="zahl-marke" hidden></span></a>
-      <a href="#aufgaben">Aufgaben <span id="aufgaben-zahl" class="zahl-marke" hidden></span></a>
-    </nav>
-    <p id="meldung" class="meldung" hidden></p>
-    <section id="inhalt"></section>
-  </main>
-  <script src="/lib/bridge.js?v=__VERSION__"></script>
-  <script src="/konto.js?v=__VERSION__"></script>
-  <script src="/admin/admin.js?v=__VERSION__"></script>
+<!-- Admin-Panel: seit Phase 2 der UI-Bausteine (E85) ganz aus window.UI gebaut, ohne eigenes Stylesheet (scripts/ui-pruefen.mjs). -->
+<body class="b-ui">
 </body>
 </html>

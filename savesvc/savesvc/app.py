@@ -94,7 +94,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         identitaet_umstellen(e)
     crm_modul.dabei_seit_nachholen(crm)
     crm_modul.uebernahme_zuschreiben(crm, e.admins)
-    if e.probe:   # frische Kopie der Live-Daten → deren Aufgaben-Verlauf gehört nicht in den Testserver (1.4.1)
+    if e.probe or e.design:   # frische Kopie der Live-Daten → deren Aufgaben-Verlauf gehört nicht in den Testserver (1.4.1)
         kopie, erledigt = e.db_path.parent / "kopie-von", e.db_path.parent / "aufgaben-geleert"
         try:
             stand = kopie.read_text().strip()
@@ -262,6 +262,7 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
         crm.angemeldet(player)          # eingeladen → aktiv bei der ersten Anmeldung (CRM)
         person = crm.person(player)
         return {"player": player, "uploader": r["uploader"], "admin": r["admin"], "probe": e.probe,
+                "design": e.design,   # Design-Spielwiese: Band „nichts hier ist live“
                 # Tester (1.4.0): Link „Tester-Panel“ in der Konto-Leiste; der Testserver selbst prüft über Cloudflare Access
                 "tester": not r["ansicht"] and "tester" in rollen.crm_rollen(player),
                 "ansicht": r["ansicht"], "echterAdmin": r["echterAdmin"],

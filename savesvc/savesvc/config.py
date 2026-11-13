@@ -22,6 +22,7 @@ class Einstellungen:
     ha_webhook: str = ""                    # Home-Assistant-Webhook für Wächter und Anfragen (leer = aus)
     waechter: bool = False                  # Gesundheitsprüfung alle 5 Minuten (im Betrieb an, in Tests aus)
     probe: bool = False                     # Probe-Zentrale (Kopie zum Testen vor dem Live-Gang, E56)
+    design: bool = False                    # Design-Spielwiese (Kopie nur über Tailscale, neue UI, 10.11.2026)
     # 1.5.0 (E81): Datenbank beim Start auf UUIDs umstellen (einmalig, mit Sicherung). IDENTITAET_UUID=0 nur für
     # Teststand-Vergleiche mit dem alten Verhalten – eine schon umgestellte Datenbank bleibt umgestellt.
     identitaet_uuid: bool = True
@@ -63,6 +64,7 @@ def laden() -> Einstellungen:
         ha_webhook=os.environ.get("HA_WEBHOOK_URL", ""),
         waechter=os.environ.get("WAECHTER", "1") != "0",
         probe=os.environ.get("PROBE", "0") == "1",
+        design=os.environ.get("DESIGN", "0") == "1",
         identitaet_uuid=os.environ.get("IDENTITAET_UUID", "1") != "0",
         zentrale_commit=os.environ.get("ZENTRALE_COMMIT", ""),
         zentrale_version=os.environ.get("ZENTRALE_VERSION", ""),

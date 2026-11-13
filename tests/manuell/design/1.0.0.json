@@ -1,0 +1,110 @@
+{
+  "version": "1.0.0",
+  "hinweis": "Abnahme der UI-Bausteine auf der Design-Spielwiese (http://<NAS_GH>:18288, nur über Tailscale, Kopie der echten Daten). Nichts davon ist live. Neu sind die Bausteine selbst, die Einstellungsseite (erste Seite aus Bausteinen) und dass Thema und Farbe schon auf der ganzen Bibliothek wirken. Der Rest der Bibliothek sieht noch aus wie bisher, er wird erst in Phase 2 umgebaut.",
+  "tests": [
+    {
+      "id": "einstellungen-neu",
+      "bereich": "Einstellungen",
+      "titel": "Die Einstellungsseite ist neu aufgebaut",
+      "schritte": [
+        "Öffne http://<NAS_GH>:18288 (Tailscale muss an sein).",
+        "Klick oben rechts auf deinen Namen, dann links auf „Einstellungen“."
+      ],
+      "erwartet": "Du siehst vier Karten untereinander: Aussehen, Startseite, Bibliothek, Konto. Alles ist gut lesbar, nichts überlappt, nichts ist abgeschnitten. Oben steht das Band „Design-Spielwiese“."
+    },
+    {
+      "id": "thema-wechseln",
+      "bereich": "Aussehen",
+      "titel": "Hell, Dunkel und Automatisch",
+      "schritte": [
+        "Einstellungen → Aussehen → Thema: tippe auf „Dunkel“.",
+        "Dann auf „Hell“, dann wieder auf „Automatisch“.",
+        "Wechsle bei „Automatisch“ in den Systemeinstellungen deines Geräts zwischen hellem und dunklem Modus."
+      ],
+      "erwartet": "Die ganze Seite wechselt sofort, auch Kopfleiste und Hintergrund, nicht nur die Karten. Bei „Automatisch“ folgt die Bibliothek deinem Gerät."
+    },
+    {
+      "id": "kein-aufblitzen",
+      "bereich": "Aussehen",
+      "titel": "Kein weißes Aufblitzen im dunklen Thema",
+      "schritte": [
+        "Stell das Thema auf „Dunkel“ (dein Gerät darf dabei hell sein).",
+        "Lade die Seite neu (Cmd+R bzw. am iPhone nach unten ziehen). Mach das ein paar Mal.",
+        "Öffne auch die Startseite der Bibliothek und lade sie neu."
+      ],
+      "erwartet": "Die Seite ist vom ersten Moment an dunkel. Es blitzt nichts weiß auf."
+    },
+    {
+      "id": "farbe-wechseln",
+      "bereich": "Aussehen",
+      "titel": "Farbe wählen",
+      "schritte": [
+        "Einstellungen → Aussehen → Farbe: tippe nacheinander jeden der sechs Punkte an.",
+        "Schau dir jedes Mal die Seite an, dann geh zur Startseite und zurück."
+      ],
+      "erwartet": "Der gewählte Punkt hat einen Haken und einen Ring. Knöpfe, Links und Markierungen nehmen sofort die Farbe an, auch auf der Startseite. Jede Farbe ist gut lesbar, hell und dunkel."
+    },
+    {
+      "id": "abstaende-kacheln",
+      "bereich": "Aussehen",
+      "titel": "Abstände und Kachelgröße",
+      "schritte": [
+        "Einstellungen → Aussehen → Abstände: „Kompakt“, dann „Luftig“, dann „Normal“.",
+        "Größe der Spielkacheln: „Klein“, „Groß“, „Mittel“. Schau dir dazu die Testseite http://<NAS_GH>:18288/ui-test/ an (Bereich „Alle Spiele“)."
+      ],
+      "erwartet": "Kompakt rückt Felder und Knöpfe enger zusammen, luftig gibt mehr Platz. Auf der Testseite werden die Spielkacheln kleiner bzw. größer. (Die echte Startseite nutzt die Kachelgröße erst nach dem Umbau.)"
+    },
+    {
+      "id": "geraeteuebergreifend",
+      "bereich": "Aussehen",
+      "titel": "Gilt auf allen Geräten",
+      "schritte": [
+        "Stell am Mac Thema „Dunkel“ und Farbe „Violett“ ein.",
+        "Öffne die Design-Spielwiese auf dem iPhone oder iPad (Tailscale an)."
+      ],
+      "erwartet": "Auch dort ist die Bibliothek dunkel und violett, ohne dass du etwas einstellen musst."
+    },
+    {
+      "id": "startseite-anordnen",
+      "bereich": "Startseite",
+      "titel": "Startseite anordnen wird gespeichert",
+      "schritte": [
+        "Einstellungen → Startseite: schieb „Favoriten“ mit dem Pfeil nach oben ganz nach vorn.",
+        "Nimm den Haken bei „Spiel der Woche“ weg.",
+        "Lade die Seite neu."
+      ],
+      "erwartet": "Nach dem Neuladen steht „Favoriten“ oben und „Spiel der Woche“ ist ausgegraut. Die Startseite selbst ändert sich noch nicht, das kommt mit dem Umbau in Phase 2."
+    },
+    {
+      "id": "bibliothek-einstellungen",
+      "bereich": "Bibliothek",
+      "titel": "Sortierung und Schalter wirken wie vorher",
+      "schritte": [
+        "Einstellungen → Bibliothek → Spiele sortieren: wähle „Meistgespielt“ (neu in der Auswahl) und geh zur Startseite.",
+        "Schalte „Bestenliste neben dem Spiel“ aus und öffne ein Spiel. Schalte sie danach wieder ein."
+      ],
+      "erwartet": "Die Spiele sind nach Spielzeit sortiert. Ohne den Schalter fehlt die Bestenliste neben dem Spiel, mit Schalter ist sie wieder da."
+    },
+    {
+      "id": "bausteine-ansehen",
+      "bereich": "Bausteine",
+      "titel": "Alle Bausteine wirken einheitlich",
+      "schritte": [
+        "Öffne http://<NAS_GH>:18288/ui-test/ (die Testseite mit allen Bausteinen).",
+        "Scroll einmal durch. Probier die Knöpfe unter „Dialoge und Meldungen“, die Reiter, das Konto-Menü oben rechts und die Glocke.",
+        "Schalte oben in der Karte „Aussehen“ hell/dunkel und ein paar Farben durch."
+      ],
+      "erwartet": "Alles sieht aus wie aus einem Guss: gleiche Rundungen, gleiche Abstände, gleiche Schrift. Dialoge kann man mit Esc schließen, Meldungen erscheinen unten in der Mitte. Wenn dir irgendwo etwas nicht gefällt, beschreib es hier. Das ist genau die Stelle für Änderungswünsche, bevor wir die Seiten umbauen."
+    },
+    {
+      "id": "handy",
+      "bereich": "Handy",
+      "titel": "Auf dem iPhone",
+      "schritte": [
+        "Öffne auf dem iPhone http://<NAS_GH>:18288/#/einstellungen und danach /ui-test/.",
+        "Tippe Schalter, Farbpunkte und Knöpfe an, öffne das Konto-Menü oben rechts und einen Dialog."
+      ],
+      "erwartet": "Nichts ragt über den Rand, man muss nicht seitlich scrollen. Alles lässt sich gut mit dem Finger treffen. Menüs und Dialoge kommen unten als Blatt herein."
+    }
+  ]
+}

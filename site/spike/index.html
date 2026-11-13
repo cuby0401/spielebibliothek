@@ -2,45 +2,17 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sandbox-Spike</title>
-  <link rel="stylesheet" href="/style.css?v=__VERSION__">
-  <style>
-    .knoepfe { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
-    .knopf.an { outline: 2px solid var(--akzent); outline-offset: 1px; }
-    table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--flaeche); }
-    th, td { text-align: left; padding: .25rem .5rem; border-bottom: 1px solid var(--linie); vertical-align: top; }
-    th.gruppe { background: var(--grund); font-weight: 650; }
-    td.s { width: 1.5rem; text-align: center; }
-    td.d { color: var(--leise); word-break: break-word; }
-    .ua { color: var(--leise); font-size: .8rem; word-break: break-word; }
-    .summe { font-weight: 650; }
-    .rahmen.klein { aspect-ratio: auto; height: 80px; }
-    .rahmen.spiel { aspect-ratio: 4 / 3; }
-    #gespeichert { font: .8rem/1.4 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; }
-  </style>
+  <!-- Technik-Test (Phase 3), aufgebaut aus den UI-Bausteinen wie alle Seiten (docs/ui-bausteine.md) -->
+  <script src="/ui/thema-frueh.js?v=__VERSION__"></script>
+  <link rel="stylesheet" href="/ui/tokens.css?v=__VERSION__">
+  <link rel="stylesheet" href="/ui/bausteine.css?v=__VERSION__">
 </head>
-<body>
-  <header class="kopf">
-    <a class="marke" href="/">Spielebibliothek</a>
-    <nav><span class="leise">Sandbox-Spike (Phase 3)</span></nav>
-  </header>
-  <main>
-    <div class="knoepfe">
-      <a class="knopf leise" id="k-test" href="?">Technik-Test</a>
-      <a class="knopf leise" id="k-keks" href="?spiel=legacy-localstorage">Keks-Klicker (localStorage)</a>
-      <button class="knopf" id="neu" type="button">Neu laden</button>
-      <button class="knopf leise" id="loeschen" type="button">Gespeichertes löschen</button>
-    </div>
-
-    <p class="summe" id="summe">Test läuft …</p>
-    <p class="ua" id="ua"></p>
-    <div id="rahmen" class="rahmen"></div>
-    <div id="tabelle"></div>
-    <h2>Gespeichert (in dieser Testseite)</h2>
-    <p class="leise">Stellvertretend für den späteren Speicher-Dienst: Die Testseite bewahrt die Werte in ihrem eigenen localStorage auf.</p>
-    <div id="gespeichert"></div>
-  </main>
+<body class="b-ui">
+  <div id="app"></div>
+  <script src="/ui/ikonen.js?v=__VERSION__"></script>
+  <script src="/ui/bausteine.js?v=__VERSION__"></script>
   <script src="/spike/spike.js?v=__VERSION__"></script>
 </body>
 </html>
