@@ -31,9 +31,10 @@
       "schritte": [
         "Öffne die Bibliothek am Mac im großen Fenster (oder Vollbild).",
         "Schau dir Startseite, Konto → Meine Spiele und das Admin-Panel (z. B. CRM) an.",
-        "Öffne zum Vergleich die Hilfe und eine einzelne Anfrage."
+        "Öffne zum Vergleich die Hilfe und eine einzelne Anfrage (Konto → Anfragen → „Öffnen“)."
       ],
-      "erwartet": "Startseite, Konto und Admin-Panel gehen über die ganze Fensterbreite, mit gleichem Rand links und rechts – kein schmaler Streifen in der Mitte. Auf der Startseite stehen dadurch mehr Spiele nebeneinander, die Kachelgröße bleibt so, wie du sie eingestellt hast. Nur Fließtext (Hilfe, Handbuch, eine Anfrage) bleibt lesbar schmal."
+      "erwartet": "Startseite, Konto und Admin-Panel gehen über die ganze Fensterbreite, mit gleichem Rand links und rechts – kein schmaler Streifen in der Mitte. Auf der Startseite stehen dadurch mehr Spiele nebeneinander, die Kachelgröße bleibt so, wie du sie eingestellt hast. Auch eine einzelne Anfrage geht über die ganze Breite. Nur Fließtext (Hilfe, Handbuch) bleibt lesbar schmal.",
+      "neuAb": "2026-11-13T10:25:00+00:00"
     },
     {
       "id": "suche-kategorien",
@@ -102,7 +103,8 @@
         "Konto → Anfragen: Art wählen, Beschreibung schreiben, ein Bild in die gestrichelte Fläche ziehen oder antippen und auswählen.",
         "„Anfrage senden“, dann bei der Anfrage auf „Öffnen“."
       ],
-      "erwartet": "Das Bild erscheint als Vorschau mit „Entfernen“. Nach dem Senden kommt unten eine Meldung, die Anfrage steht unter „Meine Anfragen“ mit gelbem Status „offen“. Geöffnet zeigt sie Text, Bild und den Bereich „Antwort“."
+      "erwartet": "Das Bild erscheint als Vorschau mit „Entfernen“. Nach dem Senden kommt unten eine Meldung, die Anfrage steht unter „Meine Anfragen“ mit gelbem Status „offen“. Geöffnet zeigt sie Text, Bild und den Bereich „Antwort“. Die geöffnete Anfrage geht wie die anderen Seiten über die ganze Fensterbreite, ohne breiten Rand links und rechts.",
+      "neuAb": "2026-11-13T10:25:00+00:00"
     },
     {
       "id": "admin-einheitlich",
@@ -138,9 +140,11 @@
       "bereich": "Handy",
       "titel": "Auf dem iPhone",
       "schritte": [
-        "Öffne auf dem iPhone die Startseite, ein Spiel, das Profil, das Admin-Panel und die Upload-Seite."
+        "Öffne auf dem iPhone die Startseite, ein Spiel, das Profil, das Admin-Panel und die Upload-Seite.",
+        "Tippe oben rechts auf dein Konto-Symbol – auf der Startseite und im Konto-Bereich –, scroll dabei auch einmal etwas nach unten und öffne es dort erneut."
       ],
-      "erwartet": "Nirgends ragt etwas über den Rand, man muss nicht seitlich scrollen. Die Seitenleisten werden zu einer wischbaren Leiste oben, Menüs und Dialoge kommen unten als Blatt herein."
+      "erwartet": "Nirgends ragt etwas über den Rand, man muss nicht seitlich scrollen. Die Seitenleisten werden zu einer wischbaren Leiste oben, Menüs und Dialoge kommen unten als Blatt herein. Das Konto-Menü kommt vollständig unten als Blatt herein, alle Einträge bis „Abmelden“ sind zu sehen und antippbar – nichts ist oben abgeschnitten.",
+      "neuAb": "2026-11-13T10:25:00+00:00"
     }
   ]
 }

@@ -502,7 +502,7 @@ async function zeigeSeite(name) {
 	const seite = el("seite");
 	seite.hidden = false;
 	seite.replaceChildren();
-	seite.classList.toggle("b-seite--schmal", name === "antrag");   // eine Anfrage ist Lesetext: lesbar schmal
+	seite.classList.remove("b-seite--schmal");   // auch eine Anfrage nutzt die volle Breite (Seb, 13.11.2026)
 	window.scrollTo(0, 0);
 	// Konto-Seiten mit Seitenleiste – fremde Profile nicht (die gehören nicht zum eigenen Konto)
 	const eigenesProfil = profilName === ich.player || profilName === `${ich.player}~${ich.ansicht}`;

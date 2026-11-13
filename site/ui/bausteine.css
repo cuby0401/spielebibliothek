@@ -352,8 +352,11 @@
 }
 
 /* ---------- Kopfleiste ---------- */
-.b-kopfleiste { position: sticky; top: env(safe-area-inset-top, 0px); z-index: var(--b-ebene-kopf); background: var(--b-kopf);
-	backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); border-bottom: var(--b-linie-breite) solid var(--b-linie); }
+.b-kopfleiste { position: sticky; top: env(safe-area-inset-top, 0px); z-index: var(--b-ebene-kopf); border-bottom: var(--b-linie-breite) solid var(--b-linie); }
+/* Glas-Hintergrund auf eigener Ebene: ein backdrop-filter direkt an der Kopfleiste machte sie zum Bezugsrahmen für position: fixed –
+   das Konto-Menü (am Handy ein Blatt unten am Bildschirm) hing dann unten an der Kopfleiste und ragte oben aus dem Bild (Seb, 13.11.2026). */
+.b-kopfleiste::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--b-kopf);
+	backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); }
 .b-kopfleiste__innen { display: flex; align-items: center; gap: var(--b-abstand-4); max-width: var(--b-inhalt-max); margin: 0 auto; min-height: 56px;
 	padding-left: max(var(--b-rand), env(safe-area-inset-left, 0px)); padding-right: max(var(--b-rand), env(safe-area-inset-right, 0px)); }
 .b-kopfleiste__marke { display: inline-flex; align-items: center; gap: var(--b-abstand-2); font-weight: 700; letter-spacing: -0.01em; color: var(--b-text); text-decoration: none; white-space: nowrap; }

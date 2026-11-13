@@ -142,6 +142,13 @@ const hintergrund = () => eval_(`getComputedStyle(document.body).backgroundColor
       const r = e.getBoundingClientRect(); if (!r.width) return false; let p = e.parentElement; while (p && p !== document.body) { const o = getComputedStyle(p).overflowX; if (o === "auto" || o === "hidden" || o === "scroll") return false; p = p.parentElement; }
       return r.right > w + 1; }).slice(0, 5).map((e) => e.tagName.toLowerCase() + "." + [...e.classList].join(".") + " " + Math.round(e.getBoundingClientRect().right)); })()`);
     ok(zuBreit.length === 0 && await eval_(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), `${w} px: nichts ragt über den Rand` + (zuBreit.length ? " – " + zuBreit.join(", ") : ""));
+    // Konto-Menü in der Kopfleiste: am Handy ein Blatt unten, ganz im Bild (13.11.2026: hing an der Kopfleiste und ragte oben hinaus)
+    await eval_(`scrollTo(0, 300); document.querySelector("#t-konto").click()`);
+    await bis(`!document.querySelector("#t-konto-menue").hidden`);
+    const lage = await eval_(`(() => { const r = document.querySelector("#t-konto-menue").getBoundingClientRect(); return { oben: Math.round(r.top), unten: Math.round(r.bottom), h: innerHeight }; })()`);
+    ok(lage.oben >= 0 && lage.unten <= lage.h && lage.unten > lage.h / 2, `${w} px: Konto-Menü ganz im Bild, unten als Blatt (oben ${lage.oben}, unten ${lage.unten} von ${lage.h})`);
+    await taste("Escape", "Escape", 27);
+    await eval_(`scrollTo(0, 0)`);
   }
   await breite(1280);
 
