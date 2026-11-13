@@ -102,7 +102,7 @@ Formularbausteine haben `.wert` (lesen/setzen) und `.eingabe` (das eigentliche S
 | `UI.liste([zeilen])` / `UI.zeile` | Listen (Glocke, Konto-Menüpunkte, Personen) | Zeile: `ikon oder avatar, titel, text, rechts, href/onclick, gefahr, ungelesen, pfeil: false, aktionen: [Knöpfe]` (stehen neben, nie in dem Link) |
 | `UI.rangliste` | Bestenlisten (Spiel, Spiel der Woche) | `spalten: [{titel}], eintraege: [{platz, name, href, titel, werte: [Text], ich}], rang` (Index der Rangspalte) |
 | `UI.tabelle` | Daten in Spalten (Admin) | `spalten: [{titel, feld oder wert(z), sortierbar, sortWert, rechts, mono, leise, breite}], zeilen, leer, onzeile, schluessel`, `.zeilenSetzen(z)` |
-| `UI.kennzahl` | eine Zahl (Admin-Übersicht) | `wert, label, hinweis, art: warnung\|gefahr\|erfolg, onclick/href` |
+| `UI.kennzahl` | eine Zahl (Admin-Übersicht) | `wert, label, hinweis, art: warnung\|gefahr\|erfolg, onclick/href, kompakt` – `kompakt`: ohne eigene Fläche, Wert in einer Zeile, zum Einbetten in eine Karte (mehrere in `UI.leiste`, Hinweis dann beim Drüberfahren), z. B. im Profilkopf (Seb, 13.11.2026) |
 | `UI.fortschritt` | Fortschritt, Speicher | `wert, max, label, art, zeigeText (true oder Text), klein` |
 | `UI.marke` | Status, Kategorie, Filter-Chip | `text, art: neutral\|akzent\|erfolg\|warnung\|gefahr\|info, punkt, ikon, onclick + an (Filter), onentfernen` |
 | `UI.avatar` | Person | `name, bild, groesse: s\|m\|l\|xl`. Die Farbe folgt fest aus dem Namen |

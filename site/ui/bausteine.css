@@ -244,6 +244,10 @@
 .b-kennzahl--warnung .b-kennzahl__wert { color: var(--b-warnung); }
 .b-kennzahl--gefahr .b-kennzahl__wert { color: var(--b-gefahr); }
 .b-kennzahl--erfolg .b-kennzahl__wert { color: var(--b-erfolg); }
+/* kompakt: eingebettet in eine Karte, ohne eigene Fläche; Wert bleibt in einer Zeile. Mehrere in einer Leiste: mehr Abstand, auch beim Umbruch sauber */
+.b-kennzahl--kompakt { padding: 0; background: none; box-shadow: none; border-radius: 0; }
+.b-kennzahl--kompakt .b-kennzahl__wert { font-size: var(--b-groesse-xl); white-space: nowrap; }
+.b-leiste:has(> .b-kennzahl--kompakt) { column-gap: var(--b-abstand-7); row-gap: var(--b-abstand-3); align-items: flex-start; }
 
 .b-fortschritt { height: 6px; border-radius: var(--b-radius-voll); background: var(--b-flaeche-3); overflow: hidden; width: 100%; }
 .b-fortschritt--klein { height: 4px; }

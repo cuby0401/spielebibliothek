@@ -396,14 +396,15 @@
 		t.zeilenSetzen = (z) => { o.zeilen = z; zeichnen(); };
 		return t;
 	}
-	// Kennzahl (Admin-Übersicht): großer Wert, Beschriftung darunter. onclick macht sie klickbar
+	// Kennzahl (Admin-Übersicht): großer Wert, Beschriftung darunter. onclick macht sie klickbar.
+	// kompakt: ohne eigene Fläche, kleinerer Wert in einer Zeile – zum Einbetten in eine Karte (z. B. Profilkopf), mehrere in UI.leiste
 	function kennzahl(o = {}) {
 		return h(o.onclick || o.href ? (o.href ? "a" : "button") : "div", {
-			class: klassen("b-kennzahl", (o.onclick || o.href) && "b-kennzahl--klickbar", o.art && `b-kennzahl--${o.art}`, o.klasse),
-			type: o.onclick && !o.href ? "button" : null, href: o.href || null, onclick: o.onclick || null, id: o.id },
+			class: klassen("b-kennzahl", (o.onclick || o.href) && "b-kennzahl--klickbar", o.art && `b-kennzahl--${o.art}`, o.kompakt && "b-kennzahl--kompakt", o.klasse),
+			type: o.onclick && !o.href ? "button" : null, href: o.href || null, onclick: o.onclick || null, id: o.id, title: o.kompakt && o.hinweis ? o.hinweis : null },
 			h("span", { class: "b-kennzahl__wert", text: String(o.wert ?? "–") }),
 			h("span", { class: "b-kennzahl__label", text: o.label }),
-			o.hinweis ? h("span", { class: "b-kennzahl__hinweis", text: o.hinweis }) : null);
+			o.hinweis && !o.kompakt ? h("span", { class: "b-kennzahl__hinweis", text: o.hinweis }) : null);   // kompakt: Hinweis beim Drüberfahren
 	}
 	function fortschritt(o = {}) {
 		const max = o.max || 100, wert = Math.max(0, Math.min(max, o.wert || 0));

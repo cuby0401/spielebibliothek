@@ -375,25 +375,25 @@ SEITEN_REG["profil"] = async (c) => {
 	const d = await Bridge.json("GET", "/api/profil/" + encodeURIComponent(profilName));
 	// Alter Link mit früherem Handle (1.5.0): auf die aktuelle Adresse umleiten – das eigene Profil dann mit Konto-Leiste wie gewohnt
 	if (d.name && d.name !== profilName && !profilName.includes("~")) { location.replace(d.ich ? "#/profil" : "#/profil/" + encodeURIComponent(d.name)); return; }
-	// Kopf (Zentrale 1.4.0): Bild, Name, Rollen, dabei seit – dazu Spielzeit, Spiele, Erfolge als Kennzahlen
+	// Kopf (Zentrale 1.4.0): Bild, Name, Rollen, dabei seit – Spielzeit, Spiele, Erfolge als kompakte Kennzahlen in derselben Karte
+	// (Seb, 13.11.2026: vorher eigene Kacheln darunter, die Spielzeit brach dort in zwei Zeilen um)
 	const rollen = (d.rollen || []).filter((r) => r !== "spieler" || d.rollen.length === 1);
 	const name = d.anzeigename || d.name;
 	c.append(titel(d.ich ? "Mein Profil" : "Profil von " + name),
-		UI.karte({ id: "profil-kopf", inhalt: UI.leiste([
+		UI.karte({ id: "profil-kopf", inhalt: UI.leiste([UI.leiste([
 			UI.avatar({ name, groesse: "xl" }),
 			UI.stapel([
 				h("strong", { id: "profil-name", class: "b-karte__titel", text: name }),
 				UI.text("@" + d.name + (d.dabeiSeit ? " · dabei seit " + new Date(d.dabeiSeit).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""), { art: "leise" }),
 				rollen.length ? UI.leiste(rollen.map((r) => UI.marke({ text: ROLLEN_NAMEN[r] || r, art: r === "admin" ? "akzent" : r === "entwickler" ? "info" : "neutral" }))) : null,
 			], { abstand: "s" }),
-		]) }),
-		UI.raster([
-			UI.kennzahl({ wert: dauer(d.sekunden), label: "Spielzeit" }),
+		]), UI.leiste([
+			UI.kennzahl({ kompakt: true, wert: dauer(d.sekunden), label: "Spielzeit" }),
 			// 1.4.1: „gespielt“ statt „Spiele“ – Admins gehören nicht alle Spiele, eigene Spiele zählen extra
-			UI.kennzahl({ wert: d.spiele.length, label: "gespielt", hinweis: "Spiele, egal von wem" }),
-			d.eigene ? UI.kennzahl({ wert: d.eigene, label: "eigene Spiele" }) : null,
-			UI.kennzahl({ wert: d.erfolge, label: "Erfolge" }),
-		].filter(Boolean), { art: "kennzahlen" }));
+			UI.kennzahl({ kompakt: true, wert: d.spiele.length, label: "gespielt", hinweis: "Spiele, egal von wem" }),
+			d.eigene ? UI.kennzahl({ kompakt: true, wert: d.eigene, label: "eigene Spiele" }) : null,
+			UI.kennzahl({ kompakt: true, wert: d.erfolge, label: "Erfolge" }),
+		].filter(Boolean), { id: "profil-zahlen" })], { verteilt: true }) }));
 	// Nur im eigenen Profil: Meine Angaben (privat)
 	if (d.ich) {
 		const inhalt = h("div", { class: "b-stapel" });

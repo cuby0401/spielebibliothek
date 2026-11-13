@@ -173,7 +173,7 @@ komp("Tabelle", "Inhalt", 260, "Daten in Spalten, sortierbar, mit Leer-Zustand."
 - Zahlen rechtsbündig (`rechts`), IDs `mono`. Klickbare Zeilen mit `onzeile` (auch per Enter).
 """, 'v.append(UI.tabelle({spalten:[{titel:"Person",wert:z=>UI.leiste([UI.avatar({name:z.n,groesse:"s"}),h("span",{text:z.n})]),sortierbar:true,sortWert:z=>z.n},{titel:"Status",wert:z=>UI.marke({text:z.s,punkt:true,art:z.a})},{titel:"Spielzeit",feld:"t",rechts:true}],zeilen:[{n:"Seb",s:"Aktiv",a:"erfolg",t:"12 h 5 min"},{n:"Paul",s:"Aktiv",a:"erfolg",t:"3 h 40 min"},{n:"Emil",s:"Verwarnt",a:"warnung",t:"48 min"}],onzeile(){}}));')
 komp("Kennzahl", "Inhalt", 150, "Eine wichtige Zahl mit Beschriftung (Admin-Übersicht).", """
-- `UI.kennzahl({wert, label, hinweis, art, onclick})` – in `UI.raster([...], {art:"kennzahlen"})`.
+- `UI.kennzahl({wert, label, hinweis, art, onclick, kompakt})` – in `UI.raster([...], {art:"kennzahlen"})`; `kompakt` ohne eigene Fläche zum Einbetten in eine Karte, mehrere in `UI.leiste`.
 - Nur Zahlen, die etwas bedeuten; `art:"warnung"` wenn etwas zu tun ist.
 """, 'v.append(UI.raster([UI.kennzahl({wert:14,label:"Personen",onclick(){}}),UI.kennzahl({wert:9,label:"Spiele"}),UI.kennzahl({wert:2,label:"Offene Anfragen",art:"warnung"}),UI.kennzahl({wert:"71 %",label:"Speicher belegt",hinweis:"2,1 GB von 3 GB"})],{art:"kennzahlen"}));')
 komp("Fortschritt", "Inhalt", 110, "Fortschrittsbalken für Spielstand und Speicher.", """

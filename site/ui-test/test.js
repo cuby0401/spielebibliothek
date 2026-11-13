@@ -114,6 +114,8 @@
 				block("Kennzahlen", UI.raster([UI.kennzahl({ wert: 14, label: "Personen", onclick: () => {} }), UI.kennzahl({ wert: 9, label: "Spiele" }),
 					UI.kennzahl({ wert: "2", label: "Offene Anfragen", art: "warnung", onclick: () => {} }), UI.kennzahl({ wert: "0", label: "Fehler heute", art: "erfolg" }),
 					UI.kennzahl({ wert: "71 %", label: "Speicher belegt", hinweis: "2,1 GB von 3 GB" })], { art: "kennzahlen" }),
+				block("Kennzahlen kompakt (in einer Karte)", UI.karte({ inhalt: UI.leiste([UI.kennzahl({ kompakt: true, wert: "1 h 41 min", label: "Spielzeit" }),
+					UI.kennzahl({ kompakt: true, wert: 10, label: "gespielt", hinweis: "Spiele, egal von wem" }), UI.kennzahl({ kompakt: true, wert: 26, label: "Erfolge" })]) })),
 					UI.fortschritt({ wert: 71, label: "Speicher", zeigeText: true }), UI.fortschritt({ wert: 94, art: "gefahr", label: "Speicher Emil", zeigeText: "94 %" })),
 				block("Marken und Avatare", UI.leiste(["neutral", "akzent", "erfolg", "warnung", "gefahr", "info"].map((art) => UI.marke({ text: art, art }))),
 					UI.leiste(["Aktiv", "Eingeladen", "Verwarnt", "Gesperrt"].map((t, i) => UI.marke({ text: t, punkt: true, art: ["erfolg", "neutral", "warnung", "gefahr"][i] }))),

@@ -468,6 +468,17 @@
         "Tippe oben rechts auf dein Konto-Symbol – auf der Startseite und im Konto-Bereich –, scroll dabei auch einmal etwas nach unten und öffne es dort erneut."
       ],
       "erwartet": "Nirgends ragt etwas über den Rand, man muss nicht seitlich scrollen. Die Seitenleisten werden zu einer wischbaren Leiste oben, Menüs und Dialoge kommen unten als Blatt herein. Das Konto-Menü kommt vollständig unten als Blatt herein, alle Einträge bis „Abmelden“ sind zu sehen und antippbar – nichts ist oben abgeschnitten."
+    },
+    {
+      "id": "design-profil-kopf-zahlen",
+      "bereich": "Neues Design: Konto",
+      "titel": "Profil: Zahlen in der Profilkarte",
+      "schritte": [
+        "Konto-Menü → Profil.",
+        "Schau dir die obere Karte mit Bild, Name und Rollen an, am Mac im großen Fenster und auf dem iPhone.",
+        "Fahr am Mac mit der Maus über „gespielt“."
+      ],
+      "erwartet": "Spielzeit, gespielt, eigene Spiele (nur wenn du welche hast) und Erfolge stehen klein mit in der Profilkarte – am Mac rechts neben Name und Rollen, auf dem iPhone darunter. Darunter gibt es keine eigenen Kacheln mehr. Die Spielzeit („1 h 41 min“) steht in einer Zeile. Beim Drüberfahren über „gespielt“ erscheint „Spiele, egal von wem“."
     }
   ]
 }
