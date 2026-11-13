@@ -287,11 +287,13 @@ function inhaltZeigen() {
 	}
 	const abschnitte = ((einstellungen.startseite || {}).abschnitte || Object.keys(ABSCHNITT_NAMEN).map((id) => ({ id, sichtbar: true })));
 	const teile = [];
+	// „Alle Spiele“ steht immer ganz unten und ist nicht einstellbar (Sebs Test 13.11.2026) – auch wenn ältere Einstellungen es verschoben oder ausgeblendet haben
 	for (const a of abschnitte) {
-		if (a.sichtbar === false && a.id !== "alle") continue;   // „Alle Spiele“ bleibt immer erreichbar (sonst findet man nichts mehr)
+		if (a.sichtbar === false || a.id === "alle") continue;
 		const t = abschnittBauen(a.id, sichtbar);
 		if (t) teile.push(t);
 	}
+	teile.push(abschnittBauen("alle", sichtbar));
 	ziel.replaceChildren(...teile);
 }
 

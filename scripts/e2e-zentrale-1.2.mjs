@@ -79,6 +79,15 @@ const dialoge = [];
   ok(await bis(`[...document.querySelectorAll("#kacheln .b-kachel__titel")].map(h=>h.textContent).join(",")==="Rätselspaß"`), "Kategorie „Puzzle“ → nur Rätselspaß");
   await eval_(`[...document.querySelectorAll("#tag-filter .b-marke")][0].click(); true`);
   await bis(`!!document.getElementById("reihe-alle")`);
+  // Sebs Test 13.11.2026: „Alle Spiele“ ist nicht mehr einstellbar und steht immer ganz unten – auch bei alten Einstellungen (oben, ausgeblendet)
+  await eval_(`fetch("/api/einstellungen",{method:"PUT",headers:{"Content-Type":"application/json","X-Bibliothek":"1"},body:JSON.stringify({startseite:{abschnitte:[{id:"alle",sichtbar:false},{id:"weiterspielen",sichtbar:true}]}})}).then(r=>r.status)`);
+  await gehe(G + "/", 3500);
+  ok(await bis(`document.getElementById("reihe-alle") && document.getElementById("reihe-alle")===[...document.querySelectorAll("#startseite > *")].pop()`), "„Alle Spiele“ trotz alter Einstellung (oben, aus) sichtbar und ganz unten");
+  await gehe(G + "/#/einstellungen", 3500);
+  ok(await bis(`document.querySelectorAll(".b-sortierliste__eintrag").length===4 && ![...document.querySelectorAll(".b-sortierliste__text")].some(l=>l.textContent==="Alle Spiele")`), "Einstellungen → Startseite ohne „Alle Spiele“");
+  await eval_(`fetch("/api/einstellungen",{method:"PUT",headers:{"Content-Type":"application/json","X-Bibliothek":"1"},body:JSON.stringify({startseite:{abschnitte:[]}})}).then(r=>r.status)`);
+  await gehe(G + "/", 3500);
+  await bis(`!!document.getElementById("reihe-alle")`);
   ok(await eval_(`${kachel("Zähler")}.querySelector("[data-daumen]").disabled`), "Eigenes Spiel: Daumen nur Anzeige");
   await eval_(`${kachel("Rätselspaß")}.querySelector("[data-daumen]").click(); true`);
   ok(await bis(`${kachel("Rätselspaß")}.querySelector("[data-daumen]").textContent==="1" && ${kachel("Rätselspaß")}.querySelector("[data-daumen]").getAttribute("aria-pressed")==="true"`), "Daumen auf der Kachel gegeben → 1");

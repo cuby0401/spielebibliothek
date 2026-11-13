@@ -47,9 +47,10 @@ SEITEN_REG["einstellungen"] = async (c) => {
 		UI.aussehenAnwenden(aussehen);
 		await einstellungenSpeichern({ aussehen: { [schluessel]: wert } });
 	};
-	const NAMEN = { weiterspielen: "Weiterspielen", favoriten: "Favoriten", neu: "Neu in der Bibliothek", "spiel-der-woche": "Spiel der Woche", alle: "Alle Spiele" };
+	// „Alle Spiele“ ist nicht einstellbar, steht immer ganz unten (Sebs Test 13.11.2026). Der Server hängt es beim Speichern selbst ans Ende.
+	const NAMEN = { weiterspielen: "Weiterspielen", favoriten: "Favoriten", neu: "Neu in der Bibliothek", "spiel-der-woche": "Spiel der Woche" };
 	const abschnitte = ((einstellungen.startseite || {}).abschnitte || Object.keys(NAMEN).map((id) => ({ id, sichtbar: true })))
-		.map((a) => ({ ...a, text: NAMEN[a.id] || a.id }));
+		.filter((a) => a.id in NAMEN).map((a) => ({ ...a, text: NAMEN[a.id] }));
 	const rolle = ich.admin ? "Admin" : ich.uploader ? "Entwickler" : "Spieler";
 	c.append(
 		titel("Einstellungen"),
@@ -62,7 +63,7 @@ SEITEN_REG["einstellungen"] = async (c) => {
 				UI.segment({ id: "e-kachel", label: "Größe der Spielkacheln", hinweis: "Wie groß die Spiele auf der Startseite erscheinen.", optionen: UI.AUSSEHEN.kachelgroesse,
 					wert: aussehen.kachelgroesse || "mittel", onwechsel: (w) => aussehenSetzen("kachelgroesse", w) }),
 			] }),
-			UI.karte({ titel: "Startseite", untertitel: "Welche Bereiche du auf der Startseite siehst und in welcher Reihenfolge. „Alle Spiele“ bleibt immer da.", inhalt: [
+			UI.karte({ titel: "Startseite", untertitel: "Welche Bereiche du auf der Startseite siehst und in welcher Reihenfolge. „Alle Spiele“ steht immer ganz unten.", inhalt: [
 				UI.sortierliste({ label: "Bereiche", ohneLabel: true, eintraege: abschnitte,
 					onwechsel: (liste) => einstellungenSpeichern({ startseite: { abschnitte: liste } }) }),
 			] }),

@@ -323,9 +323,11 @@
       "titel": "Sortierung und Schalter wirken wie vorher",
       "schritte": [
         "Einstellungen → Bibliothek → Spiele sortieren: wähle „Meistgespielt“ (neu in der Auswahl) und geh zur Startseite.",
-        "Schalte „Bestenliste neben dem Spiel“ aus und öffne ein Spiel. Schalte sie danach wieder ein."
+        "Schalte „Bestenliste neben dem Spiel“ aus und öffne ein Spiel. Schalte sie danach wieder ein.",
+        "Einstellungen → Startseite: schau dir die Liste der Bereiche an, dann die Startseite."
       ],
-      "erwartet": "Die Spiele sind nach Spielzeit sortiert. Ohne den Schalter fehlt die Bestenliste neben dem Spiel, mit Schalter ist sie wieder da."
+      "erwartet": "Die Spiele sind nach Spielzeit sortiert. Ohne den Schalter fehlt die Bestenliste neben dem Spiel, mit Schalter ist sie wieder da. Unter „Startseite“ steht „Alle Spiele“ nicht mehr in der Liste (nur Weiterspielen, Favoriten, Neu in der Bibliothek, Spiel der Woche). Auf der Startseite steht „Alle Spiele“ immer ganz unten.",
+      "neuAb": "2026-11-13T12:58:33+00:00"
     },
     {
       "id": "design-kachelgroesse-startseite",
