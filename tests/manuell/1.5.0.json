@@ -58,7 +58,8 @@
         "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
         "Nach dem Test „Handle ändern“: Gib in der Adresszeile hinter „test.cuby0401.uk/“ ein: „#/profil/“ und dein ALTES Handle (z. B. #/profil/emil)."
       ],
-      "erwartet": "Dein Profil öffnet sich und zeigt dein NEUES Handle (@…). Es kommt keine Fehlermeldung."
+      "erwartet": "Dein Profil öffnet sich wie beim Klick auf deinen Namen oben rechts: mit der Leiste links, über die volle Breite, und es zeigt dein NEUES Handle (@…). In der Adresszeile steht danach „#/profil“. Es kommt keine Fehlermeldung.",
+      "neuAb": "2026-11-13T10:33:36+00:00"
     },
     {
       "id": "handle-regeln",
@@ -117,7 +118,8 @@
         "CRM: Tipp nacheinander ins Suchfeld: eine Nummer (z. B. P-0003), einen Vornamen, ein Handle mit @, einen Teil einer E-Mail-Adresse.",
         "Tipp etwas, das genau eine Person findet, und drück Enter."
       ],
-      "erwartet": "Die Liste filtert bei jedem Zeichen. Jede der vier Arten findet die richtige Person. Bei genau einem Treffer öffnet Enter direkt die Personenkarte."
+      "erwartet": "Die Liste filtert bei jedem Zeichen. Jede der vier Arten findet die richtige Person. Bei genau einem Treffer öffnet Enter direkt die Personenkarte.",
+      "neuAb": "2026-11-13T10:33:36+00:00"
     },
     {
       "id": "crm-kacheln-filter",
@@ -126,11 +128,12 @@
       "nurAdmin": true,
       "schritte": [
         "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
-        "CRM: Klick auf die Kachel „eingeladen“, dann auf „seit 30 Tagen nicht da“.",
+        "CRM: Klick nacheinander auf die Kacheln „aktiv in 30 Tagen“, „eingeladen“ und „seit 30 Tagen nicht da“.",
         "Klick einen Rollen-Filter (z. B. Entwickler) an und wieder aus.",
         "Klick „✕ Filter löschen“."
       ],
-      "erwartet": "Jede Kachel und jeder Filter zeigt nur passende Personen, der aktive Filter ist grün. „✕ Filter löschen“ zeigt wieder alle."
+      "erwartet": "Jede Kachel und jeder Filter zeigt nur passende Personen, der aktive Filter ist grün. Bei „aktiv in 30 Tagen“ stimmt die Zahl der Zeilen mit der Kachel überein, wer „noch nie angemeldet“ ist, fehlt. „✕ Filter löschen“ zeigt wieder alle.",
+      "neuAb": "2026-11-13T10:33:36+00:00"
     },
     {
       "id": "crm-karte-ueberblick",

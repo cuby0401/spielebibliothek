@@ -301,7 +301,7 @@
 	const pnr = (nr) => nr ? "P-" + String(nr).padStart(4, "0") : "";
 	const personLink = (p) => "#person/" + (p.status === "geloescht" || !p.handle ? pnr(p.nr) : p.handle);
 	const tageHer = (iso) => iso ? Math.floor((Date.now() - new Date(iso)) / 864e5) : Infinity;
-	const crmFilter = { q: "", rolle: "", status: "", inaktiv: false };   // bleibt beim Hin und Her zur Personenkarte erhalten
+	const crmFilter = { q: "", rolle: "", status: "", inaktiv: false, aktiv: false };   // bleibt beim Hin und Her zur Personenkarte erhalten
 
 	async function personenSeite(c) {
 		const [d, cf] = await Promise.all([api("GET", "/personen"), api("GET", "/cloudflare").catch(() => ({ eingerichtet: false }))]);
@@ -324,12 +324,15 @@
 
 		const sichtbar = d.personen.filter((p) => !RAUS(p.status));
 		const inaktiv = (p) => p.status !== "eingeladen" && !p.nieAngemeldet && tageHer(p.zuletzt) > 30;
+		// Kachel „aktiv in 30 Tagen“ filtert seit 1.5.0 wirklich (vorher zeigte sie alle, Seb 10.11.)
+		const aktiv = (p) => !p.nieAngemeldet && !!p.zuletzt && tageHer(p.zuletzt) <= 30;
 		const treffer = () => {
 			const q = crmFilter.q.trim().toLowerCase().replace(/^@/, "");
 			const nur = crmFilter.status === "auffaellig" ? null : crmFilter.status;
 			return d.personen.filter((p) => (nur ? p.status === nur : crmFilter.status === "auffaellig" ? ["verwarnt", "gesperrt"].includes(p.status) : !RAUS(p.status))
 				&& (!crmFilter.rolle || p.rollen.includes(crmFilter.rolle))
 				&& (!crmFilter.inaktiv || inaktiv(p))
+				&& (!crmFilter.aktiv || aktiv(p))
 				&& (!q || [pnr(p.nr), String(p.nr || ""), p.handle, ...(p.alteHandles || []), p.anzeigename, p.vorname, p.nachname, ...p.emails]
 					.filter(Boolean).some((x) => String(x).toLowerCase().includes(q))));
 		};
@@ -359,13 +362,13 @@
 		const liste = UI.tabelle({ titel: "Personen", spalten, zeilen: treffer(), schluessel: "handle", onzeile: (p) => { location.hash = personLink(p); },
 			leer: "Keine Person passt zur Suche." });
 		const neuZeigen = () => { c.replaceChildren(); personenSeite(c); };
-		const kachel = (wert, label, f) => UI.kennzahl({ wert, label, onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false }, f); neuZeigen(); } });
+		const kachel = (wert, label, f) => UI.kennzahl({ wert, label, onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false, aktiv: false }, f); neuZeigen(); } });
 		const chip = (text, an, setzen) => UI.marke({ text, an, onclick: () => { setzen(); neuZeigen(); } });
-		const filterAn = crmFilter.rolle || crmFilter.status || crmFilter.inaktiv;
+		const filterAn = crmFilter.rolle || crmFilter.status || crmFilter.inaktiv || crmFilter.aktiv;
 		c.append(UI.abschnitt({ titel: `CRM (${sichtbar.length})`, aktionen: [suche], inhalt: UI.stapel([
 			UI.raster([
 				kachel(sichtbar.length, "Personen", {}),
-				kachel(sichtbar.filter((p) => tageHer(p.zuletzt) <= 30).length, "aktiv in 30 Tagen", {}),
+				kachel(sichtbar.filter(aktiv).length, "aktiv in 30 Tagen", { aktiv: true }),
 				kachel(sichtbar.filter((p) => p.status === "eingeladen").length, "eingeladen", { status: "eingeladen" }),
 				kachel(sichtbar.filter((p) => ["verwarnt", "gesperrt"].includes(p.status)).length, "verwarnt oder gesperrt", { status: "auffaellig" }),
 				kachel(sichtbar.filter(inaktiv).length, "seit 30 Tagen nicht da", { inaktiv: true })], { art: "kennzahlen" }),
@@ -373,9 +376,10 @@
 				...d.rollen.map((r) => chip(ROLLEN_TEXT[r], crmFilter.rolle === r, () => { crmFilter.rolle = crmFilter.rolle === r ? "" : r; })),
 				leise("Status:"),
 				...d.status.map((s) => chip(STATUS_TEXTE[s], crmFilter.status === s, () => { crmFilter.status = crmFilter.status === s ? "" : s; })),
-				chip("seit 30 Tagen nicht da", crmFilter.inaktiv, () => { crmFilter.inaktiv = !crmFilter.inaktiv; }),
+				chip("aktiv in 30 Tagen", crmFilter.aktiv, () => { crmFilter.aktiv = !crmFilter.aktiv; if (crmFilter.aktiv) crmFilter.inaktiv = false; }),
+				chip("seit 30 Tagen nicht da", crmFilter.inaktiv, () => { crmFilter.inaktiv = !crmFilter.inaktiv; if (crmFilter.inaktiv) crmFilter.aktiv = false; }),
 				filterAn ? UI.knopf({ art: "leise", groesse: "s", ikon: "schliessen", text: "Filter löschen",
-					onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false }); neuZeigen(); } }) : null]),
+					onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false, aktiv: false }); neuZeigen(); } }) : null]),
 			liste, einladen, cloudflareBox(cf),
 			d.mail ? null : leise("E-Mail-Versand nicht eingerichtet (SMTP_* in der .env) – Einladungen dann selbst verschicken."),
 			UI.leiste([UI.knopf({ art: "leise", groesse: "s", href: "#protokoll", text: "Prüfprotokoll aller Änderungen", ikon: "verlauf", ikonRechts: "winkel-rechts" })])]) }));

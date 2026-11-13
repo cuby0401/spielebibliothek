@@ -27,6 +27,8 @@ Plan im Vault: `Projekte/Spielebibliothek/Architektur/Identitaet-und-CRM-1.5.0.m
 - **Behoben:** Bestenliste: Bei Gleichstand in derselben Sekunde entschied der Name statt der Reihenfolge.
 - **Behoben:** Admin-Panel → Letzte Anmeldungen: Die Spalte „Spieler“ war seit 1.4.1 leer.
 - **Behoben:** `scripts/e2e-alle.sh` zeigte bei einem Absturz ohne Prüfpunkt nichts an.
+- **Behoben:** CRM: Die Kachel „aktiv in 30 Tagen“ zeigte alle Personen, auch nie angemeldete. Jetzt filtert sie, dazu gibt es den Filter „aktiv in 30 Tagen“ bei den Status-Filtern.
+- **Behoben:** Ein alter Link mit früherem Handle (`#/profil/<altes Handle>`) öffnete das eigene Profil schmal und ohne Konto-Leiste. Jetzt leitet er auf die aktuelle Adresse um.
 - **Tests:** `test_identitaet.py` (Umstellung, Rückweg, Fehler mittendrin, keine UUID in irgendeiner Antwort – Gegenprobe ohne Übersetzung rot), `test_handle.py`, `test_zugriff.py` (fremde IDs an jedem Admin-Endpunkt, Gegenprobe rot), Bridge-Test für den Zwischenspeicher, Ende-zu-Ende `scripts/e2e-zentrale-1.5.mjs`. Die ganze Sammlung läuft mit UUIDs im Hintergrund, mit `TEST_IDENTITAET_UUID=0` wie in 1.4.1.
 
 ## 1.4.1 – 09.11.2026
