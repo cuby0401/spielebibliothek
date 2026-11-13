@@ -359,6 +359,8 @@ SEITEN_REG["antrag"] = async (c) => {
 // ---------- Profil (Zentrale 1.2.0): Spielzeit, Erfolge, Bestplätze ----------
 SEITEN_REG["profil"] = async (c) => {
 	const d = await Bridge.json("GET", "/api/profil/" + encodeURIComponent(profilName));
+	// Alter Link mit früherem Handle (1.5.0): auf die aktuelle Adresse umleiten – das eigene Profil dann mit Konto-Leiste wie gewohnt
+	if (d.name && d.name !== profilName && !profilName.includes("~")) { location.replace(d.ich ? "#/profil" : "#/profil/" + encodeURIComponent(d.name)); return; }
 	// Kopf (Zentrale 1.4.0): Bild, Name, Rollen, dabei seit – Spielzeit, Spiele, Erfolge klein in der Ecke
 	const rollen = (d.rollen || []).filter((r) => r !== "spieler" || d.rollen.length === 1);
 	c.append(h("h1", { text: d.ich ? "Mein Profil" : "Profil von " + (d.anzeigename || d.name) }),

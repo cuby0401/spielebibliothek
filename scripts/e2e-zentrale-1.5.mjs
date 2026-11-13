@@ -96,6 +96,8 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   ok(await eval_(`document.body.textContent.includes("Wieder änderbar ab")`), "Hinweis „Wieder änderbar ab …“");
   await gehe(G + "/#/profil/seb", 3500);
   ok(await bis(`document.querySelector(".profil-kopf")?.textContent.includes("@seb_e2e")`), "Alte Profil-Adresse #/profil/seb zeigt @seb_e2e");
+  // Sebs Test 13.11.: alter Link öffnete das eigene Profil ohne Konto-Leiste (schmal) – jetzt Umleitung auf #/profil
+  ok(await bis(`location.hash==="#/profil" && !!document.querySelector(".konto")`), "Alter Link: eigenes Profil mit Konto-Leiste (#/profil)");
   ok(await eval_(OHNE_UUID), "Bibliothek ohne UUID");
   // Admin setzt zurück (ohne Frist); das alte Handle bleibt reserviert
   ok(await eval_(`fetch("/api/admin/personen/seb_e2e/handle",{method:"POST",headers:{"X-Bibliothek":"1","Content-Type":"application/json"},body:JSON.stringify({handle:"seb"})}).then(r=>r.json()).then(p=>p.handle==="seb")`), "Admin setzt @seb zurück (ohne Frist)");
@@ -115,6 +117,14 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
   await tippen("input.crm-suche", "");
   await eval_(`[...document.querySelectorAll("button.kennzahl")].find(b=>b.textContent.includes("verwarnt oder gesperrt")).click(); true`);
   ok(await bis(`${ZEILEN}.length===0 || ${ZEILEN}.every(t=>/verwarnt|gesperrt/.test(t.textContent))`), "Kachel „verwarnt oder gesperrt“ filtert");
+  // Sebs Test 10.11.: „aktiv in 30 Tagen“ zeigte alle Personen, auch nie angemeldete
+  await bis(`[...document.querySelectorAll("button.kennzahl")].some(b=>b.textContent.includes("aktiv in 30 Tagen"))`);
+  const aktivZahl = await eval_(`+[...document.querySelectorAll("button.kennzahl")].find(b=>b.textContent.includes("aktiv in 30 Tagen")).querySelector(".wert").textContent`);
+  await eval_(`[...document.querySelectorAll("button.kennzahl")].find(b=>b.textContent.includes("aktiv in 30 Tagen")).click(); true`);
+  ok(await bis(`${ZEILEN}.length===${aktivZahl} && ${ZEILEN}.every(t=>!t.textContent.includes("noch nie angemeldet")) && [...document.querySelectorAll(".chips .chip.an")].some(c=>c.textContent==="aktiv in 30 Tagen")`), "Kachel „aktiv in 30 Tagen“ filtert (ohne nie Angemeldete), Filter grün");
+  await bis(`[...document.querySelectorAll(".chips .chip")].some(c=>c.textContent==="✕ Filter löschen")`);
+  await eval_(`[...document.querySelectorAll(".chips .chip")].find(c=>c.textContent==="✕ Filter löschen").click(); true`);
+  ok(await bis(`![...document.querySelectorAll(".chips .chip.an")].length`), "„✕ Filter löschen“ hebt ihn auf");
   ok(await eval_(`(()=>{const h=[...document.querySelectorAll("h2")].find(x=>x.textContent==="Letzte Anmeldungen"); const t=h?.nextElementSibling?.nextElementSibling; return !t || [...t.querySelectorAll("tbody tr td:first-child")].every(td=>td.textContent.trim().length>0)})()`), "Letzte Anmeldungen: Spalte Spieler gefüllt");
   ok(!fehler.length, "Keine JavaScript-Fehler" + (fehler.length ? ": " + fehler.join(" | ") : ""));
   console.log(ergebnis.join("\n"));

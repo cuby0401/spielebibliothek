@@ -299,7 +299,7 @@ function initialen(ziel, text, schluessel) {
 	ziel.style.setProperty("--avatar-farbe", `hsl(${n % 360} 55% 42%)`);
 	return ziel;
 }
-const crmFilter = { q: "", rolle: "", status: "", inaktiv: false };   // bleibt beim Hin und Her zur Personenkarte erhalten
+const crmFilter = { q: "", rolle: "", status: "", inaktiv: false, aktiv: false };   // bleibt beim Hin und Her zur Personenkarte erhalten
 
 async function personenSeite(c) {
 	const [d, cf] = await Promise.all([api("GET", "/personen"), api("GET", "/cloudflare").catch(() => ({ eingerichtet: false }))]);
@@ -322,6 +322,8 @@ async function personenSeite(c) {
 
 	const sichtbar = d.personen.filter((p) => !RAUS(p.status));
 	const inaktiv = (p) => p.status !== "eingeladen" && !p.nieAngemeldet && tageHer(p.zuletzt) > 30;
+	// Kachel „aktiv in 30 Tagen“ filtert seit 1.5.0 wirklich (vorher zeigte sie alle, Seb 10.11.)
+	const aktiv = (p) => !p.nieAngemeldet && !!p.zuletzt && tageHer(p.zuletzt) <= 30;
 	// Klein oben rechts, ohne Autofokus (Seb, 10.11.): sonst sprang der Cursor hinein und Safari bot sofort E-Mail-Adressen an
 	const suche = h("input", { type: "search", class: "crm-suche", placeholder: "Suchen: Nr., Name, @handle …", value: crmFilter.q, "aria-label": "Person suchen",
 		title: "Nummer (P-0003), Name, @handle (auch frühere) oder Login-Adresse – Enter öffnet die Karte, wenn es genau einen Treffer gibt", autocomplete: "off", name: "crm-suche", spellcheck: "false" });
@@ -331,6 +333,7 @@ async function personenSeite(c) {
 		return d.personen.filter((p) => (nur ? p.status === nur : crmFilter.status === "auffaellig" ? ["verwarnt", "gesperrt"].includes(p.status) : !RAUS(p.status))
 			&& (!crmFilter.rolle || p.rollen.includes(crmFilter.rolle))
 			&& (!crmFilter.inaktiv || inaktiv(p))
+			&& (!crmFilter.aktiv || aktiv(p))
 			&& (!q || [pnr(p.nr), String(p.nr || ""), p.handle, ...(p.alteHandles || []), p.anzeigename, p.vorname, p.nachname, ...p.emails]
 				.filter(Boolean).some((x) => String(x).toLowerCase().includes(q))));
 	};
@@ -354,13 +357,13 @@ async function personenSeite(c) {
 	suche.addEventListener("input", () => { crmFilter.q = suche.value; fuellen(); });
 	suche.addEventListener("keydown", (e) => { if (e.key === "Enter") { const t = treffer(); if (t.length === 1) location.hash = personLink(t[0]); } });
 	const neuZeigen = () => { c.replaceChildren(); personenSeite(c); };
-	const kachel = (wert, text, f) => h("button", { type: "button", class: "kennzahl", onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false }, f); neuZeigen(); } },
+	const kachel = (wert, text, f) => h("button", { type: "button", class: "kennzahl", onclick: () => { Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false, aktiv: false }, f); neuZeigen(); } },
 		h("div", { class: "wert", text: String(wert) }), h("div", { class: "text", text }));
 	const chip = (text, an, setzen) => h("button", { type: "button", class: "chip" + (an ? " an" : ""), text, onclick: () => { setzen(); neuZeigen(); } });
 	c.append(h("div", { class: "crm-titel" }, h("h2", { text: `CRM (${sichtbar.length})` }), suche),
 		h("div", { class: "kacheln-klein" },
 			kachel(sichtbar.length, "Personen", {}),
-			kachel(sichtbar.filter((p) => tageHer(p.zuletzt) <= 30).length, "aktiv in 30 Tagen", {}),
+			kachel(sichtbar.filter(aktiv).length, "aktiv in 30 Tagen", { aktiv: true }),
 			kachel(sichtbar.filter((p) => p.status === "eingeladen").length, "eingeladen", { status: "eingeladen" }),
 			kachel(sichtbar.filter((p) => ["verwarnt", "gesperrt"].includes(p.status)).length, "verwarnt oder gesperrt", { status: "auffaellig" }),
 			kachel(sichtbar.filter(inaktiv).length, "seit 30 Tagen nicht da", { inaktiv: true })),
@@ -368,8 +371,9 @@ async function personenSeite(c) {
 			...d.rollen.map((r) => chip(ROLLEN_TEXT[r], crmFilter.rolle === r, () => { crmFilter.rolle = crmFilter.rolle === r ? "" : r; })),
 			h("span", { class: "leise", text: "Status:" }),
 			...d.status.map((s) => chip(STATUS_TEXTE[s], crmFilter.status === s, () => { crmFilter.status = crmFilter.status === s ? "" : s; })),
-			chip("seit 30 Tagen nicht da", crmFilter.inaktiv, () => { crmFilter.inaktiv = !crmFilter.inaktiv; }),
-			crmFilter.rolle || crmFilter.status || crmFilter.inaktiv ? chip("✕ Filter löschen", false, () => Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false })) : null),
+			chip("aktiv in 30 Tagen", crmFilter.aktiv, () => { crmFilter.aktiv = !crmFilter.aktiv; if (crmFilter.aktiv) crmFilter.inaktiv = false; }),
+			chip("seit 30 Tagen nicht da", crmFilter.inaktiv, () => { crmFilter.inaktiv = !crmFilter.inaktiv; if (crmFilter.inaktiv) crmFilter.aktiv = false; }),
+			crmFilter.rolle || crmFilter.status || crmFilter.inaktiv || crmFilter.aktiv ? chip("✕ Filter löschen", false, () => Object.assign(crmFilter, { rolle: "", status: "", inaktiv: false, aktiv: false })) : null),
 		h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
 			h("thead", {}, h("tr", {}, ...["Nr.", "Person", "E-Mail", "Rollen", "Status", "Zuletzt aktiv", ...(mitCf ? ["Cloudflare"] : [])].map((t) => h("th", { text: t })))), tbody)),
 		einladen, cloudflareBox(cf),
