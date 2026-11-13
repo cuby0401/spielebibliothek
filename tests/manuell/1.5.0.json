@@ -1,6 +1,6 @@
 {
   "version": "1.5.0",
-  "hinweis": "Der Testserver ist eine Kopie der echten Bibliothek mit deinem Konto. Nichts davon landet im Live-System. Neu in 1.5.0: Jede Person hat innen eine feste ID, außen ihr Handle (bisher der Benutzername), das sich alle 30 Tage ändern lässt. Hier stehen nur Dinge, die in 1.5.0 NEU sind, jedes einzeln. Die Admin-Tests sieht nur Seb.",
+  "hinweis": "Der Testserver ist eine Kopie der echten Bibliothek mit deinem Konto. Nichts davon landet im Live-System. Neu in 1.5.0: Jede Person hat innen eine feste ID, außen ihr Handle (bisher der Benutzername), das sich alle 30 Tage ändern lässt. Hier stehen nur Dinge, die in 1.5.0 NEU sind, jedes einzeln. Die Admin-Tests sieht nur Seb. Ebenfalls neu in 1.5.0: das neue Design – alle Seiten aus denselben Bausteinen, Aussehen (Thema, Farbe, Abstände, Kachelgröße) und Startseite selbst einstellbar. Diese Tests beginnen mit „Neues Design“.",
   "tests": [
     {
       "id": "umstellung-alles-da",
@@ -254,6 +254,220 @@
         "Nach dem Neustart test.cuby0401.uk öffnen."
       ],
       "erwartet": "Der Testserver ist da, ohne dass jemand die Container von Hand starten musste."
+    },
+    {
+      "id": "design-einstellungen-neu",
+      "bereich": "Neues Design: Einstellungen",
+      "titel": "Die Einstellungsseite ist neu aufgebaut",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Klick oben rechts auf deinen Namen, dann links auf „Einstellungen“."
+      ],
+      "erwartet": "Du siehst vier Karten untereinander: Aussehen, Startseite, Bibliothek, Konto. Alles ist gut lesbar, nichts überlappt, nichts ist abgeschnitten. Oben steht das Band „Probe-Zentrale“."
+    },
+    {
+      "id": "design-thema-wechseln",
+      "bereich": "Neues Design: Aussehen",
+      "titel": "Hell, Dunkel und Automatisch",
+      "schritte": [
+        "Einstellungen → Aussehen → Thema: tippe auf „Dunkel“.",
+        "Dann auf „Hell“, dann wieder auf „Automatisch“.",
+        "Wechsle bei „Automatisch“ in den Systemeinstellungen deines Geräts zwischen hellem und dunklem Modus."
+      ],
+      "erwartet": "Die ganze Seite wechselt sofort, auch Kopfleiste und Hintergrund, nicht nur die Karten. Bei „Automatisch“ folgt die Bibliothek deinem Gerät."
+    },
+    {
+      "id": "design-kein-aufblitzen",
+      "bereich": "Neues Design: Aussehen",
+      "titel": "Kein weißes Aufblitzen im dunklen Thema",
+      "schritte": [
+        "Stell das Thema auf „Dunkel“ (dein Gerät darf dabei hell sein).",
+        "Lade die Seite neu (Cmd+R bzw. am iPhone nach unten ziehen). Mach das ein paar Mal.",
+        "Öffne auch die Startseite der Bibliothek und lade sie neu."
+      ],
+      "erwartet": "Die Seite ist vom ersten Moment an dunkel. Es blitzt nichts weiß auf."
+    },
+    {
+      "id": "design-farbe-wechseln",
+      "bereich": "Neues Design: Aussehen",
+      "titel": "Farbe wählen",
+      "schritte": [
+        "Einstellungen → Aussehen → Farbe: tippe nacheinander jeden der sechs Punkte an.",
+        "Schau dir jedes Mal die Seite an, dann geh zur Startseite und zurück."
+      ],
+      "erwartet": "Der gewählte Punkt hat einen Haken und einen Ring. Knöpfe, Links und Markierungen nehmen sofort die Farbe an, auch auf der Startseite. Jede Farbe ist gut lesbar, hell und dunkel."
+    },
+    {
+      "id": "design-abstaende-kacheln",
+      "bereich": "Neues Design: Aussehen",
+      "titel": "Abstände und Kachelgröße",
+      "schritte": [
+        "Einstellungen → Aussehen → Abstände: „Kompakt“, dann „Luftig“, dann „Normal“.",
+        "Größe der Spielkacheln: „Klein“, „Groß“, „Mittel“. Schau dir dazu jeweils die Startseite an (Bereich „Alle Spiele“)."
+      ],
+      "erwartet": "Kompakt rückt Felder und Knöpfe enger zusammen, luftig gibt mehr Platz. Auf der Startseite werden die Spielkacheln kleiner bzw. größer."
+    },
+    {
+      "id": "design-geraeteuebergreifend",
+      "bereich": "Neues Design: Aussehen",
+      "titel": "Gilt auf allen Geräten",
+      "schritte": [
+        "Stell am Mac Thema „Dunkel“ und Farbe „Violett“ ein.",
+        "Öffne den Testserver auf dem iPhone oder iPad."
+      ],
+      "erwartet": "Auch dort ist die Bibliothek dunkel und violett, ohne dass du etwas einstellen musst."
+    },
+    {
+      "id": "design-bibliothek-einstellungen",
+      "bereich": "Neues Design: Bibliothek",
+      "titel": "Sortierung und Schalter wirken wie vorher",
+      "schritte": [
+        "Einstellungen → Bibliothek → Spiele sortieren: wähle „Meistgespielt“ (neu in der Auswahl) und geh zur Startseite.",
+        "Schalte „Bestenliste neben dem Spiel“ aus und öffne ein Spiel. Schalte sie danach wieder ein."
+      ],
+      "erwartet": "Die Spiele sind nach Spielzeit sortiert. Ohne den Schalter fehlt die Bestenliste neben dem Spiel, mit Schalter ist sie wieder da."
+    },
+    {
+      "id": "design-kachelgroesse-startseite",
+      "bereich": "Neues Design: Startseite",
+      "titel": "Kachelgröße wirkt auf der Startseite",
+      "schritte": [
+        "Öffne Konto-Menü oben rechts → Einstellungen → Aussehen → „Größe der Spielkacheln“: tippe auf „Klein“.",
+        "Klick oben links auf „Spielebibliothek“ und schau dir „Alle Spiele“ an.",
+        "Zurück in die Einstellungen, „Groß“ wählen, wieder zur Startseite. Danach „Mittel“."
+      ],
+      "erwartet": "Bei „Klein“ stehen deutlich mehr Spiele nebeneinander, bei „Groß“ weniger und größere. Das gilt auch für die Reihen (Weiterspielen, Favoriten, Neu) und auf dem iPhone."
+    },
+    {
+      "id": "design-startseite-reihen",
+      "bereich": "Neues Design: Startseite",
+      "titel": "Startseite in Reihen, in deiner Reihenfolge",
+      "schritte": [
+        "Öffne die Startseite.",
+        "Einstellungen → Startseite: schieb „Favoriten“ ganz nach oben und nimm den Haken bei „Neu in der Bibliothek“ weg.",
+        "Zurück zur Startseite."
+      ],
+      "erwartet": "Die Startseite zeigt Bereiche untereinander (z. B. Weiterspielen, Favoriten, Neu in der Bibliothek, Spiel der Woche, Alle Spiele). Nach der Änderung stehen die Favoriten oben und „Neu in der Bibliothek“ fehlt. Weiterspielen/Favoriten/Neu lassen sich seitlich wischen. „Alle Spiele“ ist immer da."
+    },
+    {
+      "id": "design-volle-breite",
+      "bereich": "Neues Design: Alle Seiten",
+      "titel": "Ganzer Bildschirm wird genutzt",
+      "schritte": [
+        "Öffne die Bibliothek am Mac im großen Fenster (oder Vollbild).",
+        "Schau dir Startseite, Konto → Meine Spiele und das Admin-Panel (z. B. CRM) an.",
+        "Öffne zum Vergleich die Hilfe und eine einzelne Anfrage (Konto → Anfragen → „Öffnen“)."
+      ],
+      "erwartet": "Startseite, Konto und Admin-Panel gehen über die ganze Fensterbreite, mit gleichem Rand links und rechts – kein schmaler Streifen in der Mitte. Auf der Startseite stehen dadurch mehr Spiele nebeneinander, die Kachelgröße bleibt so, wie du sie eingestellt hast. Auch eine einzelne Anfrage geht über die ganze Breite. Nur Fließtext (Hilfe, Handbuch) bleibt lesbar schmal."
+    },
+    {
+      "id": "design-suche-kategorien",
+      "bereich": "Neues Design: Startseite",
+      "titel": "Suchen und Kategorien",
+      "schritte": [
+        "Tippe oben in „Spiele suchen …“ einen Teil eines Spielnamens.",
+        "Lösch die Suche mit dem kleinen × und tippe auf eine Kategorie (z. B. „Puzzle“), dann noch einmal darauf."
+      ],
+      "erwartet": "Beim Suchen verschwinden die Reihen, es steht „… Spiele gefunden“ mit nur den Treffern. Die Kategorie ist dunkel hervorgehoben, solange sie aktiv ist. Ein zweiter Tipp hebt sie wieder auf und die Reihen kommen zurück."
+    },
+    {
+      "id": "design-konto-menue",
+      "bereich": "Neues Design: Kopfleiste",
+      "titel": "Konto-Menü oben rechts",
+      "schritte": [
+        "Tippe oben rechts auf dein Bild/deinen Namen.",
+        "Schließ das Menü mit Esc bzw. durch Tippen daneben. Öffne es noch einmal und wähle „Meine Spielstände“."
+      ],
+      "erwartet": "Ein Menü klappt auf: dein Name, Profil, (Meine Spiele), Meine Spielstände, Anfragen, Einstellungen, Sicherheit, darunter Admin-Panel/Tester-Panel, Hilfe und rot „Abmelden“. Es sieht genauso aus wie die Glocke daneben. Auf dem iPhone kommt es unten als Blatt herein."
+    },
+    {
+      "id": "design-glocke",
+      "bereich": "Neues Design: Kopfleiste",
+      "titel": "Glocke mit Archiv",
+      "schritte": [
+        "Tippe auf die Glocke.",
+        "Archiviere eine Meldung mit dem Kasten-Symbol, tippe unten auf „Archiv ansehen“ und hol sie mit dem Pfeil zurück."
+      ],
+      "erwartet": "Die Meldungen stehen als Liste mit Datum, ungelesene mit Punkt, wichtige rot. Archivieren und Zurückholen klappt, das Menü bleibt dabei offen."
+    },
+    {
+      "id": "design-spielansicht",
+      "bereich": "Neues Design: Spiel",
+      "titel": "Ein Spiel spielen",
+      "schritte": [
+        "Öffne ein Spiel mit Bestenliste.",
+        "Gib einen Daumen, tippe auf die Versionsnummer neben dem Titel, dann auf „Vollbild“ (Esc beendet es)."
+      ],
+      "erwartet": "Oben „‹ Übersicht“, Titel, Version, Daumen und Vollbild in einer Zeile. Das Spiel steht groß mit runden Ecken, rechts die Bestenliste (dein Name in deiner Farbe) und darunter die Erfolge mit Pokal- bzw. Schloss-Symbol. Der Versionsverlauf klappt als Karte auf."
+    },
+    {
+      "id": "design-konto-seiten",
+      "bereich": "Neues Design: Konto",
+      "titel": "Konto-Bereich einheitlich",
+      "schritte": [
+        "Konto-Menü → Profil. Klick dich links durch alle Einträge (Profil, Meine Spiele, Meine Spielstände, Anfragen, Einstellungen, Sicherheit)."
+      ],
+      "erwartet": "Jede Seite hat links dieselbe Leiste (aktive Seite farbig hinterlegt), oben einen großen Titel, darunter Karten und Tabellen im selben Stil. Das Profil zeigt dein Bild, Rollen als Marken und Spielzeit/gespielt/Erfolge als große Zahlen."
+    },
+    {
+      "id": "design-dialoge-statt-popups",
+      "bereich": "Neues Design: Konto",
+      "titel": "Eigene Dialoge statt Browser-Fenster",
+      "schritte": [
+        "Konto → Sicherheit: falls vorhanden, tippe bei einem anderen Gerät auf „Trennen“ und dann auf „Abbrechen“.",
+        "Konto → Meine Spielstände: tippe bei einem Spiel auf „Neu anfangen“ und dann auf „Abbrechen“."
+      ],
+      "erwartet": "Statt des grauen Browser-Fensters erscheint ein eigener Dialog in der Mitte (iPhone: unten), mit rotem Knopf für das Gefährliche. Esc oder „Abbrechen“ schließt ihn, es passiert nichts."
+    },
+    {
+      "id": "design-anfrage-mit-bild",
+      "bereich": "Neues Design: Konto",
+      "titel": "Anfrage mit Bild",
+      "schritte": [
+        "Konto → Anfragen: Art wählen, Beschreibung schreiben, ein Bild in die gestrichelte Fläche ziehen oder antippen und auswählen.",
+        "„Anfrage senden“, dann bei der Anfrage auf „Öffnen“."
+      ],
+      "erwartet": "Das Bild erscheint als Vorschau mit „Entfernen“. Nach dem Senden kommt unten eine Meldung, die Anfrage steht unter „Meine Anfragen“ mit gelbem Status „offen“. Geöffnet zeigt sie Text, Bild und den Bereich „Antwort“. Die geöffnete Anfrage geht wie die anderen Seiten über die ganze Fensterbreite, ohne breiten Rand links und rechts."
+    },
+    {
+      "id": "design-admin-einheitlich",
+      "bereich": "Neues Design: Admin-Panel",
+      "titel": "Admin-Panel sieht aus wie die Bibliothek",
+      "schritte": [
+        "Konto-Menü → Admin-Panel.",
+        "Klick dich links durch die Bereiche, öffne das Konto-Menü oben rechts und probier eine Aktion mit Rückfrage (z. B. abbrechen)."
+      ],
+      "erwartet": "Gleiche Kopfleiste, gleiches Konto-Menü, gleiche Seitenleiste, gleiche Karten, Tabellen, Knöpfe und Dialoge wie in der Bibliothek. Thema und Farbe aus deinen Einstellungen gelten auch hier.",
+      "nurAdmin": true
+    },
+    {
+      "id": "design-upload-einheitlich",
+      "bereich": "Neues Design: Upload",
+      "titel": "Upload-Seite im selben Look",
+      "schritte": [
+        "Öffne über „Hochladen“ oben die Upload-Seite (auf dem Testserver: https://test-upload.cuby0401.uk).",
+        "Melde dich an und schau dir deine Spiele an."
+      ],
+      "erwartet": "Dieselben Felder, Knöpfe, Karten und Dialoge wie in der Bibliothek, mit Datei-Fläche zum Ziehen. Sie folgt dem hellen/dunklen Modus deines Geräts."
+    },
+    {
+      "id": "design-tester-hilfe-einheitlich",
+      "bereich": "Neues Design: Tester-Panel, Hilfe",
+      "titel": "Tester-Panel, Hilfe und Handbuch",
+      "schritte": [
+        "Öffne /tester/ (dieses Panel), dann die Hilfe (Fragezeichen oben) und das Entwickler-Handbuch (unten in der Fußzeile)."
+      ],
+      "erwartet": "Alle drei im selben Stil: gleiche Kopfleiste, gleiche Reiter, gleiche Schrift und Abstände. Lange Texte sind gut lesbar und nicht zu breit."
+    },
+    {
+      "id": "design-handy-alle-seiten",
+      "bereich": "Neues Design: Handy",
+      "titel": "Auf dem iPhone",
+      "schritte": [
+        "Öffne auf dem iPhone die Startseite, ein Spiel, das Profil, das Admin-Panel und die Upload-Seite.",
+        "Tippe oben rechts auf dein Konto-Symbol – auf der Startseite und im Konto-Bereich –, scroll dabei auch einmal etwas nach unten und öffne es dort erneut."
+      ],
+      "erwartet": "Nirgends ragt etwas über den Rand, man muss nicht seitlich scrollen. Die Seitenleisten werden zu einer wischbaren Leiste oben, Menüs und Dialoge kommen unten als Blatt herein. Das Konto-Menü kommt vollständig unten als Blatt herein, alle Einträge bis „Abmelden“ sind zu sehen und antippbar – nichts ist oben abgeschnitten."
     }
   ]
 }
