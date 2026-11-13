@@ -75,7 +75,7 @@ tokens = {
  "bewegung": {"tokens": [{"name": "b-dauer-kurz", "value": "120ms", "usage": "Farbwechsel, Hover."}, {"name": "b-dauer-mittel", "value": "200ms", "usage": "Schalter, Dialog, Meldung."},
    {"name": "b-kurve", "value": "cubic-bezier(0.2, 0.8, 0.2, 1)", "usage": "Für alle Übergänge."}]},
  "masse": {"tokens": [{"name": "b-linie-breite", "value": "1px", "usage": ""}, {"name": "b-fokus-breite", "value": "2px", "usage": "Fokusring in b-akzent, 2px Abstand."},
-   {"name": "b-inhalt-max", "value": "1200px", "usage": "Inhaltsbreite auf großen Bildschirmen."}, {"name": "b-text-max", "value": "68ch", "usage": "Höchstbreite von Fließtext."},
+   {"name": "b-inhalt-max", "value": "none", "usage": "Inhaltsbreite: volle Fensterbreite (nur Fließtext bleibt schmal)."}, {"name": "b-rand", "value": "var(--b-abstand-4), ab 900 px var(--b-abstand-6)", "usage": "Abstand des Inhalts zum Fensterrand."}, {"name": "b-text-max", "value": "68ch", "usage": "Höchstbreite von Fließtext."},
    {"name": "b-ebene-kopf", "value": "50", "usage": ""}, {"name": "b-ebene-menue", "value": "60", "usage": ""}, {"name": "b-ebene-meldung", "value": "90", "usage": ""}]},
 }
 json.dump(tokens, open(os.path.join(P, "tokens.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)

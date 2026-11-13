@@ -1,6 +1,6 @@
 # UI-Bausteine – der Werkzeugkasten für jede Oberfläche der Zentrale
 
-Stand 10.11.2026. Seb: „Diese Vorlagen sind dafür da, dass ich besser die Server bauen kann. Dann kannst du immer auf die
+Stand 13.11.2026. Seb: „Diese Vorlagen sind dafür da, dass ich besser die Server bauen kann. Dann kannst du immer auf die
 Bausteine zugreifen und kannst auch nichts Falsches bauen. Dann ist alles einheitlich.“
 
 Die Bausteine sind **kein Angebot für Spiele-Entwickler** und es gibt keine Schauseite dafür. Sie sind die Pflicht für jede
@@ -25,6 +25,9 @@ neue oder umgebaute Seite der Zentrale (Bibliothek, Konto, Upload, Hilfe, Handbu
    `UMGEBAUT` steht. `node scripts/kontrast-pruefen.mjs` prüft alle Farbpaare gegen WCAG AA.
 8. **Was man einstellen kann, muss wirken.** Kachelgröße, Abstände, Thema und Farbe gelten auf jeder Seite – darum nur
    Tokens benutzen (z. B. Spielkacheln immer in `UI.raster`/`UI.reihe`). Verbindliche Kurzfassung: `CLAUDE.md` im Repo.
+9. **Volle Fensterbreite** (Seb, 10./11.11.2026): `--b-inhalt-max` ist `none`, den Abstand zum Fensterrand regelt `--b-rand`
+   (ab 900 px `--b-abstand-6`). Schmal bleibt nur Fließtext (`b-lesetext`, `--b-text-max`, `UI.seite({schmal})`: Hilfe, Handbuch).
+   Eine einzelne Anfrage ist seit 13.11.2026 ebenfalls breit.
 
 ## Einbinden (Reihenfolge wichtig)
 
@@ -113,7 +116,7 @@ Formularbausteine haben `.wert` (lesen/setzen) und `.eingabe` (das eigentliche S
 ### Navigation und Layout
 | Baustein | Wofür | Wichtigste Optionen |
 |---|---|---|
-| `UI.kopfleiste` | Leiste oben (klebt, Milchglas) | `marke: {text, href}, mitte (z. B. Suche), rechts: [Elemente]` |
+| `UI.kopfleiste` | Leiste oben (klebt, Milchglas) | `marke: {text, href}, mitte (z. B. Suche), rechts: [Elemente]`. Das Milchglas liegt auf `::before`: ein `backdrop-filter` direkt an der Kopfleiste macht sie zum Bezugsrahmen für `position: fixed`, dann ragte das Konto-Menü (am Handy ein Blatt unten) oben aus dem Bild (13.11.2026). |
 | `UI.menue` | Popover am Knopf (Glocke, Konto) | `ausloeser (UI.knopf), eintraege: [{text, ikon, onclick/href, gefahr, rechts} \| "trenner" \| {titel}]` oder `inhalt`, `breit, ausrichtung`. Esc, Klick daneben und Pfeiltasten gehen. Auf dem Handy erscheint es unten als Blatt. In einer `UI.tabelle` schwebt es fest am Knopf (wird nicht abgeschnitten) – gut für „…“-Aktionen je Zeile |
 | `UI.reiter` | Bereiche einer Seite (Admin, Tester) | `eintraege: [{id, text, zahl, ikon}], aktiv, onwechsel(id)`, `.setzen(id)`, `.zahlSetzen(id, n)`. Mit `href` je Eintrag: Links zwischen Seiten (Hilfe-Center), aktiv = `aria-current="page"` |
 | `UI.seitenleiste` | Bereichsnavigation links (Konto, Admin) | `gruppen: [{titel, eintraege: [{id, text, ikon, href, zahl}]}], aktiv, onwechsel`. Auf dem Handy wird daraus eine waagerechte Leiste , `.setzen(id)`, `.zahlSetzen(id, n)` |
@@ -122,7 +125,7 @@ Formularbausteine haben `.wert` (lesen/setzen) und `.eingabe` (das eigentliche S
 | `UI.abschnitt` | Startseiten-Reihe, Seitenbereich | `titel, untertitel, alle: {text, href/onclick}, aktionen, inhalt, einklappbar, offen, onklappen` |
 | `UI.raster(kinder, {art: karten\|kennzahlen})` | Kacheln/Karten im Raster | Kachelbreite folgt der Kachelgröße des Spielers |
 | `UI.mauer(karten, {spalte, breit})` | Karten unterschiedlicher Höhe ohne Lücken (Personenkarte im CRM) | jede Karte in die gerade kürzeste Spalte, Wichtiges zuerst übergeben; `spalte` = Mindestbreite (360), `breit` = Elemente über die ganze Breite darunter |
-| `UI.reihe(kinder)` | waagerecht scrollende Reihe (Startseite) | |
+| `UI.reihe(kinder)` | waagerecht scrollende Reihe (Startseite) | Breite je Kachel folgt der Kachelgröße des Spielers (`--b-kachel-min` × 1,25), auch bei voller Fensterbreite. |
 | `UI.buehne` | laufendes Spiel: großer Rahmen + schmale Spalte (Bestenliste, Erfolge) | `rahmenId, seite: [Elemente]`; am Element `.gross(an)` (Fensterhöhe), `.ohneSeite(an)`, Attribut `data-flach` (niedriger Rahmen, Technik-Test) |
 | `UI.fusszeile` | Fußzeile jeder Seite | `links: [{text, href}], rechts (Text), rechtsId` |
 | `UI.stapel(kinder, {abstand: s\|l, tag: ul})` / `UI.leiste(kinder, {verteilt})` | senkrecht bzw. waagerecht anordnen | |
@@ -157,4 +160,5 @@ hilfe, buch. Neues Icon: in `site/ui/ikonen.js` eintragen (Stil Lucide, 24×24, 
 
 ## Abnahme
 - 10.11.2026: Richtung „Klar“ und Akzent Blau gewählt (Seb).
-- Bausteine-Abnahme durch Seb steht noch aus (Testplan `tests/manuell/ui-bausteine.json`). Danach beginnt Phase 2.
+- 11.11.2026: Phase 2 vorgezogen, alle Seiten aus Bausteinen (E86). Testpläne der Design-Spielwiese: `tests/manuell/design/1.0.0.json` und `1.1.0.json`.
+- 13.11.2026: Seb entscheidet, das neue Design zusammen mit Zentrale 1.5.0 auf den Testserver zu bringen (statt später als 2.0.0). Die Design-Tests stehen deshalb auch im Testplan `tests/manuell/1.5.0.json`.

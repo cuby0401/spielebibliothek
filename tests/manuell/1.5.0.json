@@ -130,9 +130,9 @@
         "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
         "CRM: Klick nacheinander auf die Kacheln „aktiv in 30 Tagen“, „eingeladen“ und „seit 30 Tagen nicht da“.",
         "Klick einen Rollen-Filter (z. B. Entwickler) an und wieder aus.",
-        "Klick „✕ Filter löschen“."
+        "Klick „Filter löschen“ (Knopf mit Kreuz rechts neben den Filtern)."
       ],
-      "erwartet": "Jede Kachel und jeder Filter zeigt nur passende Personen, der aktive Filter ist grün. Bei „aktiv in 30 Tagen“ stimmt die Zahl der Zeilen mit der Kachel überein, wer „noch nie angemeldet“ ist, fehlt. „✕ Filter löschen“ zeigt wieder alle.",
+      "erwartet": "Jede Kachel und jeder Filter zeigt nur passende Personen, der aktive Filter ist hervorgehoben (dunkel hinterlegt). Bei „aktiv in 30 Tagen“ stimmt die Zahl der Zeilen mit der Kachel überein, wer „noch nie angemeldet“ ist, fehlt. „Filter löschen“ zeigt wieder alle.",
       "neuAb": "2026-11-13T10:33:36+00:00"
     },
     {
