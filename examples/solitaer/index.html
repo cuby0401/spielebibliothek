@@ -1,0 +1,1087 @@
+<!doctype html>
+<html lang="de" data-tisch="dunkel" data-karten="papier">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Solitär</title>
+  <script src="/lib/gamesave.js"></script>
+  <style>
+    [hidden] { display: none !important; }
+    @font-face { font-family: "Fredoka"; src: url("./schrift/fredoka.woff2") format("woff2"); font-weight: 500 700; font-display: swap; }
+
+    /* ---------- Tisch: Werte wie die Bausteine der Spielebibliothek ---------- */
+    :root, [data-tisch="dunkel"] {
+      --grund: #111113; --flaeche: #1c1c1f; --flaeche-2: #26262a; --flaeche-3: #3a3a40; --text: #f2f2f5; --leise: #a1a1a8;
+      --linie: #2f2f34; --kopf: rgba(28, 28, 31, 0.72); --akzent: #4c9bff; --akzent-zart: #15294a; --akzent-text: #06142b;
+      --warnung: #f0a640; --warnung-zart: #33240f; --erfolg: #4cc27a; --abdunkeln: rgba(0, 0, 0, 0.6);
+      --meldung: #f2f2f5; --meldung-text: #111113; --schatten-3: 0 24px 64px rgba(0, 0, 0, 0.6);
+      --platz-rand: rgba(255, 255, 255, 0.16); --platz-zeichen: rgba(255, 255, 255, 0.22);
+      --karten-schatten: 0 8px 18px rgba(0, 0, 0, 0.45);
+    }
+    [data-tisch="hell"] {
+      --grund: #f5f5f7; --flaeche: #ffffff; --flaeche-2: #f0f0f3; --flaeche-3: #e6e6eb; --text: #1d1d1f; --leise: #6e6e73;
+      --linie: #e3e3e8; --kopf: rgba(255, 255, 255, 0.72); --akzent: #0a66d8; --akzent-zart: #e6effc; --akzent-text: #ffffff;
+      --warnung: #9a5b00; --warnung-zart: #fdf0dc; --erfolg: #1c7c3c; --abdunkeln: rgba(0, 0, 0, 0.36);
+      --meldung: #1d1d1f; --meldung-text: #f5f5f7; --schatten-3: 0 24px 64px rgba(0, 0, 0, 0.22);
+      --platz-rand: rgba(0, 0, 0, 0.16); --platz-zeichen: rgba(0, 0, 0, 0.2);
+      --karten-schatten: 0 6px 14px rgba(0, 0, 0, 0.12);
+    }
+
+    /* ---------- Kartendesigns ---------- */
+    [data-karten="papier"] {
+      --papier: #fdf8ec; --papier-rand: #e2d6bd; --kante: #b9ad94; --rot: #e03e3e; --schwarz: #23263a;
+      --tint-rot: #fde3df; --tint-schwarz: #e4e7f2; --kartenschrift: "Fredoka", system-ui, sans-serif; --radius-faktor: 0.12;
+    }
+    [data-karten="bunt"] {
+      --papier: #ffffff; --rot: #e8384f; --schwarz: #4757e6; --s1: #e8384f; --s2: #f08a00; --s0: #4757e6; --s3: #1a9e63;
+      --kartenschrift: "Fredoka", system-ui, sans-serif; --radius-faktor: 0.14;
+    }
+    [data-karten="klar"] {
+      --papier: #ffffff; --rot: #c4281c; --schwarz: #1d1d1f; --radius-faktor: 0.1;
+      --kartenschrift: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+    }
+    [data-tisch="dunkel"][data-karten="klar"] { --papier: #2c2c31; --rot: #ff6b5e; --schwarz: #f2f2f5; }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body { background: var(--grund); color: var(--text); display: flex; flex-direction: column; user-select: none; -webkit-user-select: none;
+           font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", system-ui, sans-serif; }
+    button { font: inherit; color: inherit; }
+    svg { flex: none; }
+
+    /* ---------- Kopfleiste ---------- */
+    #kopf { flex: none; display: flex; align-items: center; gap: 16px; padding: 12px 24px; min-height: 64px; position: relative; z-index: 50;
+            background: var(--kopf); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--linie); }
+    .kopf-links { display: flex; align-items: center; gap: 12px; flex: 1 1 0; min-width: 0; }
+    .kopf-rechts { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 1 1 0; }
+    .titel { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+    .segment { display: flex; padding: 2px; border-radius: 8px; background: var(--flaeche-2); }
+    .segment button { height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--leise);
+                      font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .segment button.an { background: var(--flaeche); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+    [data-tisch="dunkel"] .segment button.an { background: var(--flaeche-3); }
+    .punkt { width: 7px; height: 7px; border-radius: 999px; background: var(--akzent); }
+    #info { display: flex; align-items: center; gap: 16px; color: var(--leise); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #info > span { display: flex; align-items: center; gap: 6px; }
+
+    .knopf { height: 40px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; white-space: nowrap;
+             display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 120ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .knopf:hover { background: var(--flaeche-2); }
+    .knopf.standard { background: var(--flaeche-2); padding: 0 16px; font-weight: 500; }
+    .knopf.standard:hover { background: var(--flaeche-3); }
+    .knopf.primaer { background: var(--akzent); color: var(--akzent-text); padding: 0 16px; font-weight: 600; }
+    .knopf.primaer:hover { filter: brightness(1.08); background: var(--akzent); }
+    .knopf.nur-ikon { width: 40px; padding: 0; }
+    .knopf:disabled { opacity: 0.4; cursor: default; background: transparent; }
+    .knopf .nur-handy { display: none; }
+    .knopf:focus-visible, .segment button:focus-visible, .farbe:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+    .gross { height: 44px; flex: 1 1 0; }
+
+    /* ---------- Band der täglichen Patience ---------- */
+    #band { flex: none; margin: 16px auto 0; width: min(560px, calc(100% - 24px)); padding: 12px 14px; display: flex; align-items: center; gap: 12px;
+            background: var(--flaeche); border-radius: 12px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.06); position: relative; z-index: 40; }
+    .rund { width: 40px; height: 40px; border-radius: 999px; background: var(--akzent-zart); color: var(--akzent); display: grid; place-items: center; flex: none; }
+    #band .texte { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+    #band b { font-size: 15px; font-weight: 600; }
+    #band small { font-size: 13px; color: var(--leise); }
+    .pille { flex: none; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--warnung-zart); color: var(--warnung);
+             font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .pille.erfolg { background: color-mix(in srgb, var(--erfolg) 16%, transparent); color: var(--erfolg); }
+
+    /* ---------- Spielfeld ---------- */
+    #feld { position: relative; flex: 1; touch-action: none; overflow: hidden; }
+    .platz, .karte { position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); border-radius: calc(var(--cw) * var(--radius-faktor)); }
+    .platz { border: 2px dashed var(--platz-rand); display: grid; place-items: center; color: var(--platz-zeichen);
+             font: 600 calc(var(--cw) * 0.4) / 1 var(--kartenschrift); }
+    .platz.stapel { cursor: pointer; }
+    .karte { cursor: pointer; transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform; font-family: var(--kartenschrift);
+             color: var(--schwarz); background: var(--papier); box-shadow: var(--karten-schatten); }
+    .karte.rot { color: var(--rot); }
+    .karte > div { position: absolute; }
+    .karte .ecke { left: 8%; top: 5%; display: flex; align-items: baseline; line-height: 1; gap: calc(var(--cw) * 0.02); }
+    .karte .ecke .rang { font-size: calc(var(--cw) * 0.25); font-weight: 600; letter-spacing: -0.03em; }
+    .karte .ecke .sym { font-size: calc(var(--cw) * 0.19); }
+    .karte.verdeckt { box-shadow: none !important; }
+    .karte .mitte { right: 9%; bottom: 6.5%; width: 54%; aspect-ratio: 1; border-radius: 999px; display: grid; place-items: center;
+                    font-size: calc(var(--cw) * 0.34); line-height: 1; }
+    .karte .plakette { right: 9%; bottom: 6.5%; width: 54%; aspect-ratio: 1; border-radius: 30%; display: flex; flex-direction: column;
+                       align-items: center; justify-content: center; line-height: 1; }
+    .karte .plakette .rang { font-size: calc(var(--cw) * 0.28); font-weight: 700; }
+    .karte .plakette .sym { font-size: calc(var(--cw) * 0.13); }
+    .karte .plakette svg { display: none; }
+    .karte .rueckseite { inset: 0; border-radius: inherit; display: none; }
+    .karte .emblem { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; line-height: 1; }
+    .karte.bild .mitte, .karte:not(.bild) .plakette { display: none; }
+    .karte.zu { background: var(--ruecken); }
+    .karte.zu > div { display: none; }
+    .karte.zu > .rueckseite { display: block; }
+
+    /* Kartenpapier */
+    [data-karten="papier"] .karte:not(.zu) { box-shadow: inset 0 0 0 1.5px var(--papier-rand), 0 calc(var(--cw) * 0.03) 0 var(--kante), var(--karten-schatten); }
+    [data-karten="papier"] .karte.zu { box-shadow: 0 calc(var(--cw) * 0.03) 0 var(--kante), var(--karten-schatten); }
+    [data-karten="papier"] .mitte { background: var(--tint-schwarz); }
+    [data-karten="papier"] .rot .mitte { background: var(--tint-rot); }
+    [data-karten="papier"] .plakette { background: var(--schwarz); color: var(--papier); transform: rotate(-6deg); }
+    [data-karten="papier"] .rot .plakette { background: var(--rot); }
+    [data-karten="papier"] .rueckseite { background-image: radial-gradient(rgba(255, 255, 255, 0.28) calc(var(--cw) * 0.025), transparent calc(var(--cw) * 0.03));
+                                          background-size: calc(var(--cw) * 0.14) calc(var(--cw) * 0.14); }
+    [data-karten="papier"] .rueckseite::before { content: ""; position: absolute; inset: 6%; border-radius: calc(var(--cw) * 0.08);
+                                                  border: max(1.5px, calc(var(--cw) * 0.02)) solid rgba(255, 255, 255, 0.85); }
+    [data-karten="papier"] .emblem { width: 38%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 999px; background: var(--papier);
+                                      color: var(--ruecken); font-size: calc(var(--cw) * 0.22); }
+    [data-karten="papier"] .emblem::after { content: "\2660\FE0E"; }
+
+    /* Bunt */
+    [data-karten="bunt"] .karte:not(.zu) { box-shadow: inset 0 0 0 max(2px, calc(var(--cw) * 0.03)) currentColor, 0 calc(var(--cw) * 0.03) 0 rgba(0, 0, 0, 0.55), var(--karten-schatten); }
+    [data-karten="bunt"] .karte.s0 { color: var(--s0); } [data-karten="bunt"] .karte.s1 { color: var(--s1); }
+    [data-karten="bunt"] .karte.s2 { color: var(--s2); } [data-karten="bunt"] .karte.s3 { color: var(--s3); }
+    [data-karten="bunt"] .ecke { left: 5%; top: 3.5%; align-items: center; gap: calc(var(--cw) * 0.04); }
+    [data-karten="bunt"] .ecke .rang { min-width: calc(var(--cw) * 0.3); height: calc(var(--cw) * 0.3); padding: 0 3px; border-radius: 30%;
+                                        background: currentColor; display: grid; place-items: center; font-size: calc(var(--cw) * 0.21); }
+    [data-karten="bunt"] .ecke .rang span { color: #fff; }
+    [data-karten="bunt"] .mitte { right: 7%; bottom: 3%; font-size: calc(var(--cw) * 0.56); }
+    [data-karten="bunt"] .plakette { right: 9%; bottom: 4%; border-radius: 0; }
+    [data-karten="bunt"] .plakette svg { display: block; width: 60%; }
+    [data-karten="bunt"] .plakette .rang { font-size: calc(var(--cw) * 0.46); }
+    [data-karten="bunt"] .plakette .sym { display: none; }
+    [data-karten="bunt"] .karte.zu { box-shadow: inset 0 0 0 max(2.5px, calc(var(--cw) * 0.04)) #fff, 0 calc(var(--cw) * 0.03) 0 rgba(0, 0, 0, 0.55), var(--karten-schatten); }
+    [data-karten="bunt"] .rueckseite { background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0 calc(var(--cw) * 0.06), transparent calc(var(--cw) * 0.06) calc(var(--cw) * 0.14)); }
+    [data-karten="bunt"] .emblem { width: 40%; aspect-ratio: 1; transform: translate(-50%, -50%) rotate(45deg); border-radius: 30%; background: #fff;
+                                    color: var(--ruecken); font-size: calc(var(--cw) * 0.2); font-weight: 700; }
+    [data-karten="bunt"] .emblem::after { content: "S"; transform: rotate(-45deg); }
+
+    /* Klar */
+    [data-karten="klar"] .ecke .rang { font-weight: 650; font-size: calc(var(--cw) * 0.22); }
+    [data-karten="klar"] .mitte, [data-karten="klar"] .plakette { right: 8%; bottom: 4%; width: auto; aspect-ratio: auto; font-size: calc(var(--cw) * 0.48); }
+    [data-karten="klar"] .plakette .rang { display: none; }
+    [data-karten="klar"] .plakette .sym { font-size: calc(var(--cw) * 0.48); }
+    [data-karten="klar"] .karte.zu { box-shadow: inset 0 0 0 calc(var(--cw) * 0.05) var(--papier), var(--karten-schatten); }
+    [data-karten="klar"] .rueckseite { inset: 5%; border-radius: calc(var(--cw) * 0.06);
+      background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.12) 0 2px, transparent 2px 9px), repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0 2px, transparent 2px 9px); }
+
+    .karte.zieht { transition: none; }
+    .karte.tipp, .platz.tipp { outline: 3px solid var(--akzent); outline-offset: 2px; }
+    .karte.wackeln { animation: wackeln 0.3s; }
+    @keyframes wackeln { 25% { margin-left: -5px; } 75% { margin-left: 5px; } }
+    .karte.feiern { animation: huepfen 0.6s ease 6 alternate; }
+    @keyframes huepfen { to { margin-top: -10px; } }
+
+    /* ---------- Fenster ---------- */
+    .schleier { position: fixed; inset: 0; background: var(--abdunkeln); display: grid; place-items: center; padding: 16px; z-index: 5000; }
+    .fenster { background: var(--flaeche); border-radius: 18px; padding: 24px 20px 20px; width: 100%; max-width: 380px; max-height: calc(100dvh - 32px);
+               overflow: auto; display: flex; flex-direction: column; gap: 20px; box-shadow: var(--schatten-3); }
+    .fenster.mitte-text { text-align: center; }
+    .fenster .kopfzeile { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .fenster .rund { width: 56px; height: 56px; }
+    .fenster h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.2; }
+    .fenster h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+    .fenster p { margin: 0; font-size: 13px; color: var(--leise); }
+    .knoepfe { display: flex; gap: 8px; }
+    .kennzahlen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .kennzahl { padding: 12px 8px; border-radius: 12px; background: var(--grund); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .kennzahl b { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.2; }
+    .kennzahl span { font-size: 12px; color: var(--leise); text-align: center; }
+    .woche { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; text-align: center; }
+    .woche div { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--leise); }
+    .woche i { width: 36px; height: 36px; border-radius: 999px; border: 1.5px dashed var(--platz-rand); display: grid; place-items: center; font-style: normal; font-weight: 700; }
+    .woche .geloest i { border: 0; background: var(--erfolg); color: #fff; }
+    .woche .heute { color: var(--text); font-weight: 650; }
+    .woche .heute.geloest i { background: var(--akzent); color: var(--akzent-text); }
+    .zahlen { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 15px; font-variant-numeric: tabular-nums; text-align: left; }
+    .zahlen dt { color: var(--leise); } .zahlen dd { margin: 0; text-align: right; font-weight: 600; }
+    .einstellung { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+    .einstellung > span { font-size: 15px; }
+    .farben { display: flex; gap: 8px; }
+    .farbe { width: 30px; height: 30px; border-radius: 999px; border: 0; cursor: pointer; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25); }
+    .farbe.an { box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 4px var(--text); }
+    .klein { font-size: 12px; color: var(--leise); }
+    #meldung { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--meldung); color: var(--meldung-text);
+               padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 6000; pointer-events: none; max-width: calc(100% - 32px); }
+
+    /* ---------- Handy ---------- */
+    @media (max-width: 720px) {
+      #kopf { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 8px 12px 10px; }
+      .kopf-links { display: contents; }
+      .titel { grid-column: 1; grid-row: 1; padding-left: 4px; }
+      .kopf-rechts { grid-column: 2; grid-row: 1; gap: 0; }
+      #kopf .segment { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: 1fr 1fr; }
+      #kopf .segment button { height: 34px; }
+      #info { grid-column: 1 / -1; grid-row: 3; justify-content: center; gap: 14px; }
+      .kopf-rechts .knopf .text { display: none; }
+      .kopf-rechts .knopf .nur-handy { display: block; }
+      .kopf-rechts .knopf:not(.primaer) { width: 44px; height: 44px; padding: 0; background: transparent; }
+      .kopf-rechts .knopf.primaer { height: 36px; padding: 0 12px; }
+      #band { margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header id="kopf">
+    <div class="kopf-links">
+      <span class="titel">Solitär</span>
+      <div class="segment" role="group" aria-label="Spielart">
+        <button type="button" data-modus="frei">Freies Spiel</button>
+        <button type="button" data-modus="taeglich">Täglich<span class="punkt" id="punkt" aria-label="heute noch offen"></span></button>
+      </div>
+    </div>
+    <div id="info">
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="zeit">0:00</span></span>
+      <span id="zuege">0 Züge</span>
+    </div>
+    <div class="kopf-rechts">
+      <button class="knopf" id="k-zurueck" type="button" title="Rückgängig (Strg+Z)" aria-label="Rückgängig">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg><span class="text">Rückgängig</span></button>
+      <button class="knopf" id="k-tipp" type="button" aria-label="Tipp">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg><span class="text">Tipp</span></button>
+      <button class="knopf primaer" id="k-fertig" type="button" hidden>Fertig legen</button>
+      <button class="knopf standard" id="k-neu" type="button" aria-label="Neues Spiel">
+        <svg class="nur-handy" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg><span class="text">Neues Spiel</span></button>
+      <button class="knopf nur-ikon" id="k-menue" type="button" aria-label="Menü">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+    </div>
+  </header>
+
+  <section id="band" aria-label="Tägliche Patience" hidden>
+    <div class="rund"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></div>
+    <div class="texte"><b>Tägliche Patience</b><small id="band-text"></small></div>
+    <span class="pille" id="band-serie"></span>
+  </section>
+
+  <div id="feld"></div>
+  <div id="meldung" hidden></div>
+
+  <!-- Gewonnen -->
+  <div class="schleier" id="f-sieg" hidden>
+    <div class="fenster mitte-text" role="dialog" aria-labelledby="sieg-titel">
+      <div class="kopfzeile">
+        <div class="rund"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></div>
+        <h2 id="sieg-titel"></h2>
+        <p id="sieg-text"></p>
+      </div>
+      <div class="kennzahlen" id="sieg-zahlen"></div>
+      <div id="sieg-woche-block" hidden><h3>Diese Woche</h3><div class="woche" id="sieg-woche"></div></div>
+      <div class="knoepfe">
+        <button class="knopf standard gross" type="button" data-zu>Ansehen</button>
+        <button class="knopf primaer gross" type="button" id="sieg-weiter"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rückfrage -->
+  <div class="schleier" id="f-frage" hidden>
+    <div class="fenster" role="dialog" aria-labelledby="frage-titel">
+      <div><h2 id="frage-titel"></h2><p id="frage-text"></p></div>
+      <div class="knoepfe">
+        <button class="knopf standard gross" type="button" data-zu>Weiterspielen</button>
+        <button class="knopf primaer gross" type="button" id="frage-ja"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menü -->
+  <div class="schleier" id="f-menue" hidden>
+    <div class="fenster" role="dialog" aria-labelledby="menue-titel">
+      <h2 id="menue-titel">Solitär</h2>
+      <div><h3>Statistik</h3><dl class="zahlen" id="statistik"></dl></div>
+      <div>
+        <h3>Aussehen</h3>
+        <div class="einstellung"><span>Karten</span>
+          <div class="segment" role="group" aria-label="Karten"><button type="button" data-karten="papier">Papier</button><button type="button" data-karten="bunt">Bunt</button><button type="button" data-karten="klar">Klar</button></div></div>
+        <div class="einstellung"><span>Tisch</span>
+          <div class="segment" role="group" aria-label="Tisch"><button type="button" data-tisch="dunkel">Dunkel</button><button type="button" data-tisch="hell">Hell</button></div></div>
+        <div class="einstellung"><span>Rückseite</span><div class="farben" id="farben"></div></div>
+      </div>
+      <div>
+        <h3>Spiel</h3>
+        <div class="einstellung"><span>Karten ziehen</span>
+          <div class="segment" role="group" aria-label="Karten ziehen"><button type="button" data-ziehen="1">1</button><button type="button" data-ziehen="3">3</button></div></div>
+        <p class="klein" id="ziehen-hinweis"></p>
+        <div class="einstellung"><span>Sichere Karten automatisch ablegen</span>
+          <div class="segment" role="group" aria-label="Automatisch ablegen"><button type="button" data-auto="1">An</button><button type="button" data-auto="0">Aus</button></div></div>
+      </div>
+      <div class="knoepfe">
+        <button class="knopf standard gross" type="button" id="k-vonvorn">Von vorn</button>
+        <button class="knopf primaer gross" type="button" data-zu>Schließen</button>
+      </div>
+      <p class="klein" id="version"></p>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const FARBEN = ["♠︎", "♥︎", "♦︎", "♣︎"];
+    const RANG = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "B", "D", "K"];
+    const RUECKEN = { koralle: "#ff6b4a", blau: "#3d7eff", gruen: "#1fa971", violett: "#8b5cf6" };
+    const rang = (id) => (id % 13) + 1;
+    const farbe = (id) => Math.floor(id / 13);
+    const istRot = (id) => farbe(id) === 1 || farbe(id) === 2;
+
+    // Lösbare Verteilungen für die tägliche Patience (geprüft mit einem Löser, 1 Karte ziehen).
+    // Tag 1 = 14.11.2026. Nach dem Ende der Liste beginnt sie von vorn.
+    const TAEGLICH = [
+      1,3,4,5,6,7,9,10,11,12,13,15,18,20,21,22,23,24,26,27,28,29,31,33,34,
+      35,36,38,41,42,43,45,47,48,49,52,53,54,55,58,59,60,62,63,64,65,67,69,71,73,
+      74,75,76,78,79,80,81,82,83,84,87,88,90,91,92,93,94,95,96,97,98,99,102,103,105,
+      106,107,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,126,127,128,130,131,132,133,134,
+      135,136,137,138,140,141,143,146,148,150,153,154,156,160,161,162,163,164,166,167,168,169,170,171,172,
+      173,174,176,177,178,179,180,181,182,183,185,186,188,189,191,196,197,198,200,201,202,203,204,205,206,
+      209,210,212,213,214,215,217,218,219,220,222,224,226,229,230,231,232,233,234,236,240,242,244,247,248,
+      249,250,251,252,253,255,256,257,259,260,261,262,263,264,265,266,268,269,272,273,274,275,276,278,279,
+      281,283,284,285,286,288,289,290,291,292,293,294,296,297,300,301,302,306,307,308,309,310,312,313,314,
+      315,316,319,320,322,323,324,325,326,328,329,330,331,333,334,335,336,338,339,340,342,344,345,347,348,
+      349,352,354,358,359,360,362,363,364,366,367,368,371,372,374,375,376,377,378,379,380,381,382,383,384,
+      385,386,388,389,390,391,392,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,412,413,
+      415,416,419,420,421,423,424,426,427,428,429,430,431,433,434,438,439,440,441,442,443,444,445,447,448,
+      449,450,451,452,453,454,455,456,459,460,461,462,463,467,468,469,470,472,476,477,478,479,480,481,483,
+      484,486,487,489,490,491,492,497,498,499,500,501,502,503,504,506,507,511,514,518,519,520,521,523,525,
+      526,530,531,532,533,534,535,537,538,539,540,541,545,546,547,551,552,553,554,556,557,558,559,561,564,
+      567,568,573,577,578,579,580,581,582,583,585,586,587,588,589,590,591,593,594,595,596,597,599,601,602,
+      604,605,606,607,608,610,611,614,615,617,618,619,620,621,622,624,625,626,627,628,629,630,632,634,635,
+      636,637,639,640,641,644,645,647,648,649,650,651,653,654,655,656,658,659,660,661,662,663,665,667,669,
+      670,672,673,674,675,676,677,679,680,681,682,683,684,685,686,687,689,691,692,695,696,697,699,700,701,
+      702,703,706,709,710,711,712,713,716,717,718,719,720,721,723,724,725,726,728,729,730,732,733,734,736,
+      737,740,741,742,743,744,745,747,748,749,751,752,753,754,755,757,760,761,762,763,764,765,767,768,769,
+      770,771,772,773,774,776,778,779,780,782,783,785,788,789,790,791,792,793,795,796,797,798,799,801,803,
+      805,806,808,811,812,813,814,816,817,818,819,820,821,823,824,825,827,829,830,832,833,834,836,837,838,
+      841,842,844,848,849,850,851,853,854,855,858,859,860,861,862,863,864,867,868,869,870,871,872,873,878,
+      880,881,883,884,885,886,888,889,891,892,893,894,895,896,897,899,901,902,905,906,908,909,910,912,913,
+      915,917,920,921,923,924,925,926,928,929,930,932,933,935,937,938,939,941,942,945,947,950,952,953,956,
+      957,958,960,961,963,964,965,966,968,969,970,971,972,973,974,975,976,977,980,982,983,984,985,986,987,
+      988,989,990,991,992,993,994,995,996,997,999,1000,1002,1003,1004,1005,1006,1008,1009,1010,1011,1012,1013,1014,1015,
+      1019,1020,1021,1024,1025,1026,1027,1028,1029,1033,1034,1035,1036,1037,1039,1040,1043,1044,1045,1047,1048,1049,1050,1053,1054,
+      1055,1057,1058,1059,1060,1061,1062,1066,1067,1068,1069,1070,1072,1074,1075,1076,1080,1081,1082,1083,1084,1088,1089,1090,1091,
+      1094,1095,1096,1100,1101,1102,1103,1104,1105,1107,1108,1109,1110,1111,1112,1114,1115,1116,1117,1118,1119,1120,1121,1123,1124,
+      1125,1127,1128,1129,1130,1131,1132,1133,1134,1135,1136,1137,1138,1139,1141,1142,1143,1144,1146,1148,1149,1150,1151,1152,1153,
+      1156,1157,1158,1160,1161,1164,1166,1167,1168,1169,1170,1171,1173,1174,1175,1177,1179,1180,1182,1184,1185,1186,1187,1188,1189,
+      1190,1192,1193,1194,1198,1199,1200,1202,1203,1206,1207,1208,1209,1210,1211,1212,1214,1216,1218,1219,1222,1223,1225,1226,1227,
+      1228,1229,1230,1231,1233,1235,1236,1238,1239,1242,1243,1244,1245,1246,1248,1249,1251,1252,1253,1254,1260,1261,1263,1265,1266,
+      1267,1268,1270,1271,1272,1273,1275,1276,1277,1279,1280,1281,1284,1285,1286,1288,1289,1290,1293,1294,1295,1296,1298,1299,1300,
+      1301,1305,1306,1308,1310,1312,1313,1314,1315,1316,1318,1320,1322,1323,1326,1327,1328,1329,1330,1332,1333,1334,1335,1337,1340,
+      1341,1342,1343,1344,1345,1346,1347,1348,1349,1351,1354,1355,1356,1357,1358,1359,1360,1361,1363,1365,1368,1369,1370,1371,1373,
+      1374,1375,1377,1378,1380,1381,1382,1383,1385,1388,1389,1390,1392,1394,1395,1396,1398,1399,1400,1402,1403,1404,1407,1408,1409
+    ];
+    const TAG_EINS = Date.UTC(2026, 10, 14);
+
+    // ---------- Spielstand ----------
+    const STANDARD = {
+      statistik: { gespielt: 0, gewonnen: 0, besteZeit: 0, wenigsteZuege: 0, serie: 0, besteSerie: 0,
+                   taeglichGeloest: 0, tagesSerie: 0, besteTagesSerie: 0, letzterTag: 0, tage: [] },
+      einstellungen: { ziehen: 1, autoAblegen: true, karten: "papier", tisch: "dunkel", ruecken: "koralle", modus: "frei" },
+      spiel: null,
+      taeglich: null
+    };
+    const MIGRATION = {};
+    let stand = structuredClone(STANDARD);
+    const spiele = { frei: null, taeglich: null };
+    const verlaeufe = { frei: [], taeglich: [] };
+    let modus = "frei";
+    let spiel = null;        // das gerade sichtbare Spiel
+    let laufSeit = null;
+    const verlauf = () => verlaeufe[modus];
+
+    let speicherTimer = null;
+    function speichern(sofort) {
+      clearTimeout(speicherTimer);
+      const los = async () => {
+        const kopie = (s) => (s ? { ...s, zeit: s === spiel ? spielzeit() : s.zeit } : null);
+        stand.spiel = kopie(spiele.frei);
+        stand.taeglich = kopie(spiele.taeglich);
+        stand.einstellungen.modus = modus;
+        try { await GameSave.save("stand", stand); }
+        catch (e) { melden("Nicht gespeichert: " + e.message); }
+      };
+      if (sofort) los(); else speicherTimer = setTimeout(los, 700);
+    }
+
+    // ---------- Mischen ----------
+    function zufallZahlen(seed) {   // mulberry32 – genau so im Löser
+      let a = seed >>> 0;
+      return () => {
+        a = (a + 0x6D2B79F5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return (t ^ (t >>> 14)) >>> 0;
+      };
+    }
+    function mischenMit(naechste) {
+      const d = Array.from({ length: 52 }, (_, i) => i);
+      for (let i = d.length - 1; i > 0; i--) { const j = naechste() % (i + 1); [d[i], d[j]] = [d[j], d[i]]; }
+      return d;
+    }
+    function mischen() {
+      const z = new Uint32Array(52); crypto.getRandomValues(z);
+      let n = 0;
+      return mischenMit(() => z[n++]);
+    }
+
+    // ---------- Tage ----------
+    function heute() {
+      const d = new Date();
+      return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - TAG_EINS) / 86400000) + 1;
+    }
+    function datumVon(tag) { return new Date(TAG_EINS + (tag - 1) * 86400000); }
+    function datumText(tag) {
+      return datumVon(tag).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+    }
+    function tagesStart(tag) {
+      const n = TAEGLICH.length;
+      const seed = n ? TAEGLICH[((tag - 1) % n + n) % n] : tag;
+      return mischenMit(zufallZahlen(seed));
+    }
+    function tagesSerieJetzt() {
+      const st = stand.statistik;
+      return st.letzterTag >= heute() - 1 ? st.tagesSerie : 0;
+    }
+    function heuteGeloest() { return stand.statistik.letzterTag === heute(); }
+
+    // ---------- Neues Spiel ----------
+    function geben(start, art, tag) {
+      const d = start.slice();
+      const tab = [[], [], [], [], [], [], []];
+      const offen = new Array(52).fill(false);
+      for (let r = 0; r < 7; r++) for (let t = r; t < 7; t++) tab[t].push(d.pop());
+      tab.forEach((s) => { offen[s[s.length - 1]] = true; });
+      return { modus: art, tag: tag || 0, start, stock: d, waste: [], found: [[], [], [], []], tab, offen, zuege: 0, zeit: 0,
+               ziehen: art === "taeglich" ? 1 : stand.einstellungen.ziehen, gezaehlt: false, gewonnen: false, hilfe: false };
+    }
+
+    function neuesSpiel(start) {
+      uhrAus();
+      if (modus === "frei") {
+        if (spiel && spiel.gezaehlt && !spiel.gewonnen) stand.statistik.serie = 0;
+        spiele.frei = geben(start || mischen(), "frei");
+      } else {
+        const tag = heute();
+        spiele.taeglich = geben(tagesStart(tag), "taeglich", tag);
+      }
+      spiel = spiele[modus];
+      verlaeufe[modus] = [];
+      $("f-sieg").hidden = true;
+      zeichnen(true);
+      speichern(true);
+    }
+
+    function modusSetzen(neu, ohneSpeichern) {
+      uhrAus();
+      modus = neu;
+      if (modus === "taeglich") {
+        const s = spiele.taeglich;
+        if (!s || s.tag !== heute()) { spiele.taeglich = geben(tagesStart(heute()), "taeglich", heute()); verlaeufe.taeglich = []; }
+      } else if (!spiele.frei || spiele.frei.gewonnen) {
+        spiele.frei = geben(mischen(), "frei"); verlaeufe.frei = [];
+      }
+      spiel = spiele[modus];
+      document.querySelectorAll("#kopf [data-modus]").forEach((b) => b.classList.toggle("an", b.dataset.modus === modus));
+      $("band").hidden = modus !== "taeglich";
+      messen();
+      zeichnen(true);
+      uhrAn();
+      if (!ohneSpeichern) speichern();
+    }
+
+    // ---------- Zeit ----------
+    function spielzeit() { return spiel ? spiel.zeit + (laufSeit ? Date.now() - laufSeit : 0) : 0; }
+    function uhrAn() { if (spiel && spiel.gezaehlt && !spiel.gewonnen && !laufSeit && !document.hidden) laufSeit = Date.now(); }
+    function uhrAus() { if (laufSeit && spiel) spiel.zeit += Date.now() - laufSeit; laufSeit = null; }
+    function zeitText(ms) { const s = Math.floor(ms / 1000); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) { uhrAus(); speichern(true); return; }
+      if (modus === "taeglich" && spiel && spiel.tag !== heute()) { modusSetzen("taeglich"); return; }   // nach Mitternacht
+      uhrAn();
+    });
+    setInterval(infoZeigen, 1000);
+
+    // ---------- Regeln ----------
+    const oben = (stapel) => stapel[stapel.length - 1];
+    function aufAblage(id, f) {
+      const s = spiel.found[f];
+      return s.length === 0 ? rang(id) === 1 : farbe(oben(s)) === farbe(id) && rang(oben(s)) === rang(id) - 1;
+    }
+    function aufSpalte(id, t) {
+      const s = spiel.tab[t];
+      if (s.length === 0) return rang(id) === 13;
+      const o = oben(s);
+      return spiel.offen[o] && istRot(o) !== istRot(id) && rang(o) === rang(id) + 1;
+    }
+    function stapelVon(ort) {
+      if (ort.typ === "tab") return spiel.tab[ort.i];
+      if (ort.typ === "found") return spiel.found[ort.i];
+      return spiel[ort.typ];
+    }
+    function finden(id) {
+      for (const typ of ["stock", "waste"]) { const k = spiel[typ].indexOf(id); if (k >= 0) return { typ, i: 0, k }; }
+      for (let i = 0; i < 4; i++) { const k = spiel.found[i].indexOf(id); if (k >= 0) return { typ: "found", i, k }; }
+      for (let i = 0; i < 7; i++) { const k = spiel.tab[i].indexOf(id); if (k >= 0) return { typ: "tab", i, k }; }
+      return null;
+    }
+    function beweglich(ort, id) {
+      if (!ort || ort.typ === "stock" || !spiel.offen[id]) return false;
+      if (ort.typ === "tab") return true;
+      return ort.k === stapelVon(ort).length - 1;
+    }
+    function erlaubt(ort, ziel) {
+      const s = stapelVon(ort), id = s[ort.k], anzahl = s.length - ort.k;
+      if (ziel.typ === "found") return anzahl === 1 && !(ort.typ === "found" && ort.i === ziel.i) && aufAblage(id, ziel.i);
+      if (ziel.typ === "tab") return !(ort.typ === "tab" && ort.i === ziel.i) && aufSpalte(id, ziel.i);
+      return false;
+    }
+
+    // ---------- Züge ----------
+    function merken() {
+      const v = verlauf();
+      v.push(JSON.stringify({ stock: spiel.stock, waste: spiel.waste, found: spiel.found, tab: spiel.tab, offen: spiel.offen, zuege: spiel.zuege }));
+      if (v.length > 300) v.shift();
+    }
+    function gezogen() {
+      if (!spiel.gezaehlt) { spiel.gezaehlt = true; stand.statistik.gespielt++; }
+      spiel.zuege++;
+      uhrAn();
+    }
+    function aufdecken(ort) {
+      if (ort.typ !== "tab") return;
+      const s = spiel.tab[ort.i];
+      if (s.length && !spiel.offen[oben(s)]) spiel.offen[oben(s)] = true;
+    }
+    function bewegen(ort, ziel) {
+      const karten = stapelVon(ort).splice(ort.k);
+      stapelVon(ziel).push(...karten);
+      aufdecken(ort);
+    }
+    function zug(ort, ziel) { merken(); bewegen(ort, ziel); gezogen(); nachDemZug(); }
+    function ziehen() {
+      if (spiel.gewonnen || fertigLaeuft) return;
+      if (!spiel.stock.length && !spiel.waste.length) return;
+      merken();
+      if (spiel.stock.length) {
+        const n = Math.min(spiel.ziehen, spiel.stock.length);
+        for (let i = 0; i < n; i++) { const id = spiel.stock.pop(); spiel.offen[id] = true; spiel.waste.push(id); }
+      } else {
+        spiel.stock = spiel.waste.reverse();
+        spiel.stock.forEach((id) => { spiel.offen[id] = false; });
+        spiel.waste = [];
+      }
+      gezogen();
+      nachDemZug();
+    }
+    function rueckgaengig() {
+      const v = verlauf();
+      if (!v.length || spiel.gewonnen || fertigLaeuft) return;
+      Object.assign(spiel, JSON.parse(v.pop()));
+      spiel.hilfe = true;
+      zeichnen();
+      speichern();
+    }
+
+    // Sicher: Die Karte wird für keine Karte der anderen Farbe mehr als Unterlage gebraucht.
+    function sicher(id) {
+      const r = rang(id);
+      if (r <= 2) return true;
+      const andere = istRot(id) ? [0, 3] : [1, 2];
+      return andere.every((f) => spiel.found.some((s) => s.length && farbe(s[0]) === f && s.length >= r - 1));
+    }
+    function autoAblegen() {
+      let weiter = true;
+      while (weiter) {
+        weiter = false;
+        const kandidaten = [];
+        if (spiel.waste.length) kandidaten.push({ typ: "waste", i: 0, k: spiel.waste.length - 1 });
+        spiel.tab.forEach((s, i) => { if (s.length) kandidaten.push({ typ: "tab", i, k: s.length - 1 }); });
+        for (const ort of kandidaten) {
+          const id = stapelVon(ort)[ort.k];
+          if (!spiel.offen[id] || !sicher(id)) continue;
+          const f = ablageFuer(id);
+          if (f < 0) continue;
+          bewegen(ort, { typ: "found", i: f });
+          weiter = true;
+          break;
+        }
+      }
+    }
+    function ablageFuer(id) {
+      for (let f = 0; f < 4; f++) if (aufAblage(id, f) && (spiel.found[f].length || f === freieAblage())) return f;
+      return -1;
+    }
+    function freieAblage() { return spiel.found.findIndex((s) => s.length === 0); }
+
+    function nachDemZug() {
+      if (stand.einstellungen.autoAblegen) autoAblegen();
+      zeichnen();
+      if (spiel.found.every((s) => s.length === 13)) gewonnen();
+      else speichern();
+    }
+
+    function antippen(id) {
+      if (spiel.gewonnen || fertigLaeuft) return;
+      const ort = finden(id);
+      if (!ort) return;
+      if (ort.typ === "stock") { ziehen(); return; }
+      if (!beweglich(ort, id)) { wackeln(id); return; }
+      const s = stapelVon(ort);
+      if (ort.k === s.length - 1 && ort.typ !== "found") {
+        const f = ablageFuer(id);
+        if (f >= 0) { zug(ort, { typ: "found", i: f }); return; }
+      }
+      const ziele = [];
+      for (let t = 0; t < 7; t++) {
+        const z = { typ: "tab", i: t };
+        if (!erlaubt(ort, z)) continue;
+        if (ort.typ === "tab" && ort.k === 0 && spiel.tab[t].length === 0) continue;
+        ziele.push(z);
+      }
+      ziele.sort((a, b) => (spiel.tab[a.i].length ? 0 : 1) - (spiel.tab[b.i].length ? 0 : 1));
+      if (ziele.length) zug(ort, ziele[0]);
+      else wackeln(id);
+    }
+
+    // ---------- Fertig legen ----------
+    function alleOffen() { return !spiel.stock.length && !spiel.waste.length && spiel.tab.every((s) => s.every((id) => spiel.offen[id])); }
+    let fertigLaeuft = false;
+    function fertigLegen() {
+      if (fertigLaeuft || spiel.gewonnen) return;
+      fertigLaeuft = true;
+      merken();
+      const schritt = () => {
+        let best = null;
+        spiel.tab.forEach((s, i) => {
+          if (!s.length) return;
+          const id = oben(s);
+          if (ablageFuer(id) >= 0 && (!best || rang(id) < rang(best.id))) best = { id, i };
+        });
+        if (!best) { fertigLaeuft = false; nachDemZug(); return; }
+        bewegen({ typ: "tab", i: best.i, k: spiel.tab[best.i].length - 1 }, { typ: "found", i: ablageFuer(best.id) });
+        spiel.zuege++;
+        zeichnen();
+        if (spiel.found.every((s) => s.length === 13)) { fertigLaeuft = false; gewonnen(); return; }
+        setTimeout(schritt, 70);
+      };
+      if (!spiel.gezaehlt) gezogen(); else uhrAn();
+      schritt();
+    }
+
+    // ---------- Gewonnen ----------
+    async function gewonnen() {
+      uhrAus();
+      spiel.gewonnen = true;
+      const st = stand.statistik, zeit = spiel.zeit, zuege = spiel.zuege, taeglich = spiel.modus === "taeglich";
+      if (taeglich && st.letzterTag === spiel.tag) {          // heute schon gelöst: zählt nicht noch einmal
+        zeichnen();
+        speichern(true);
+        $("sieg-titel").textContent = "Nochmal gelöst";
+        $("sieg-text").textContent = "Zählt nicht noch einmal. Morgen um Mitternacht wartet die nächste.";
+        kennzahlen($("sieg-zahlen"), [[zeitText(zeit), "Zeit"], [zuege, "Züge"], [tagesSerieJetzt(), "Tage in Folge"]]);
+        wocheZeigen($("sieg-woche"));
+        $("sieg-woche-block").hidden = false;
+        $("sieg-weiter").textContent = "Freies Spiel";
+        setTimeout(() => { $("f-sieg").hidden = false; }, 700);
+        return;
+      }
+      st.gewonnen++;
+      if (!taeglich) { st.serie++; st.besteSerie = Math.max(st.besteSerie, st.serie); }
+      const neueZeit = !st.besteZeit || zeit < st.besteZeit;
+      const neueZuege = !st.wenigsteZuege || zuege < st.wenigsteZuege;
+      if (neueZeit) st.besteZeit = zeit;
+      if (neueZuege) st.wenigsteZuege = zuege;
+      let erstesMalHeute = false;
+      if (taeglich && spiel.tag === heute() && st.letzterTag !== spiel.tag) {
+        erstesMalHeute = true;
+        st.tagesSerie = st.letzterTag === spiel.tag - 1 ? st.tagesSerie + 1 : 1;
+        st.besteTagesSerie = Math.max(st.besteTagesSerie, st.tagesSerie);
+        st.letzterTag = spiel.tag;
+        st.taeglichGeloest++;
+        st.tage = [...st.tage.filter((t) => t > spiel.tag - 60), spiel.tag];
+      }
+      zeichnen();
+      speichern(true);
+      kartenEl.forEach((el, i) => { el.style.animationDelay = (i % 13) * 0.05 + "s"; el.classList.add("feiern"); });
+
+      if (taeglich) {
+        $("sieg-titel").textContent = "Tägliche Patience gelöst";
+        $("sieg-text").textContent = "Morgen um Mitternacht wartet die nächste.";
+        const serie = tagesSerieJetzt();
+        kennzahlen($("sieg-zahlen"), [[zeitText(zeit), "Zeit"], [zuege, "Züge"], [serie, serie === 1 ? "Tag in Folge" : "Tage in Folge"]]);
+        wocheZeigen($("sieg-woche"));
+        $("sieg-weiter").textContent = "Freies Spiel";
+      } else {
+        $("sieg-titel").textContent = "Gewonnen!";
+        const rekord = st.gewonnen > 1 && (neueZeit || neueZuege);
+        $("sieg-text").textContent = rekord ? (neueZeit ? "Neue Bestzeit!" : "So wenige Züge wie nie!") : "Schön gelegt.";
+        kennzahlen($("sieg-zahlen"), [[zeitText(zeit), "Zeit"], [zuege, "Züge"], [st.gewonnen, "gewonnen"]]);
+        $("sieg-weiter").textContent = "Neues Spiel";
+      }
+      $("sieg-woche-block").hidden = !taeglich;
+      setTimeout(() => { $("f-sieg").hidden = false; }, 700);
+
+      try {
+        await GameSave.submitScore({ gewonnen: st.gewonnen, taeglich: st.taeglichGeloest, tagesserie: st.besteTagesSerie, besteZeit: st.besteZeit });
+      } catch (e) { melden("Bestenliste: " + e.message); }
+
+      const erfolge = ["erster-sieg"];
+      if (st.gewonnen >= 10) erfolge.push("zehn-siege");
+      if (st.gewonnen >= 50) erfolge.push("fuenfzig-siege");
+      if (st.gewonnen >= 100) erfolge.push("hundert-siege");
+      if (zeit < 180000) erfolge.push("schnell");
+      if (zuege <= 120) erfolge.push("sparsam");
+      if (st.serie >= 5) erfolge.push("serie-fuenf");
+      if (spiel.ziehen === 3) erfolge.push("drei-karten");
+      if (!spiel.hilfe) erfolge.push("ohne-netz");
+      if (erstesMalHeute) erfolge.push("erste-taegliche");
+      if (st.tagesSerie >= 7) erfolge.push("woche-voll");
+      if (st.tagesSerie >= 30) erfolge.push("monat-voll");
+      for (const id of erfolge) { try { await GameSave.erfolg(id); } catch (e) { /* Bibliothek nicht erreichbar */ } }
+    }
+    function kennzahlen(el, paare) {
+      el.replaceChildren(...paare.map(([wert, text]) => {
+        const d = document.createElement("div"); d.className = "kennzahl";
+        const b = document.createElement("b"); b.textContent = wert;
+        const s = document.createElement("span"); s.textContent = text;
+        d.append(b, s); return d;
+      }));
+    }
+    function wocheZeigen(el) {
+      const h = heute(), wtag = (datumVon(h).getUTCDay() + 6) % 7;   // Montag = 0
+      const namen = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+      const geloest = new Set(stand.statistik.tage);
+      el.replaceChildren(...namen.map((n, i) => {
+        const tag = h - wtag + i;
+        const d = document.createElement("div");
+        if (geloest.has(tag)) d.classList.add("geloest");
+        if (tag === h) d.classList.add("heute");
+        const kreis = document.createElement("i");
+        kreis.setAttribute("aria-label", n + (geloest.has(tag) ? ": gelöst" : ": offen"));
+        if (geloest.has(tag)) kreis.textContent = "✓";
+        const t = document.createElement("span"); t.textContent = n;
+        d.append(kreis, t);
+        return d;
+      }));
+    }
+
+    // ---------- Tipp ----------
+    function tipp() {
+      if (spiel.gewonnen || fertigLaeuft) return;
+      spiel.hilfe = true;
+      const quellen = [];
+      if (spiel.waste.length) quellen.push({ typ: "waste", i: 0, k: spiel.waste.length - 1 });
+      spiel.tab.forEach((s, i) => { if (s.length) quellen.push({ typ: "tab", i, k: s.length - 1 }); });
+      for (const ort of quellen) {
+        const id = stapelVon(ort)[ort.k], f = ablageFuer(id);
+        if (f >= 0) return zeigeTipp(id, { typ: "found", i: f });
+      }
+      for (let i = 0; i < 7; i++) {
+        const s = spiel.tab[i], k = s.findIndex((id) => spiel.offen[id]);
+        if (k < 0) continue;
+        const ort = { typ: "tab", i, k };
+        for (let t = 0; t < 7; t++) {
+          if (!erlaubt(ort, { typ: "tab", i: t })) continue;
+          if (k === 0 && !spiel.tab[t].length) continue;
+          return zeigeTipp(s[k], { typ: "tab", i: t });
+        }
+      }
+      if (spiel.waste.length) {
+        const ort = { typ: "waste", i: 0, k: spiel.waste.length - 1 };
+        for (let t = 0; t < 7; t++) if (erlaubt(ort, { typ: "tab", i: t })) return zeigeTipp(oben(spiel.waste), { typ: "tab", i: t });
+      }
+      if (spiel.stock.length || spiel.waste.length) {
+        markieren([spiel.stock.length ? kartenEl[oben(spiel.stock)] : platzEl.stock]);
+        melden("Zieh eine Karte vom Stapel.");
+        return;
+      }
+      melden(modus === "taeglich" ? "Keine Züge mehr. Probier es mit Rückgängig oder „Von vorn“." : "Keine Züge mehr. Starte ein neues Spiel.");
+    }
+    function zeigeTipp(id, ziel) {
+      const s = ziel.typ === "tab" ? spiel.tab[ziel.i] : spiel.found[ziel.i];
+      markieren([kartenEl[id], s.length ? kartenEl[oben(s)] : platzEl[ziel.typ + ziel.i]]);
+    }
+    function markieren(els) {
+      els.forEach((el) => el.classList.add("tipp"));
+      setTimeout(() => els.forEach((el) => el.classList.remove("tipp")), 1400);
+    }
+
+    // ---------- Darstellung ----------
+    const feld = $("feld");
+    const kartenEl = [], platzEl = {};
+    let mass = null;
+    const KRONE = '<svg viewBox="0 0 30 20" fill="currentColor" aria-hidden="true"><path d="M2 18 L4 5 L10 11 L15 2 L20 11 L26 5 L28 18 Z"/></svg>';
+
+    function aufbauen() {
+      const div = (klasse, text) => { const el = document.createElement("div"); if (klasse) el.className = klasse; if (text) el.textContent = text; return el; };
+      const span = (klasse, text) => { const el = document.createElement("span"); if (klasse) el.className = klasse; el.textContent = text; return el; };
+      const platz = (name, zeichen, klasse) => {
+        const el = div("platz" + (klasse ? " " + klasse : ""), zeichen);
+        feld.appendChild(el);
+        platzEl[name] = el;
+      };
+      platz("stock", "", "stapel");
+      for (let i = 0; i < 4; i++) platz("found" + i, "A");
+      for (let i = 0; i < 7; i++) platz("tab" + i, "");
+      platzEl.stock.addEventListener("click", () => ziehen());
+      for (let id = 0; id < 52; id++) {
+        const el = div("karte s" + farbe(id) + (istRot(id) ? " rot" : "") + (rang(id) > 10 ? " bild" : ""));
+        const ecke = div("ecke");
+        const r = span("rang", ""); r.appendChild(span("", RANG[rang(id)]));
+        ecke.append(r, span("sym", FARBEN[farbe(id)]));
+        const mitte = div("mitte", FARBEN[farbe(id)]);
+        const plakette = div("plakette");
+        plakette.innerHTML = KRONE;                       // feste Grafik, kein Text
+        plakette.append(span("rang", RANG[rang(id)]), span("sym", FARBEN[farbe(id)]));
+        const rueckseite = div("rueckseite");
+        rueckseite.appendChild(div("emblem"));
+        el.append(ecke, mitte, plakette, rueckseite);
+        el.dataset.id = id;
+        el.addEventListener("pointerdown", greifen);
+        feld.appendChild(el);
+        kartenEl[id] = el;
+      }
+    }
+
+    function messen() {
+      const B = feld.clientWidth, H = feld.clientHeight;
+      const rand = Math.max(10, Math.min(24, B * 0.02));
+      const luecke = Math.max(5, Math.min(16, B * 0.014));
+      let cw = Math.min((B - 2 * rand - 6 * luecke) / 7, 112);
+      cw = Math.min(cw, (H - 2 * rand) / 4.3);
+      const ch = cw * 1.4;
+      const x0 = (B - (7 * cw + 6 * luecke)) / 2;
+      feld.style.setProperty("--cw", cw + "px");
+      feld.style.setProperty("--ch", ch + "px");
+      mass = { B, H, rand, luecke, cw, ch, x0, tabY: rand + ch + luecke * 1.8 };
+    }
+    const spalteX = (i) => mass.x0 + i * (mass.cw + mass.luecke);
+    function setzen(el, x, y, z) { el.style.transform = "translate(" + x + "px," + y + "px)"; el.style.zIndex = z; }
+
+    function zeichnen(ohneAnimation) {
+      if (!mass) messen();
+      const { cw, ch, rand, tabY, H } = mass;
+      kartenEl.forEach((el) => el.classList.remove("feiern"));
+      setzen(platzEl.stock, spalteX(0), rand, 0);
+      platzEl.stock.textContent = spiel.waste.length ? "↻" : "";
+      for (let i = 0; i < 4; i++) setzen(platzEl["found" + i], spalteX(3 + i), rand, 0);
+      for (let i = 0; i < 7; i++) setzen(platzEl["tab" + i], spalteX(i), tabY, 0);
+
+      const karte = (id, x, y, z, verdeckt) => {
+        const el = kartenEl[id];
+        el.classList.toggle("zu", !spiel.offen[id]);
+        el.classList.toggle("verdeckt", !!verdeckt);
+        if (ohneAnimation) el.style.transition = "none";
+        setzen(el, x, y, z);
+      };
+      spiel.stock.forEach((id, k) => karte(id, spalteX(0), rand, 10 + k, k < spiel.stock.length - 1));
+      const w = spiel.waste, sichtbar = spiel.ziehen === 3 ? 3 : 1, faecher = cw * 0.3;
+      w.forEach((id, k) => karte(id, spalteX(1) + Math.max(0, k - (w.length - sichtbar)) * faecher, rand, 100 + k, k < w.length - sichtbar));
+      spiel.found.forEach((s, f) => s.forEach((id, k) => karte(id, spalteX(3 + f), rand, 200 + k, k < s.length - 1)));
+      spiel.tab.forEach((s, i) => {
+        const zu = s.filter((id) => !spiel.offen[id]).length, auf = s.length - zu;
+        const verfuegbar = H - tabY - ch - rand;
+        let dZu = ch * 0.1, dAuf = ch * 0.25;
+        if (zu * dZu + (auf - 1) * dAuf > verfuegbar) {
+          dZu = ch * 0.07;
+          dAuf = Math.max(ch * 0.13, (verfuegbar - zu * dZu) / Math.max(1, auf - 1));
+        }
+        let y = tabY;
+        s.forEach((id, k) => { karte(id, spalteX(i), y, 300 + k); y += spiel.offen[id] ? dAuf : dZu; });
+      });
+      if (ohneAnimation) { void feld.offsetHeight; kartenEl.forEach((el) => { el.style.transition = ""; }); }
+
+      $("k-zurueck").disabled = !verlauf().length || spiel.gewonnen;
+      $("k-tipp").disabled = spiel.gewonnen;
+      $("k-fertig").hidden = spiel.gewonnen || !alleOffen();
+      $("k-tipp").hidden = !$("k-fertig").hidden;
+      $("k-neu").hidden = modus === "taeglich";
+      $("punkt").hidden = heuteGeloest();
+      bandZeigen();
+      infoZeigen();
+    }
+
+    function bandZeigen() {
+      if (modus !== "taeglich") return;
+      const serie = tagesSerieJetzt();
+      if (spiel.gewonnen) $("band-text").textContent = "Gelöst in " + zeitText(spiel.zeit) + " · morgen gibt es die nächste";
+      else if (heuteGeloest()) $("band-text").textContent = "Heute schon gelöst · nochmal zum Spaß";
+      else $("band-text").textContent = datumText(spiel.tag) + " · für alle gleich";
+      $("band-serie").textContent = serie ? "Serie " + serie : "Neue Serie";
+      $("band-serie").classList.toggle("erfolg", heuteGeloest());
+    }
+
+    function infoZeigen() {
+      if (!spiel) return;
+      $("zeit").textContent = zeitText(spielzeit());
+      $("zuege").textContent = spiel.zuege + (spiel.zuege === 1 ? " Zug" : " Züge");
+    }
+    function wackeln(id) { const el = kartenEl[id]; el.classList.remove("wackeln"); void el.offsetWidth; el.classList.add("wackeln"); }
+    let meldungTimer = null;
+    function melden(text) {
+      $("meldung").textContent = text; $("meldung").hidden = false;
+      clearTimeout(meldungTimer); meldungTimer = setTimeout(() => { $("meldung").hidden = true; }, 2600);
+    }
+
+    // ---------- Ziehen mit Maus/Finger ----------
+    let griff = null;
+    const posVon = (el) => { const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(el.style.transform); return m ? [Number(m[1]), Number(m[2])] : [0, 0]; };
+    function greifen(ev) {
+      if (ev.button > 0 || !spiel || spiel.gewonnen || fertigLaeuft) return;
+      const id = Number(ev.currentTarget.dataset.id);
+      const ort = finden(id);
+      if (!ort) return;
+      ev.preventDefault();
+      const ids = beweglich(ort, id) ? stapelVon(ort).slice(ort.k) : [];
+      griff = { id, ort, ids, x: ev.clientX, y: ev.clientY, zieht: false, basis: ids.map((k) => posVon(kartenEl[k])) };
+      window.addEventListener("pointermove", bewegt);
+      window.addEventListener("pointerup", losgelassen);
+      window.addEventListener("pointercancel", abgebrochen);
+    }
+    function bewegt(ev) {
+      if (!griff || !griff.ids.length) return;
+      const dx = ev.clientX - griff.x, dy = ev.clientY - griff.y;
+      if (!griff.zieht && Math.hypot(dx, dy) < 6) return;
+      griff.zieht = true;
+      griff.ids.forEach((k, n) => {
+        const el = kartenEl[k];
+        el.classList.add("zieht");
+        setzen(el, griff.basis[n][0] + dx, griff.basis[n][1] + dy, 1000 + n);
+      });
+      griff.dx = dx; griff.dy = dy;
+    }
+    function aufraeumen() {
+      window.removeEventListener("pointermove", bewegt);
+      window.removeEventListener("pointerup", losgelassen);
+      window.removeEventListener("pointercancel", abgebrochen);
+      if (griff) griff.ids.forEach((k) => kartenEl[k].classList.remove("zieht"));
+    }
+    function abgebrochen() { aufraeumen(); griff = null; zeichnen(); }
+    function losgelassen() {
+      aufraeumen();
+      const g = griff; griff = null;
+      if (!g) return;
+      if (!g.zieht) { antippen(g.id); return; }
+      const x = g.basis[0][0] + g.dx, y = g.basis[0][1] + g.dy, { cw, ch } = mass;
+      const ueber = (ax, ay, bh) => Math.max(0, Math.min(x + cw, ax + cw) - Math.max(x, ax)) * Math.max(0, Math.min(y + ch, ay + bh) - Math.max(y, ay));
+      let best = null, bestWert = 0;
+      const pruefen = (ziel, ax, ay, bh) => {
+        if (!erlaubt(g.ort, ziel)) return;
+        const wert = ueber(ax, ay, bh);
+        if (wert > bestWert) { best = ziel; bestWert = wert; }
+      };
+      for (let f = 0; f < 4; f++) pruefen({ typ: "found", i: f }, spalteX(3 + f), mass.rand, ch);
+      for (let t = 0; t < 7; t++) {
+        const s = spiel.tab[t];
+        const unten = s.length ? posVon(kartenEl[oben(s)])[1] + ch : mass.tabY + ch;
+        pruefen({ typ: "tab", i: t }, spalteX(t), mass.tabY, unten - mass.tabY);
+      }
+      if (best) zug(g.ort, best); else zeichnen();
+    }
+
+    // ---------- Aussehen ----------
+    function aussehenAnwenden() {
+      const e = stand.einstellungen, html = document.documentElement;
+      html.dataset.karten = ["papier", "bunt", "klar"].includes(e.karten) ? e.karten : "papier";
+      html.dataset.tisch = e.tisch === "hell" ? "hell" : "dunkel";
+      html.style.setProperty("--ruecken", RUECKEN[e.ruecken] || RUECKEN.koralle);
+    }
+
+    // ---------- Fenster ----------
+    function menueZeigen() {
+      const st = stand.statistik;
+      const dl = $("statistik"); dl.replaceChildren();
+      [
+        ["Gespielt", st.gespielt],
+        ["Gewonnen", st.gewonnen + (st.gespielt ? " (" + Math.round((st.gewonnen / st.gespielt) * 100) + " %)" : "")],
+        ["Beste Zeit", st.besteZeit ? zeitText(st.besteZeit) : "–"],
+        ["Wenigste Züge", st.wenigsteZuege || "–"],
+        ["Siege in Folge", st.serie + " (bisher bis " + st.besteSerie + ")"],
+        ["Tägliche gelöst", st.taeglichGeloest],
+        ["Tage in Folge", tagesSerieJetzt() + " (bisher bis " + st.besteTagesSerie + ")"]
+      ].forEach(([k, v]) => {
+        const dt = document.createElement("dt"); dt.textContent = k;
+        const dd = document.createElement("dd"); dd.textContent = v;
+        dl.append(dt, dd);
+      });
+      einstellungenZeigen();
+      $("k-vonvorn").textContent = modus === "taeglich" ? "Tägliche von vorn" : "Dieses Spiel von vorn";
+      $("k-vonvorn").disabled = spiel.gewonnen && modus === "taeglich";
+      $("version").textContent = "Solitär " + (GameSave.version ? "Version " + GameSave.version : (GameSave.available ? "Entwurf" : "lokal"));
+      $("f-menue").hidden = false;
+    }
+    function einstellungenZeigen() {
+      const e = stand.einstellungen;
+      const an = (sel, pruef) => document.querySelectorAll(sel).forEach((b) => b.classList.toggle("an", pruef(b)));
+      an("#f-menue [data-karten]", (b) => b.dataset.karten === e.karten);
+      an("#f-menue [data-tisch]", (b) => b.dataset.tisch === e.tisch);
+      an("[data-ziehen]", (b) => Number(b.dataset.ziehen) === e.ziehen);
+      an("[data-auto]", (b) => (b.dataset.auto === "1") === e.autoAblegen);
+      an(".farbe", (b) => b.dataset.ruecken === e.ruecken);
+      $("ziehen-hinweis").textContent = modus === "taeglich" ? "Bei der täglichen Patience wird immer 1 Karte gezogen." :
+        (spiel.ziehen !== e.ziehen ? "Gilt ab dem nächsten Spiel." : "");
+      $("ziehen-hinweis").hidden = !$("ziehen-hinweis").textContent;
+    }
+    function fragen(titel, text, ja, aktion) {
+      $("frage-titel").textContent = titel; $("frage-text").textContent = text; $("frage-ja").textContent = ja;
+      $("frage-ja").onclick = () => { $("f-frage").hidden = true; aktion(); };
+      $("f-frage").hidden = false;
+    }
+    const laufendesSpiel = () => spiel && spiel.gezaehlt && !spiel.gewonnen;
+
+    for (const [name, wert] of Object.entries(RUECKEN)) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "farbe"; b.dataset.ruecken = name; b.style.background = wert;
+      b.setAttribute("aria-label", { koralle: "Koralle", blau: "Blau", gruen: "Grün", violett: "Violett" }[name]);
+      b.onclick = () => { stand.einstellungen.ruecken = name; aussehenAnwenden(); einstellungenZeigen(); speichern(); };
+      $("farben").appendChild(b);
+    }
+    document.querySelectorAll("[data-zu]").forEach((b) => b.addEventListener("click", () => { b.closest(".schleier").hidden = true; }));
+    document.querySelectorAll(".schleier").forEach((s) => s.addEventListener("click", (e) => { if (e.target === s) s.hidden = true; }));
+    document.querySelectorAll("#kopf [data-modus]").forEach((b) => b.addEventListener("click", () => { if (b.dataset.modus !== modus) modusSetzen(b.dataset.modus); }));
+    $("k-neu").onclick = () => {
+      if (laufendesSpiel()) fragen("Neues Spiel?", "Das laufende Spiel zählt dann als verloren.", "Neues Spiel", () => neuesSpiel());
+      else neuesSpiel();
+    };
+    $("sieg-weiter").onclick = () => { $("f-sieg").hidden = true; if (modus === "taeglich") modusSetzen("frei"); else neuesSpiel(); };
+    $("k-zurueck").onclick = rueckgaengig;
+    $("k-tipp").onclick = tipp;
+    $("k-fertig").onclick = fertigLegen;
+    $("k-menue").onclick = menueZeigen;
+    $("k-vonvorn").onclick = () => {
+      $("f-menue").hidden = true;
+      const start = spiel.start;
+      if (modus === "taeglich") neuesSpiel();
+      else if (laufendesSpiel()) fragen("Von vorn beginnen?", "Gleiche Karten, neuer Versuch. Das laufende Spiel zählt als verloren.", "Von vorn", () => neuesSpiel(start));
+      else neuesSpiel(start);
+    };
+    document.querySelectorAll("#f-menue [data-karten]").forEach((b) => b.addEventListener("click", () => {
+      stand.einstellungen.karten = b.dataset.karten; aussehenAnwenden(); einstellungenZeigen(); speichern();
+    }));
+    document.querySelectorAll("#f-menue [data-tisch]").forEach((b) => b.addEventListener("click", () => {
+      stand.einstellungen.tisch = b.dataset.tisch; aussehenAnwenden(); einstellungenZeigen(); speichern();
+    }));
+    document.querySelectorAll("[data-ziehen]").forEach((b) => b.addEventListener("click", () => {
+      stand.einstellungen.ziehen = Number(b.dataset.ziehen);
+      if (modus === "frei" && !spiel.gezaehlt) { spiel.ziehen = stand.einstellungen.ziehen; zeichnen(); }
+      einstellungenZeigen(); speichern();
+    }));
+    document.querySelectorAll("[data-auto]").forEach((b) => b.addEventListener("click", () => {
+      stand.einstellungen.autoAblegen = b.dataset.auto === "1"; einstellungenZeigen(); speichern();
+    }));
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); rueckgaengig(); }
+      else if (e.key === "Escape") document.querySelectorAll(".schleier").forEach((s) => { s.hidden = true; });
+    });
+    window.addEventListener("resize", () => { if (spiel) { messen(); zeichnen(true); } });
+
+    // ---------- Start ----------
+    (async () => {
+      aufbauen();
+      try {
+        const { data, migriert } = await GameSave.load("stand", { standard: STANDARD, migration: MIGRATION });
+        stand = data;
+        if (migriert) speichern(true);
+      } catch (e) {
+        melden("Spielstand nicht geladen: " + e.message);
+      }
+      aussehenAnwenden();
+      if (stand.spiel && !stand.spiel.gewonnen) spiele.frei = stand.spiel;
+      if (stand.taeglich && stand.taeglich.tag === heute()) spiele.taeglich = stand.taeglich;
+      modusSetzen(stand.einstellungen.modus === "taeglich" ? "taeglich" : "frei", true);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "title": "Solitär",
+  "description": "Die klassische Patience: Sortiere alle 52 Karten nach Farbe vom Ass bis zum König. Jeden Tag gibt es dazu eine lösbare Patience, die für alle gleich ist.",
+  "thumbnail": "thumb.svg",
+  "saveVersion": 1,
+  "tags": ["Karten", "Klassiker", "Entspannt", "Täglich"],
+  "leaderboard": {
+    "enabled": true,
+    "rangiertNach": "gewonnen",
+    "order": "desc",
+    "spalten": [
+      { "key": "gewonnen", "label": "Gewonnen" },
+      { "key": "taeglich", "label": "Täglich gelöst" },
+      { "key": "tagesserie", "label": "Längste Tagesserie" },
+      { "key": "besteZeit", "label": "Beste Zeit", "format": "zeit" }
+    ]
+  },
+  "erfolge": [
+    { "id": "erster-sieg", "titel": "Erster Sieg", "beschreibung": "Gewinne ein Spiel" },
+    { "id": "zehn-siege", "titel": "Stammgast", "beschreibung": "Gewinne 10 Spiele" },
+    { "id": "fuenfzig-siege", "titel": "Kartenprofi", "beschreibung": "Gewinne 50 Spiele" },
+    { "id": "hundert-siege", "titel": "Hundert Patiencen", "beschreibung": "Gewinne 100 Spiele" },
+    { "id": "schnell", "titel": "Flinke Finger", "beschreibung": "Gewinne in unter 3 Minuten" },
+    { "id": "sparsam", "titel": "Sparsam", "beschreibung": "Gewinne mit höchstens 120 Zügen" },
+    { "id": "serie-fuenf", "titel": "Glückssträhne", "beschreibung": "Gewinne 5 freie Spiele hintereinander" },
+    { "id": "drei-karten", "titel": "Dreierpack", "beschreibung": "Gewinne mit „3 Karten ziehen“" },
+    { "id": "erste-taegliche", "titel": "Guten Morgen", "beschreibung": "Löse deine erste tägliche Patience" },
+    { "id": "woche-voll", "titel": "Ganze Woche", "beschreibung": "Löse die tägliche Patience 7 Tage in Folge" },
+    { "id": "monat-voll", "titel": "Unermüdlich", "beschreibung": "Löse die tägliche Patience 30 Tage in Folge" },
+    { "id": "ohne-netz", "titel": "Ohne Netz", "beschreibung": "Gewinne ohne Rückgängig und ohne Tipp", "geheim": true }
+  ]
+}
