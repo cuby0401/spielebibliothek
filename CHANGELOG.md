@@ -5,7 +5,23 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
-## 1.6.0 – in Arbeit (ab 17.11.2026)
+## 1.6.1 – 17.11.2026
+
+Kleines Update für Multiplayer nach den Antworten des ersten Multiplayer-Entwicklers (Zugzeiten, Bedenkzeit, Siegzähler im Raum).
+Auf Wunsch des Admins ohne Handtests live, automatische Tests grün.
+
+- **Neu: Zeitgeber** in `GameSave.multiplayer.spiel`: `frist(zustand) → {bis, aktion}`. Bei Ablauf führt der Host
+  `zug(zustand, aktion, null)` aus (`von === null` = die Uhr). Den Zeitpunkt legt das Spiel im Zustand ab, deshalb läuft die Uhr nach
+  einem Host-Wechsel weiter. Dieselbe Frist löst nur einmal aus.
+- **Neu: Siegzähler über mehrere Runden:** `neu(spieler, optionen, vorher)` bekommt den bisherigen Zustand.
+- **Korrigiert:** Ein sofortiges `spiel.neu()` direkt nach `await GameSave.multiplayer.spiel(…)` konnte vom übernommenen leeren
+  Raumstand überschrieben werden. `spiel()` meldet sich jetzt erst fertig, wenn der Stand übernommen ist.
+- **Vier gewinnt:** 30 Sekunden Zugzeit (danach ist der andere dran) und Siegzähler.
+- **Handbuch:** Abschnitt „Zeitgeber“, Siegzähler, Hinweis, dass der Host den ganzen Zustand kennt. KI-Anleitung ergänzt.
+- **Doku:** LAN-Adresse der NAS durch einen Platzhalter ersetzt (Repo ist öffentlich).
+- **Tests:** `scripts/gamesave-mp-test.js` (zwei nachgestellte Tabs: Zeitgeber, Host-Wechsel, Siegzähler), läuft in `deploy.sh` mit.
+
+## 1.6.0 – 17.11.2026
 
 Kleines Update mit zwei großen Neuerungen für Entwickler: Multiplayer und der MCP-Server für Claude (E88). Anlass: Die Spiele eines Entwicklers
 sind alle Multiplayer. Kommt vor den Tickets (die werden 1.7.0). Plan im Vault: `Projekte/Spielebibliothek/Architektur/Multiplayer-und-MCP.md`.
@@ -18,10 +34,6 @@ sind alle Multiplayer. Kommt vor den Tickets (die werden 1.7.0). Plan im Vault: 
   prüft die Züge beim Host, legt den Stand im Raum ab und schickt jedem Spieler nur seine Sicht. Geht der Host, übernimmt ein anderer
   mit genau diesem Stand. Darunter `raum()` mit `senden`, `beiNachricht`, `standSichern`, `beiHostwerden`. Lokal spielen zwei Tabs
   gegeneinander, im Entwurf darf man gegen sich selbst spielen. Auf der NAS läuft kein Code der Entwickler.
-- **Neu: Zeitgeber und Siegzähler** (nach den Antworten des ersten Multiplayer-Entwicklers): `frist(zustand) → {bis, aktion}` – bei Ablauf
-  führt der Host `zug(zustand, aktion, null)` aus, nach einem Host-Wechsel läuft die Uhr aus dem Zustand weiter (Zugzeit, Bedenkzeit,
-  Karte kurz zeigen). `neu(spieler, optionen, vorher)` bekommt den bisherigen Zustand, z. B. für einen Siegzähler im Raum.
-  Korrigiert: Ein sofortiges `spiel.neu()` direkt nach `await spiel(…)` konnte vom übernommenen leeren Raumstand überschrieben werden.
 - **Neu: Beispielspiel „Vier gewinnt“** (`examples/vier-gewinnt`) und die Multiplayer-Vorlage im Handbuch.
 - **Neu: MCP-Server für Claude** unter `mcp.cuby0401.uk`: Claude liest das Handbuch, holt die Vorlage, sieht die eigenen Spiele und
   ihre Dateien, lädt Entwürfe hoch und liest Prüfung und Fehlerberichte. Veröffentlichen bleibt beim Entwickler. Anmeldung für
@@ -32,7 +44,7 @@ sind alle Multiplayer. Kommt vor den Tickets (die werden 1.7.0). Plan im Vault: 
   `test-mcp.cuby0401.uk` → `http://<NAS_LAN>:18188`. Siehe `docs/betrieb.md`.
 - **Testserver:** Speicher-Dienst und Caddy bekommen dort die Gruppe des Upload-Dienstes, sonst waren neu hochgeladene Entwürfe nicht
   lesbar (live regeln das die ACLs).
-- **Tests:** `scripts/gamesave-mp-test.js` (Zeitgeber, Host-Wechsel, Siegzähler), `test_multiplayer.py` (11), `test_mcp.py` (6), Ende-zu-Ende `scripts/e2e-zentrale-1.6.mjs` (zwei Tabs spielen Vier gewinnt,
+- **Tests:** `test_multiplayer.py` (11), `test_mcp.py` (6), Ende-zu-Ende `scripts/e2e-zentrale-1.6.mjs` (zwei Tabs spielen Vier gewinnt,
   Host-Wechsel, Rauswerfen, MCP-Schlüssel, Freigabe der Claude-App).
 
 ## 1.5.0 – 13.11.2026

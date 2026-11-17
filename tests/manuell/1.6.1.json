@@ -1,0 +1,37 @@
+{
+  "version": "1.6.1",
+  "hinweis": "Neu in 1.6.1: Zeitgeber (Zugzeit) und Siegzähler für Multiplayer, am Beispiel „Vier gewinnt“. Für alle Tests braucht ihr zwei Personen oder zwei Geräte mit zwei Konten. Hier stehen nur Dinge, die in 1.6.1 NEU sind.",
+  "tests": [
+    {
+      "id": "mp-zugzeit",
+      "bereich": "Multiplayer",
+      "titel": "Zugzeit läuft ab (Zeitgeber)",
+      "schritte": [
+        "Beide sind im selben Raum, Person 1 (Host) klickt „Spiel starten“.",
+        "Person 1 setzt keinen Stein und wartet 30 Sekunden. Unter dem Status zählt „Noch … s für diesen Zug“ herunter."
+      ],
+      "erwartet": "Bei beiden zählt die Restzeit gleich herunter. Nach 30 Sekunden ist ohne Klick Person 2 dran (bei ihr „Du bist dran (Rot).“), die Uhr beginnt wieder bei 30 s. Es wurde kein Stein gesetzt."
+    },
+    {
+      "id": "mp-zugzeit-host-wechsel",
+      "bereich": "Multiplayer",
+      "titel": "Zugzeit läuft nach einem Host-Wechsel weiter",
+      "schritte": [
+        "Beide spielen, Person 2 ist dran, die Uhr läuft.",
+        "Person 1 (Host) klickt „Raum verlassen“, tritt sofort mit dem Raumcode wieder bei.",
+        "Person 2 setzt keinen Stein."
+      ],
+      "erwartet": "Person 2 ist jetzt Host. Die Uhr springt nicht auf 30 s zurück, sondern läuft weiter. Ist sie abgelaufen, ist Person 1 dran."
+    },
+    {
+      "id": "mp-siegzaehler",
+      "bereich": "Multiplayer",
+      "titel": "Siegzähler über mehrere Runden",
+      "schritte": [
+        "Beide spielen eine Runde bis zum Sieg.",
+        "Der Host klickt „Neues Spiel“ und ihr spielt noch eine Runde zu Ende."
+      ],
+      "erwartet": "Unter der Spielerliste steht „Siege: <Name> 1 · <Name> 0“ und nach der zweiten Runde der richtige Stand. „Neues Spiel“ setzt den Siegzähler nicht zurück. Nach „Raum verlassen“ beider Spieler und einem neuen Raum beginnt er wieder bei 0."
+    }
+  ]
+}
