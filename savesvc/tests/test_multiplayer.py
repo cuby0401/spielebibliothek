@@ -100,10 +100,11 @@ def test_kein_multiplayer_fremde_herkunft_unbekannter_raum(mp):
 def test_rauswerfen_und_voller_raum(mp):
     with mp.verbinden(neu=1) as a:
         code = naechste(a, "raum")["raum"]["code"]
-        with mp.verbinden("paul@example.com", raum=code) as b, mp.verbinden("eli@example.com", raum=code) as c:
+        with mp.verbinden("paul@example.com", raum=code) as b:
+            naechste(b, "raum")                            # erst paul ganz drin, dann eli (sonst zufällige Reihenfolge)
+            c = mp.verbinden("eli@example.com", raum=code).__enter__()
             rc = naechste(c, "raum")["raum"]
             assert rc["zuschauer"] is True                 # max 2 Spieler → eli schaut zu
-            naechste(b, "raum")
             b.send_text(json.dumps({"t": "rauswerfen", "wer": "eli"}))
             assert naechste(b, "fehler")["text"].startswith("Rauswerfen darf nur der Host")
             a.send_text(json.dumps({"t": "rauswerfen", "wer": "eli"}))
