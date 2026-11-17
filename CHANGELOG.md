@@ -5,7 +5,31 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
-## 1.5.0 – in Arbeit (ab 09.11.2026)
+## 1.6.0 – in Arbeit (ab 17.11.2026)
+
+Kleines Update mit zwei großen Neuerungen für Entwickler: Multiplayer und der MCP-Server für Claude (E88). Anlass: Carls Spiele
+sind alle Multiplayer. Kommt vor den Tickets (die werden 1.7.0). Plan im Vault: `Projekte/Spielebibliothek/Architektur/Multiplayer-und-MCP.md`.
+
+- **Neu: Multiplayer.** Spiele mit `"multiplayer": {"min": 2, "max": 4}` in der `game.json` starten mit einer Lobby: Raum erstellen,
+  mit Raumcode beitreten, offene Räume. Neben dem Spiel steht die Raum-Karte: Code, Einladungslink, Mitspieler über die Glocke
+  einladen, Spielerliste mit Host und Zuschauern, Host weitergeben, Rauswerfen, Raum verlassen. Neu laden führt in denselben Raum,
+  eine kurz verlorene Verbindung wird von selbst wiederhergestellt.
+- **Neu: `GameSave.multiplayer`.** Die Regeln laufen im Browser des Hosts (Weg A, Seb 17.11.): `spiel({neu, zug, sicht}, {zeigen, fehler})`
+  prüft die Züge beim Host, legt den Stand im Raum ab und schickt jedem Spieler nur seine Sicht. Geht der Host, übernimmt ein anderer
+  mit genau diesem Stand. Darunter `raum()` mit `senden`, `beiNachricht`, `standSichern`, `beiHostwerden`. Lokal spielen zwei Tabs
+  gegeneinander, im Entwurf darf man gegen sich selbst spielen. Auf der NAS läuft kein Code der Entwickler.
+- **Neu: Beispielspiel „Vier gewinnt“** (`examples/vier-gewinnt`) und die Multiplayer-Vorlage im Handbuch.
+- **Neu: MCP-Server für Claude** unter `mcp.cuby0401.uk`: Claude liest das Handbuch, holt die Vorlage, sieht die eigenen Spiele und
+  ihre Dateien, lädt Entwürfe hoch und liest Prüfung und Fehlerberichte. Veröffentlichen bleibt beim Entwickler. Anmeldung für
+  Claude Code mit Schlüssel (Upload-Seite → „KI-Zugang (Claude)“, widerrufbar), für die Claude-App über OAuth mit Freigabe-Seite
+  (Access + Upload-Passwort). Andere KIs bekommen einen Hinweis.
+- **Neu im Handbuch:** Kapitel 9c „Multiplayer“ und 9d „Claude direkt verbinden (MCP)“, Prompt-Block mit Multiplayer-Regeln.
+- **Einrichtung (Seb):** Tunnel-Route `mcp.cuby0401.uk` → `http://caddy:8080` ohne Access-Anwendung, für den Testserver
+  `test-mcp.cuby0401.uk` → `http://192.168.178.100:18188`. Siehe `docs/betrieb.md`.
+- **Tests:** `test_multiplayer.py` (11), `test_mcp.py` (6), Ende-zu-Ende `scripts/e2e-zentrale-1.6.mjs` (zwei Tabs spielen Vier gewinnt,
+  Host-Wechsel, Rauswerfen, MCP-Schlüssel, Freigabe der Claude-App).
+
+## 1.5.0 – 13.11.2026
 
 Kleines Update mit großem Umbau im Hintergrund: Identität mit drei Schichten und das komplette CRM (E80–E82). Die Tickets folgen in 1.6.0.
 Plan im Vault: `Projekte/Spielebibliothek/Architektur/Identitaet-und-CRM-1.5.0.md`.

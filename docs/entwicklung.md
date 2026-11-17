@@ -8,8 +8,8 @@ stehen im Vault `seb-brain` unter `Projekte/Spielebibliothek/`. Diese Datei ist 
 | Dienst | Code | Darf | Erreichbar |
 |---|---|---|---|
 | caddy | `Caddyfile` | liefert `site/`, `lib/` und Spieldateien aus, leitet `/api/*` weiter | `games`, `play`, `upload` über den Tunnel |
-| savesvc (Speicher-Dienst) | `savesvc/savesvc/app.py`, `verwaltung.py`, `intern.py`, `gemeinschaft.py` (Spielzeit, Glocke, Erfolge, Profil, Spiel der Woche), `waechter.py` (Gesundheit, Home Assistant) | Datenbank lesen/schreiben, Spiele **nur lesen** | `/api/*` unter `games`, `/intern/*` nur im Docker-Netz |
-| upload (Upload-Dienst) | `savesvc/savesvc/upload.py` | Spieldateien schreiben, Upload-Konten | `/api/upload/*` unter `upload`, `/intern/*` nur im Docker-Netz |
+| savesvc (Speicher-Dienst) | `savesvc/savesvc/app.py`, `verwaltung.py`, `intern.py`, `gemeinschaft.py` (Spielzeit, Glocke, Erfolge, Profil, Spiel der Woche), `waechter.py` (Gesundheit, Home Assistant), `multiplayer.py` (Räume, WebSocket, 1.6.0) | Datenbank lesen/schreiben, Spiele **nur lesen** | `/api/*` unter `games`, `/intern/*` nur im Docker-Netz |
+| upload (Upload-Dienst) | `savesvc/savesvc/upload.py`, `mcp.py` (MCP-Server für Claude, 1.6.0) | Spieldateien schreiben, Upload-Konten, KI-Zugänge | `/api/upload/*` unter `upload`, `/mcp`, `/oauth/*` und `/.well-known/oauth-*` unter `mcp`, `/intern/*` nur im Docker-Netz |
 
 Die beiden Python-Dienste rufen sich gegenseitig über `/intern/*` mit `INTERN_TOKEN` auf (aus `.env`, legt `deploy.sh` an):
 - Speicher-Dienst → Upload-Dienst: Spiele löschen, Upload-Konten, Ereignisse (Admin-Panel)
@@ -41,7 +41,11 @@ Die beiden Python-Dienste rufen sich gegenseitig über `/intern/*` mit `INTERN_T
 6. **Spiele bestimmen nie selbst ihre ID.** Die Bridge hängt die ID an das iframe-Fenster, nicht an die Nachricht.
 7. **Ändernde Anfragen brauchen `X-Bibliothek: 1`** (bzw. `X-Upload: 1`) gegen CSRF. `/intern/*` ist davon ausgenommen und hat das Token.
 8. **Neue Felder in API-Antworten** sind ok, entfernte oder umbenannte brechen die Seiten – dann alle Aufrufer in `site/` anpassen.
-9. **Prompt-Block nur in `site/handbuch/prompt.txt` ändern** und danach `scripts/startvorlage.sh` laufen lassen.
+9. **Prompt-Block nur in `site/handbuch/prompt.txt` ändern** und danach `scripts/startvorlage.sh` laufen lassen (baut auch die
+   Multiplayer-Vorlage aus `examples/vier-gewinnt/`, 1.6.0).
+10. **Multiplayer (1.6.0): Auf der NAS läuft kein Code der Entwickler.** Der Dienst bringt nur Raum, Spieler und Nachrichten zusammen,
+   die Regeln rechnet der Browser des Hosts (`GameSave.multiplayer.spiel`). Die Verbindung hält die Bibliotheksseite, nicht das Spiel.
+11. **MCP (1.6.0): Die KI veröffentlicht nie.** Uploads über MCP landen wie alle anderen als Entwurf (`entwurf_installieren`).
 
 ## Tests
 
@@ -57,6 +61,7 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
 - Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`, 1.2.1 (Profil, Glocke archivieren, Symbole, Größen): `scripts/e2e-zentrale-1.3.mjs`, 1.3.0 (Beschreibung und Vorschaubild, „noch nie angemeldet“, Cloudflare-Hinweis): `scripts/e2e-zentrale-1.3-steckbrief.mjs`, 1.3.1 (Zurück zum Hochladen, Antragsseite, Bilder an Anträgen): `scripts/e2e-zentrale-1.3.1-antraege.mjs`. Einzelne Tests: `E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh`.
+- 1.6.0 (Multiplayer mit zwei Tabs im Entwurf, MCP-Schlüssel, Freigabe-Seite der Claude-App): `scripts/e2e-zentrale-1.6.mjs`.
 - **Alle Ende-zu-Ende-Tests auf einmal:** `scripts/e2e-alle.sh` (frischer Teststand je Test, räumt danach auf). Vor dem Deploy automatisch mit `scripts/deploy.sh --gruendlich`.
 - **Seit 1.4.1 auf dem Mac (NAS entlasten):** Läuft Docker Desktop, steht der Teststand auf dem Mac (Ports nur an 127.0.0.1, Hostnamen `127.0.0.1` / `localhost` / `upload.localhost`), volle Runde ca. 2:35 Min. Sonst wie bisher auf der NAS. Erzwingen: `E2E_ORT=mac` bzw. `E2E_ORT=nas`. `deploy.sh --probe` legt dafür einen Auftrag an. Den holt der Mac (`scripts/auftraege-mac.py`, siehe docs/betrieb.md), das Ergebnis steht unter „Aufgaben“. Log: `~/Library/Logs/spielebibliothek-auftraege.log`.
 - **Warten in den Tests:** `gehe(url, ms)` wartet höchstens `ms`, bis die Seite geladen ist und das DOM 400 ms still steht. Wo echte Zeit vergehen muss (Spielzeit, verzögerte Erfolge), ausdrücklich `warte()` nehmen.

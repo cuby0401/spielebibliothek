@@ -123,6 +123,31 @@ Die Probe-Zentrale ist zugleich der Testserver für die Tester:
 - **Ergebnisse:** `/volume1/docker/spielebibliothek-tests/ergebnisse.db` (überlebt Neubauten), im Admin-Panel der Probe bei der Freigabe.
 - **Tester benachrichtigen:** `deploy.sh --probe` schickt allen mit der CRM-Rolle „Tester“ eine Glocke (ab 1.4.0 live).
 - **Neuen Tester aufnehmen:** E-Mail in die Richtlinie „Tester“ der Access-Anwendung, Rolle „Tester“ im CRM (für Link und Glocke).
+- **MCP-Server auf dem Testserver (1.6.0):** Tunnel-Route `test-mcp.cuby0401.uk` → `http://192.168.178.100:18188` (gleicher Port
+  wie `test`, Caddy wählt nach dem Hostnamen). **Ohne Access-Anwendung** – der MCP-Server meldet selbst an (Schlüssel/OAuth).
+
+## MCP-Server (Zentrale 1.6.0, E88)
+
+Für die KIs der Entwickler (Claude Code, Claude-App). Läuft im Upload-Dienst (`savesvc/savesvc/mcp.py`), Handbuch und Vorlagen
+liest er aus `site/handbuch/` (in `compose.yaml` als `/handbuch` eingebunden).
+
+- **Einmalig:** Tunnel-Route `mcp.cuby0401.uk` → `http://caddy:8080` anlegen, **ohne Access-Anwendung** (eine KI kann keinen
+  E-Mail-Code eingeben). Caddy reicht unter diesem Namen nur `/mcp`, `/oauth/token`, `/oauth/register` und
+  `/.well-known/oauth-*` an den Upload-Dienst weiter, alles andere ist 404.
+- **Anmeldung:** Schlüssel für Claude Code (Upload-Seite → „KI-Zugang (Claude)“) oder OAuth für die Claude-App. Freigegeben wird auf
+  `upload.cuby0401.uk/upload/mcp-freigabe.html` – dort gelten Access (Anwendung „upload“) und das Upload-Passwort.
+  Gespeichert sind nur Hashes (Tabelle `mcp_zugang` in `upload.db`). Wird ein Upload-Konto gelöscht, sind alle seine Zugänge widerrufen.
+- **Was die KI darf:** Handbuch, Vorlagen, eigene Spiele und Dateien lesen, Entwürfe hochladen, Prüfung und Fehlerberichte abrufen.
+  **Nicht:** veröffentlichen, löschen, fremde Spiele. Jeder Upload steht im Sicherheitsprotokoll („als Entwurf hochgeladen (über Claude)“).
+- **Andere KIs:** nicht gesperrt, bekommen aber in jeder Antwort einen Hinweis (Seb, 17.11.2026).
+- **Not-Aus:** sperrt auch den MCP-Server (503).
+
+## Multiplayer (Zentrale 1.6.0, E88)
+
+Räume laufen im Speicher-Dienst (`savesvc/savesvc/multiplayer.py`) über einen WebSocket der Bibliotheksseite (`/api/mp/<spiel>`).
+Auf der NAS läuft dabei kein Code der Entwickler – die Regeln rechnet der Browser des Hosts. Räume liegen nur im Arbeitsspeicher:
+Ein Neustart des Speicher-Dienstes (Deploy) beendet laufende Räume, alle landen wieder in der Lobby. Gespeicherte Spielstände bleiben.
+Grenzen: 300 Räume, 10 neue Räume je Person und Minute, 64 KB je Nachricht, 256 KB Spielstand, 40 Nachrichten je Sekunde.
 
 
 ## Aufträge auf dem Mac (Zentrale 1.4.1, NAS entlasten)
