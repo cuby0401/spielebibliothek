@@ -72,10 +72,12 @@ const dialoge = [];
   // 1) Übersicht: Suche, Kategorien, Daumen auf der Kachel
   await gehe(G + "/", 3500);
   const kachel = (t) => `[...document.querySelectorAll(".b-kachel")].find(k=>k.querySelector(".b-kachel__titel").textContent===${JSON.stringify(t)})`;
-  ok(await eval_(`[...document.querySelectorAll("#tag-filter .b-marke")].map(b=>b.textContent).join(",")`) === "Puzzle,Wörter", "Kategorien-Filter aus den tags");
+  // Weitere Beispielspiele (z. B. Solitär, 14.11.) bringen eigene Kategorien mit – geprüft wird nur, dass die von Rätselspaß da sind
+  const filter = await eval_(`[...document.querySelectorAll("#tag-filter .b-marke")].map(b=>b.textContent)`);
+  ok(filter.includes("Puzzle") && filter.includes("Wörter"), "Kategorien-Filter aus den tags");
   await eval_(`{ const s=document.getElementById("suche"); s.value="zähl"; s.dispatchEvent(new Event("input")); } true`);
   ok(await bis(`[...document.querySelectorAll("#kacheln .b-kachel__titel")].map(h=>h.textContent).join(",")==="Zähler"`), "Suche „zähl“ → nur Zähler");
-  await eval_(`{ const s=document.getElementById("suche"); s.value=""; s.dispatchEvent(new Event("input")); [...document.querySelectorAll("#tag-filter .b-marke")][0].click(); } true`);
+  await eval_(`{ const s=document.getElementById("suche"); s.value=""; s.dispatchEvent(new Event("input")); [...document.querySelectorAll("#tag-filter .b-marke")].find(b=>b.textContent==="Puzzle").click(); } true`);
   ok(await bis(`[...document.querySelectorAll("#kacheln .b-kachel__titel")].map(h=>h.textContent).join(",")==="Rätselspaß"`), "Kategorie „Puzzle“ → nur Rätselspaß");
   await eval_(`[...document.querySelectorAll("#tag-filter .b-marke")][0].click(); true`);
   await bis(`!!document.getElementById("reihe-alle")`);
