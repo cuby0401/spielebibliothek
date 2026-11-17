@@ -181,3 +181,9 @@ def test_host_verliert_verbindung_nach_gnadenfrist_neuer_host(mp, monkeypatch):
             with mp.verbinden("paul@example.com", raum=code) as a2:
                 raum = naechste(a2, "raum")["raum"]
                 assert raum["host"] == "seb" and raum["ich"] == "paul"
+
+
+def test_mitspieler_zum_einladen(mp):
+    mp.get("/api/me", headers=mp.als("paul@example.com"))     # eingeladen → aktiv bei der ersten Anmeldung
+    liste = mp.get("/api/mp/mitspieler", headers=mp.als()).json()
+    assert [x["id"] for x in liste] == ["eli", "max", "paul"]      # ohne einen selbst

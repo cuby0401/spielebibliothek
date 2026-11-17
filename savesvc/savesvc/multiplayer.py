@@ -398,6 +398,13 @@ def registrieren(app: FastAPI, e, db, spieler, crm) -> Raeume:
         sid, mp, _ = http_spiel(request, user, game, player)
         return {"raeume": raeume.offene(sid, player), "min": mp["min"], "max": mp["max"]}
 
+    @app.get("/api/mp/mitspieler")
+    def mitspieler(player: str = Depends(spieler)):
+        """Wen man einladen kann: alle aktiven Personen außer einem selbst (Anzeigenamen sind in der Bibliothek ohnehin öffentlich)."""
+        liste = [{"id": p["name"], "name": name_von(p["name"])} for p in (crm.personen() if crm else [])
+                 if p.get("status") in ("aktiv", "verwarnt") and p["name"] != player and "~" not in p["name"]]
+        return sorted(liste, key=lambda x: x["name"].lower())
+
     @app.post("/api/mp/{user}/{game}/einladen")
     def einladen(request: Request, user: str = P(...), game: str = P(...), player: str = Depends(spieler),
                  body: dict = Body(...)):
