@@ -102,10 +102,14 @@ const uploadForm = UI.formular({ id: "uploadform", absenden: "Hochladen", onabse
 const speicher = UI.stapel([], { id: "speicher", abstand: "s" });
 speicher.hidden = true;
 const spieleListe = UI.stapel([], { id: "liste" });
+const kiListe = UI.stapel([], { id: "ki-zugang" });
 const bereich = UI.seite({ id: "bereich", titel: "Spiel hochladen oder aktualisieren", inhalt: [
 	speicher,
 	UI.karte({ titel: "Neues Spiel oder Update", inhalt: uploadForm }),
-	UI.abschnitt({ titel: "Deine Spiele", inhalt: spieleListe })] });
+	UI.abschnitt({ titel: "Deine Spiele", inhalt: spieleListe }),
+	UI.abschnitt({ titel: "KI-Zugang (Claude)", untertitel: "Claude lädt Entwürfe selbst hoch und liest Handbuch, Prüfung und Fehlerberichte – veröffentlichen machst du.",
+		aktionen: [UI.knopf({ id: "ki-neu", art: "standard", groesse: "s", ikon: "plus", text: "Schlüssel für Claude Code", onclick: () => kiSchluessel() })],
+		inhalt: kiListe })] });
 anmeldung.hidden = true; bereich.hidden = true;
 $("app").replaceChildren(anmeldung, bereich);
 
@@ -397,6 +401,40 @@ async function hochladenAbsenden() {
 	}
 }
 
+// ---------- KI-Zugang (MCP, Zentrale 1.6.0) ----------
+async function kiZugang() {
+	let d;
+	try { d = await api("GET", "/mcp/zugaenge"); } catch (e) { return fehler(e); }
+	const zeilen = d.zugaenge.map((z) => ({ ikon: z.art === "oauth" ? "geraet" : "schloss",
+		titel: z.art === "oauth" ? `${z.name} (Claude-App)` : `${z.name} (Claude Code)`,
+		text: `seit ${datum(z.erstellt)}` + (z.zuletzt ? ` · zuletzt benutzt ${datum(z.zuletzt)}` : " · noch nicht benutzt"),
+		aktionen: [UI.knopf({ art: "gefahr-leise", groesse: "s", text: "Widerrufen", onclick: async () => {
+			if (!await UI.bestaetigen({ titel: "Zugang widerrufen?", text: `„${z.name}“ kommt danach nicht mehr an deine Spiele.`, ja: "Widerrufen", gefahr: true })) return;
+			try { await api("DELETE", `/mcp/zugaenge/${z.id}`); meldung("Zugang widerrufen.", "erfolg"); } catch (e) { fehler(e); }
+			kiZugang();
+		} })] }));
+	kiListe.replaceChildren(
+		zeilen.length ? UI.liste(zeilen, { label: "KI-Zugänge" }) : UI.leer({ klein: true, ikon: "schloss", titel: "Noch keine KI verbunden",
+			text: "Claude Code: Schlüssel erstellen. Claude-App: Einstellungen → Konnektoren → Eigenen Konnektor hinzufügen, Adresse unten." }),
+		UI.angaben([["Adresse für die Claude-App", UI.code(d.adresse, { kopieren: true })]]),
+		UI.text("Die Bibliothek ist für Claude gebaut. Andere KIs bekommen einen Hinweis und sind nicht getestet.", { art: "klein" }));
+}
+
+async function kiSchluessel() {
+	const name = await UI.eingabe({ titel: "Schlüssel für Claude Code", label: "Name", wert: "Claude Code",
+		hinweis: "Damit du ihn später wiedererkennst, z. B. „Laptop“." });
+	if (name === null) return;
+	let d;
+	try { d = await api("POST", "/mcp/zugaenge", { name }); } catch (e) { return fehler(e); }
+	let fenster;
+	fenster = UI.dialog({ id: "ki-schluessel", titel: "Schlüssel erstellt", breit: true, festhalten: true,
+		text: "Diesen Befehl einmal im Terminal ausführen. Der Schlüssel erscheint nur jetzt – behandle ihn wie ein Passwort.",
+		inhalt: UI.code(d.befehl, { block: true, kopieren: true }),
+		aktionen: [UI.knopf({ art: "primaer", text: "Fertig", onclick: () => fenster.schliessen(true) })] });
+	await fenster.oeffnen();
+	kiZugang();
+}
+
 // ---------- Start ----------
 async function start() {
 	let s;
@@ -430,6 +468,7 @@ async function start() {
 		speicher.hidden = false;
 	}
 	liste();
+	kiZugang();
 }
 
 start();

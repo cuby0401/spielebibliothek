@@ -29,6 +29,8 @@
         <li><a href="#steckbrief">Beschreibung und Vorschaubild</a></li>
         <li><a href="#gamejson"><code>game.json</code></a></li>
         <li><a href="#erfolge">Erfolge, Kategorien, Spiel der Woche</a></li>
+        <li><a href="#multiplayer">Multiplayer – mehrere Spieler in einem Raum</a></li>
+        <li><a href="#claude">Claude direkt verbinden (MCP)</a></li>
         <li><a href="#selbst">Was du selbst einstellen kannst – und was nicht</a></li>
         <li><a href="#werkzeuge">Fehler suchen</a></li>
         <li><a href="#checkliste">Checkliste vor jedem Update</a></li>
@@ -285,6 +287,111 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
         (live, Entwurf, ältere Versionen) – ältere Versionen sind meist der größte Brocken.
         Ist er voll, wird der Upload abgelehnt – alte Spiele löschen oder Seb um mehr Platz bitten.</li>
     </ul>
+
+    <h2 id="multiplayer">9c. Multiplayer – mehrere Spieler in einem Raum</h2>
+    <p>Spiele für mehrere Spieler laufen über die Bibliothek. Du brauchst <strong>keinen eigenen Server</strong> – eigene Server,
+      WebSockets, Firebase oder PeerJS gehen in der Bibliothek ohnehin nicht (keine Verbindungen ins Internet).</p>
+    <h3>Was die Bibliothek für dich macht</h3>
+    <ul>
+      <li><strong>Lobby:</strong> Neuen Raum erstellen, mit Raumcode (4 Buchstaben) beitreten oder einen offenen Raum aus der Liste wählen.
+        Dein Spiel startet erst, wenn der Spieler im Raum ist – eine eigene Lobby brauchst du nicht.</li>
+      <li><strong>Raum-Karte</strong> neben dem Spiel: Code, Einladungslink, Mitspieler über die Glocke einladen, Spielerliste,
+        Host weitergeben, Rauswerfen, Raum verlassen.</li>
+      <li><strong>Namen</strong> kommen aus der Bibliothek. Mitspielen kann nur, wer angemeldet ist.</li>
+      <li><strong>Verbindung weg?</strong> Die Bibliothek verbindet von selbst neu, der Platz bleibt.</li>
+    </ul>
+    <h3>Grundsatz: Die Regeln rechnet der Host</h3>
+    <p>Einer im Raum ist <strong>Host</strong> (am Anfang, wer den Raum erstellt hat). Nur sein Browser rechnet die Spielregeln: Er bekommt die Züge
+      der anderen, prüft sie, legt den Spielstand im Raum ab und schickt jedem Spieler nur das, was dieser sehen darf (z. B. nur die eigenen Karten).
+      Geht der Host (oder ist seine Verbindung länger als 10 Sekunden weg), wird ein anderer Spieler Host – mit genau dem zuletzt abgelegten Stand.
+      Das Spiel läuft einfach weiter.</p>
+    <h3><code>game.json</code></h3>
+<pre><code>"multiplayer": { "min": 2, "max": 4 }</code></pre>
+    <p><code>min</code>/<code>max</code> = Spieler je Raum (höchstens 16). Wer dazukommt, wenn der Raum voll ist, schaut zu. Die Lobby zeigt „2–4 Spieler“.</p>
+    <h3>Der einfache Weg: <code>GameSave.multiplayer.spiel</code></h3>
+    <p>Du schreibst die Regeln wie auf einem Spieleserver – drei Funktionen, die nur mit dem Zustand (einfaches JSON) arbeiten:</p>
+<pre><code>const regeln = {
+  // Neues Spiel. spieler = IDs der verbundenen Mitspieler (ohne Zuschauer)
+  neu(spieler, optionen) {
+    if (spieler.length &lt; 2) throw new Error("Zu zweit spielen");
+    return { spieler, dran: 0, haende: austeilen(spieler), stapel: [...] };
+  },
+  // Ein Zug von Spieler „von“. Immer prüfen! Ablehnen mit throw – der Spieler sieht den Text.
+  zug(zustand, aktion, von) {
+    if (zustand.spieler[zustand.dran] !== von) throw new Error("Du bist nicht dran");
+    /* … Zustand ändern … */
+    return zustand;
+  },
+  // Was Spieler „fuer“ sehen darf: fremde Karten weglassen!
+  sicht(zustand, fuer) {
+    return { ...zustand, haende: undefined, meineHand: zustand.haende[fuer] || [],
+             kartenDerAnderen: Object.fromEntries(Object.entries(zustand.haende).map(([id, h]) =&gt; [id, h.length])) };
+  },
+  // optional: jemand kommt, geht oder verliert die Verbindung
+  spielerGeaendert(zustand, spieler) { return zustand; },
+};
+
+const spiel = await GameSave.multiplayer.spiel(regeln, {
+  zeigen(sicht, raum) { /* sicht === null: noch nicht gestartet */ malen(sicht, raum); },
+  fehler(text) { meldungZeigen(text); },   // abgelehnter Zug
+});
+
+spiel.zug({ karte: 12 });   // bei allen gleich – beim Host direkt, sonst geht es zum Host
+spiel.neu();                // nur der Host: neues Spiel starten
+spiel.raum.istHost;         // z. B. Knopf „Spiel starten“ nur beim Host zeigen</code></pre>
+    <ul>
+      <li><strong>Alles, was zum Spiel gehört, steht im Zustand</strong> – keine Variablen nebenher. Nur so kann ein neuer Host weitermachen.
+        Zufall (Mischen) passiert in <code>neu</code>/<code>zug</code> beim Host und landet im Zustand.</li>
+      <li><code>zug</code> bekommt eine Kopie des Zustands. Gib den neuen Zustand zurück (oder den geänderten).</li>
+      <li>Höchstens <strong>256 KB</strong> Zustand und <strong>64 KB</strong> je Sicht/Zug, höchstens 40 Nachrichten je Sekunde.</li>
+    </ul>
+    <h3>Der Raum</h3>
+<pre><code>const raum = spiel.raum;   // oder: const raum = await GameSave.multiplayer.raum();
+raum.code; raum.ich; raum.host; raum.istHost; raum.zuschauer; raum.min; raum.max;
+raum.spieler;   // [{ id, name, verbunden, zuschauer, host }] – Reihenfolge wie beim Betreten
+raum.beiAenderung(() =&gt; spielerlisteMalen(raum.spieler));</code></pre>
+    <p>Für eigene Wege gibt es darunter die einfache Ebene: <code>raum.senden(daten, an)</code> (an: weglassen = alle anderen, <code>"host"</code>,
+      eine ID oder eine Liste von IDs), <code>raum.beiNachricht((daten, von) =&gt; …)</code>, <code>raum.standSichern(daten)</code> (nur Host) und
+      <code>raum.beiHostwerden((stand) =&gt; …)</code>. Für fast alle Spiele reicht <code>spiel()</code>.</p>
+    <h3>Testen</h3>
+    <ul>
+      <li><strong>Lokal:</strong> Den Spielordner über einen kleinen Webserver öffnen (z. B. <code>npx serve</code> oder <code>python3 -m http.server</code>)
+        und <strong>zwei Tabs</strong> aufmachen – die spielen gegeneinander, der ältere Tab ist Host. Direkt per Doppelklick (<code>file://</code>) geht es nicht.</li>
+      <li><strong>Im Entwurf:</strong> Den Entwurf in zwei Tabs öffnen – im Entwurf darfst du gegen dich selbst spielen (der zweite Tab heißt dann z. B. „seb (2)“).</li>
+      <li>Bestenliste und Erfolge funktionieren wie immer – jeder Spieler meldet seine eigenen.</li>
+    </ul>
+    <h3>Umstieg von einem eigenen Server (Socket.IO, Cloudflare Workers …)</h3>
+    <ul>
+      <li>Die Spiellogik des Servers (Zustand, Züge prüfen, gefilterte Sicht je Spieler) wandert fast unverändert in <code>regeln</code>.</li>
+      <li>Aus <code>socket.emit("game:action", aktion)</code> wird <code>spiel.zug(aktion)</code>, aus dem Ereignis mit der Sicht vom Server wird <code>zeigen(sicht)</code>.</li>
+      <li>Die eigene Lobby (Name, Raum erstellen, Code, Spielerliste, Rauswerfen) fällt weg – das macht die Bibliothek.</li>
+      <li><strong>Jedes Spiel ist ein eigener Ordner</strong> mit eigener <code>game.json</code> und eigener Kachel. Gemeinsame Dateien (Töne, Hilfe, Bilder)
+        kopierst du in jedes Spiel.</li>
+    </ul>
+    <p data-hinweis="info">Räume liegen nur im Arbeitsspeicher der Bibliothek. Wird sie neu gestartet (z. B. bei einem Update), sind laufende Räume weg und
+      alle landen wieder in der Lobby. Räume ohne Spieler verschwinden nach 15 Minuten. Mit <code>GameSave.save</code> Gespeichertes bleibt immer.</p>
+
+    <h2 id="claude">9d. Claude direkt verbinden (MCP)</h2>
+    <p>Du kannst Claude mit der Bibliothek verbinden. Dann liest Claude das Handbuch selbst, holt die Startvorlage, sieht deine Spiele,
+      lädt Entwürfe hoch und liest die Prüfung und die Fehlerberichte – du musst keine ZIPs mehr packen.</p>
+    <ul>
+      <li><strong>Veröffentlichen macht immer noch du</strong> – Claude gibt dir den Link zum Testen und zum Update-Fenster.</li>
+      <li>Claude kommt nur an <strong>deine</strong> Spiele, und alles landet als Entwurf.</li>
+      <li>Die Bibliothek ist für Claude gebaut. Andere KIs (z. B. ChatGPT) bekommen einen Hinweis und sind nicht getestet.</li>
+    </ul>
+    <h3>Claude Code</h3>
+    <ol>
+      <li>Upload-Seite → <strong>„KI-Zugang (Claude)“</strong> → „Schlüssel für Claude Code erstellen“.</li>
+      <li>Den angezeigten Befehl kopieren und im Terminal ausführen. Der Schlüssel erscheint nur dieses eine Mal – behandle ihn wie ein Passwort.</li>
+      <li>In Claude Code einfach sagen, was du bauen willst, z. B. „Bau ein Kartenspiel für 2–4 Spieler für die Spielebibliothek“.</li>
+    </ol>
+    <h3>Claude-App (claude.ai, Desktop)</h3>
+    <ol>
+      <li>Einstellungen → Konnektoren → <strong>Eigenen Konnektor hinzufügen</strong>.</li>
+      <li>Name: <code>Spielebibliothek</code>, Adresse: <code>https://mcp.cuby0401.uk/mcp</code> → Verbinden.</li>
+      <li>Es öffnet sich die Upload-Seite: anmelden (mit Upload-Passwort) und <strong>„Erlauben“</strong>.</li>
+    </ol>
+    <p>Alle Verbindungen siehst du auf der Upload-Seite unter „KI-Zugang (Claude)“ und kannst sie dort jederzeit widerrufen.</p>
 
     <h2 id="selbst">10. Was du selbst einstellen kannst – und was nicht</h2>
     <div class="b-tabelle"><table>

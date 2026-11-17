@@ -71,3 +71,16 @@ def registrieren(app: FastAPI, e, db, aktuelle_season) -> None:
         else:
             # Der Upload-Dienst nennt Entwickler beim Ordnernamen → UUID (1.5.0); „*“ = an alle bleibt
             db.melden(an if an == "*" else identitaet.id_von_ordner(an), text.strip(), link if isinstance(link, str) else None)
+
+    @app.get("/intern/fehler/{user}", dependencies=[Depends(intern)])
+    def fehler_von(user: str = P(..., max_length=64), ordner: str | None = Query(None, max_length=64)):
+        """Fehlerberichte aus den Spielen eines Entwicklers (Spieleordner) – für den MCP-Server (1.6.0, E88)."""
+        basis = e.spiele_dir / user
+        if not games.BENUTZER_MUSTER.match(user) or not basis.is_dir():
+            return []
+        namen = {p.name.split("~", 1)[0] for p in basis.iterdir() if p.is_dir()}
+        if ordner is not None:
+            namen &= {ordner}
+        ids = [f"{user}/{n}{z}" for n in sorted(namen) for z in ("", versionen.ENTWURF)]
+        return [{k: f.get(k) for k in ("game", "meldung", "quelle", "zeile", "spalte", "stack", "anzahl", "erstes", "letztes", "browser")}
+                for f in db.fehler_liste(ids)]

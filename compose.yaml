@@ -110,8 +110,14 @@ services:
       INTERN_TOKEN: ${INTERN_TOKEN:?INTERN_TOKEN fehlt in .env – deploy.sh legt es an}
       # Speicher je Entwickler in MB (Spiele + Entwürfe + aufgehobene Versionen), in .env änderbar
       UPLOAD_KONTINGENT_MB: ${UPLOAD_KONTINGENT_MB:-1024}
+      # MCP-Server für die KIs der Entwickler (Zentrale 1.6.0): öffentliche Adressen (Standard = live)
+      MCP_URL: https://mcp.cuby0401.uk
+      UPLOAD_OEFFENTLICH: https://upload.cuby0401.uk
+      GAMES_OEFFENTLICH: https://games.cuby0401.uk
     volumes:
       - /volume1/games/spiele:/spiele
+      # Handbuch und Vorlagen für den MCP-Server (nur lesen)
+      - ./site/handbuch:/handbuch:ro
       # Passwort-Hashes und Sitzungs-Schlüssel (Ordner liegt unter filebrowser/, dort hat UID 10021 schon Rechte)
       - /volume1/games/filebrowser/upload:/data
       - ./config:/config:ro
@@ -131,6 +137,7 @@ services:
     #   games.cuby0401.uk  → http://caddy:8080
     #   play.cuby0401.uk   → http://caddy:8080
     #   upload.cuby0401.uk → http://caddy:8080
+    #   mcp.cuby0401.uk    → http://caddy:8080   (1.6.0, OHNE Access-Anwendung – der MCP-Server meldet selbst an)
     depends_on: [caddy]
     networks: [intern]
 

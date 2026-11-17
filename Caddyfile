@@ -6,6 +6,8 @@
 #   games.cuby0401.uk → Bibliotheksseite, /lib, /api
 #   play.cuby0401.uk  → nur Spieldateien (/play) und /lib – eigener Origin für die Spiele (E14)
 #   upload.cuby0401.uk → Upload-Seite + Upload-Dienst (Phase 6b, ersetzt File Browser – E19)
+#   mcp.cuby0401.uk    → MCP-Server für die KIs der Entwickler (Zentrale 1.6.0, E88) – OHNE Cloudflare Access,
+#                        der Upload-Dienst meldet selbst an (Schlüssel bzw. OAuth). Nur /mcp, /oauth/* und /.well-known/oauth-*
 {
 	admin off
 	auto_https off
@@ -117,10 +119,24 @@
 		}
 	}
 
+	# ---------- mcp.cuby0401.uk: MCP-Server (1.6.0) ----------
+	@mcp host mcp.cuby0401.uk
+	handle @mcp {
+		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		header Cache-Control "no-store"
+		@mcp_dienst path /mcp /oauth/token /oauth/register /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/mcp /.well-known/oauth-authorization-server /.well-known/oauth-authorization-server/mcp
+		handle @mcp_dienst {
+			reverse_proxy upload:8000
+		}
+		handle {
+			respond 404
+		}
+	}
+
 	# ---------- games.cuby0401.uk: Bibliothek ----------
 
 	# Die Bibliothek spricht nur mit sich selbst und mit play; sie lässt sich nirgends einbetten.
-	@games not host play.cuby0401.uk upload.cuby0401.uk
+	@games not host play.cuby0401.uk upload.cuby0401.uk mcp.cuby0401.uk
 	header @games Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://play.cuby0401.uk; frame-src https://play.cuby0401.uk; connect-src 'self' https://play.cuby0401.uk; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 	# GameSave-Bibliothek und Bridge

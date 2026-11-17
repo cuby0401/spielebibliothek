@@ -30,9 +30,10 @@ ART=${ART:-test}
 GH=${GH:-<NAS_GH>}
 PH=${PH:-<NAS_PH>}
 UH=${UH:-<NAS_UH>}
+MH=${MH:-mcp.localhost}   # MCP-Server (1.6.0): Testserver test-mcp.cuby0401.uk, sonst nur über den Host-Kopf erreichbar
 if [ "$ART" = probe ]; then
 	N=sbprobe; T=/volume1/docker/spielebibliothek-probe; PG=18188; PP=18189; PU=18190
-	GH=test.cuby0401.uk; PH=test-play.cuby0401.uk; UH=test-upload.cuby0401.uk
+	GH=test.cuby0401.uk; PH=test-play.cuby0401.uk; UH=test-upload.cuby0401.uk; MH=test-mcp.cuby0401.uk
 	G="https://$GH"; P="https://$PH"; U="https://$UH"
 	LAN=${LAN:-192.168.178.100}   # nur hier lauschen – der Tunnel holt die Anfragen dort ab, Tailscale kommt nicht ran
 	ANMELDUNG="-e ACCESS_TEAM_DOMAIN=cold-glitter-fc3b.cloudflareaccess.com -e ACCESS_AUD=04f54bd3a75c2ac0db275f6996c5761d9738b172bd57bdd64befcd99ed4db240"
@@ -130,7 +131,7 @@ up)
 	find "$T/repo/lib" "$T/repo/examples" -type f \( -name '*.js' -o -name '*.html' \) \
 		-exec sh -c 'if sed --version >/dev/null 2>&1; then sed -i "$0" "$@"; else sed -i "" "$0" "$@"; fi' "s#https://games.cuby0401.uk#$G#g; s#https://play.cuby0401.uk#$P#g; s#https://upload.cuby0401.uk#$U#g" {} +
 	sed -e "s#https://games.cuby0401.uk#$G#g" -e "s#https://play.cuby0401.uk#$P#g" -e "s#https://upload.cuby0401.uk#$U#g" \
-		-e "s#\([^-]\)play\.cuby0401\.uk#\1$PH#g" -e "s#\([^-]\)upload\.cuby0401\.uk#\1$UH#g" \
+		-e "s#\([^-]\)play\.cuby0401\.uk#\1$PH#g" -e "s#\([^-]\)upload\.cuby0401\.uk#\1$UH#g" -e "s#\([^-]\)mcp\.cuby0401\.uk#\1$MH#g" \
 		-e "s#savesvc:8000#$N-savesvc:8000#" -e "s#upload:8000#$N-upload:8000#" "$T/repo/Caddyfile" > "$T/Caddyfile"
 	# Zeilen mit „# NUR-LIVE“ (z. B. die Sperre der Testseite /ui-test/) gelten nur live und auf dem Testserver
 	if [ "$ART" != probe ]; then grep -v '# NUR-LIVE' "$T/Caddyfile" > "$T/Caddyfile.neu" && mv "$T/Caddyfile.neu" "$T/Caddyfile"; fi
@@ -148,7 +149,9 @@ up)
 		-e PROBE="$( [ "$ART" = probe ] && echo 1 || echo 0 )" -e DESIGN="$( [ "$ART" = design ] && echo 1 || echo 0 )" -e ZENTRALE_COMMIT="${ZENTRALE_COMMIT:-}" -e ZENTRALE_VERSION="${ZENTRALE_VERSION:-}" \
 		-v "$T/data:/data" -v "$T/spiele:/spiele:ro" -v "$T/config:/config" spielebibliothek-savesvc:$N >/dev/null
 	docker run -d $NEUSTART --name $N-upload --network $N --user 10021:10021 $ANMELDUNG -e UPLOAD_DATA=/data \
-		-e UPLOAD_COOKIE_SECURE=$COOKIE_SECURE -e INTERN_TOKEN=test-token -e SAVESVC_URL=http://$N-savesvc:8000 -v "$T/udata:/data" -v "$T/config:/config:ro" -v "$T/spiele:/spiele" spielebibliothek-savesvc:$N \
+		-e UPLOAD_COOKIE_SECURE=$COOKIE_SECURE -e INTERN_TOKEN=test-token -e SAVESVC_URL=http://$N-savesvc:8000 \
+		-e MCP_URL="$( [ "$ART" = probe ] && echo "https://$MH" || echo "http://$MH:$PG" )" -e UPLOAD_OEFFENTLICH="$U" -e GAMES_OEFFENTLICH="$G" -v "$T/repo/site/handbuch:/handbuch:ro" \
+		-v "$T/udata:/data" -v "$T/config:/config:ro" -v "$T/spiele:/spiele" spielebibliothek-savesvc:$N \
 		uvicorn savesvc.upload:app_factory --factory --host 0.0.0.0 --port 8000 >/dev/null
 	docker run -d $NEUSTART --name $N-caddy --network $N --user 10020:10020 -e XDG_CONFIG_HOME=/tmp -e XDG_DATA_HOME=/tmp \
 		$PORTS \

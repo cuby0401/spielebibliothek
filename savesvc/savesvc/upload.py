@@ -220,6 +220,8 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     daten = daten or Path(os.environ.get("UPLOAD_DATA", "/data"))
     sicher = os.environ.get("UPLOAD_COOKIE_SECURE", "1") != "0"
     store = Entwickler(daten / "upload.db")
+    from .mcp import Zugaenge
+    zugaenge = Zugaenge(daten / "upload.db")      # KI-Zugänge (MCP, 1.6.0)
     geheim = geheimnis(daten / "geheimnis")
     spieler = Pruefer(e, Benutzerliste(e.users_file), schluessel_quelle)
     speicher = speicher or SpeicherDienst(os.environ.get("SAVESVC_URL", "http://savesvc:8000"), os.environ.get("INTERN_TOKEN", ""))
@@ -244,6 +246,9 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         # CSRF: Fremde Seiten können diesen Header nicht ohne CORS-Freigabe setzen
         # (/intern ist nur im Docker-Netz erreichbar und hat ein eigenes Token)
         if request.url.path.startswith("/intern/"):
+            return await weiter(request)
+        # MCP (1.6.0): keine Cookies, eigene Anmeldung per Bearer-Token – CSRF spielt dort keine Rolle
+        if request.url.path == "/mcp" or request.url.path.startswith("/oauth/"):
             return await weiter(request)
         if request.method in ("POST", "PUT", "DELETE") and request.headers.get("x-upload") != "1":
             return JSONResponse({"detail": "Header X-Upload fehlt"}, status_code=403)
@@ -314,6 +319,10 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
 
     @app.get("/api/upload/spiele")
     def meine_spiele(player: str = Depends(angemeldet)):
+        return spiele_von(player)
+
+    def spiele_von(player: str) -> list[dict]:
+        """Alle Spiele eines Entwicklers mit Version, Entwurf und Speicher (Upload-Seite und MCP, 1.6.0)."""
         basis = e.spiele_dir / player
         ergebnis = []
         for name in spiel_namen(basis):
@@ -343,11 +352,15 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     def hochladen(player: str = Depends(angemeldet), ordner: str = P(...), datei: UploadFile = File(...),
                   neu: str = Form("")):
         """Jeder Upload landet als Entwurf (E35). Veröffentlicht wird nur über das Update-Fenster."""
+        return entwurf_installieren(player, ordner, datei.file, neu)
+
+    def entwurf_installieren(player: str, ordner: str, zipdatei, neu: str, quelle: str = "") -> dict:
+        """ZIP als Entwurf installieren – Upload-Seite und MCP (1.6.0, quelle=" über Claude")."""
         ziel = ordnerpfad(player, ordner)
         basis = ziel.parent
         entwurf = versionen.entwurf(basis, ordner)
         try:
-            ergebnis = zipinstall.installieren(datei.file, entwurf)
+            ergebnis = zipinstall.installieren(zipdatei, entwurf)
         except zipinstall.UngueltigesZip as fehler:
             store.ereignis(player, f"Upload blockiert: {str(fehler)[:200]}", ordner)          # Sicherheitsprotokoll (1.5.0)
             raise HTTPException(422, str(fehler)) from None
@@ -361,7 +374,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
         release.aenderung_merken(basis, ordner, neu, player)
         speicher_still("POST", f"/intern/entwurf/{player}/{ordner}/zuruecksetzen")   # frischer Test mit echtem Spielstand
         log.info("%s hat %s als Entwurf hochgeladen (%d Dateien)", player, ordner, ergebnis.dateien)
-        store.ereignis(player, "als Entwurf hochgeladen", ordner, ergebnis.dateien)
+        store.ereignis(player, "als Entwurf hochgeladen" + quelle, ordner, ergebnis.dateien)
         return {"ordner": ordner, "entwurf": True, "dateien": ergebnis.dateien, "bytes": ergebnis.bytes,
                 "uebersprungen": ergebnis.uebersprungen[:50]}
 
@@ -603,6 +616,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     @app.delete("/intern/entwickler/{name}", status_code=204, dependencies=[Depends(intern)])
     def i_sperren(name: str = P(...)):
         if store.loeschen(name_ok(name)):
+            zugaenge.alle_widerrufen(name)          # KI-Zugänge (MCP) gelten nur mit Upload-Konto
             store.ereignis(name, "Upload-Konto gelöscht")
 
     @app.delete("/intern/spiele/{user}/{ordner}", status_code=204, dependencies=[Depends(intern)])
@@ -630,6 +644,14 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     def i_ereignisse(player: str | None = None, limit: int = 25):
         return store.ereignisse(max(1, min(limit, 200)), player)
 
+    # ---------- MCP-Server für die KIs der Entwickler (Zentrale 1.6.0, E88) ----------
+    from . import mcp
+    mcp.registrieren(app, e, store, zugaenge, spieler, angemeldet, spiele_von=spiele_von, entwurf_installieren=entwurf_installieren,
+                     pruefung=pruefung, ordnerpfad=ordnerpfad, speicher=speicher,
+                     handbuch_dir=Path(os.environ.get("MCP_HANDBUCH", "/handbuch")),
+                     mcp_url=os.environ.get("MCP_URL", "https://mcp.cuby0401.uk"),
+                     upload_url=os.environ.get("UPLOAD_OEFFENTLICH", "https://upload.cuby0401.uk"),
+                     games_url=os.environ.get("GAMES_OEFFENTLICH", "https://games.cuby0401.uk"))
     return app
 
 

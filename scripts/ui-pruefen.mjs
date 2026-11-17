@@ -15,6 +15,7 @@ const lesen = (p) => readFileSync(new URL(p, wurzel), "utf8");
 const UMGEBAUT = [
 	{ html: "site/ui-test/index.html", js: ["site/ui-test/test.js"] },
 	{ html: "site/upload/index.html", js: ["site/upload/upload.js"] },
+	{ html: "site/upload/mcp-freigabe.html", js: ["site/upload/mcp-freigabe.js"] },
 	{ html: "site/tester/index.html", js: ["site/tester/tester.js"] },
 	{ html: "site/hilfe/index.html", js: ["site/hilfe/hilfe-rahmen.js", "site/hilfe/hilfe.js"] },
 	{ html: "site/handbuch/index.html", js: ["site/hilfe/hilfe-rahmen.js", "site/handbuch/handbuch.js"] },

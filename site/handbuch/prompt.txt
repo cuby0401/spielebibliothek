@@ -31,6 +31,13 @@ ERFOLGE UND KATEGORIEN (optional, empfohlen)
   (id nur a–z, 0–9, _ und -, max. 40 Zeichen, nie umbenennen). Im Spiel freischalten: await GameSave.erfolg("erster-sieg") (mit try/catch).
   Die Bibliothek zeigt selbst eine Meldung, das Spiel muss nichts anzeigen.
 
+MULTIPLAYER (nur für Spiele mit mehreren Spielern)
+- In der game.json: "multiplayer": { "min": 2, "max": 4 }. Kein eigener Server, kein WebSocket, kein Firebase/PeerJS – die Bibliothek bringt die Spieler in einen Raum (Lobby, Raumcode, Einladen). Baue KEINE eigene Lobby.
+- Die Regeln rechnet der Browser des Hosts: const spiel = await GameSave.multiplayer.spiel({ neu(spieler, optionen) → zustand, zug(zustand, aktion, von) → zustand (ungültig: throw new Error("…")), sicht(zustand, fuer) → was dieser Spieler sehen darf }, { zeigen(sicht, raum), fehler(text) }).
+- Alles, was zum Spiel gehört (auch gemischte Karten, wer dran ist), steht im zustand als einfaches JSON – keine Variablen nebenher. Sonst kann ein neuer Host nicht weitermachen.
+- Züge immer mit spiel.zug(aktion) schicken, neues Spiel nur beim Host mit spiel.neu(). sicht === null heißt: noch nicht gestartet. Den Knopf „Spiel starten“ nur zeigen, wenn spiel.raum.istHost.
+- In sicht() fremde Geheimnisse (Handkarten, Stapel) weglassen. Höchstens 256 KB Zustand, 64 KB je Sicht.
+
 GAME.JSON (Pflicht)
 { "title": "...", "description": "ein Satz", "thumbnail": "thumb.svg", "saveVersion": 1, "tags": ["..."],
   "leaderboard": { "enabled": true, "order": "desc", "label": "Punkte" } }
