@@ -149,7 +149,9 @@ up)
 	mkdir -p "$TESTERGEBNISSE" 2>/dev/null || docker run --rm -v "$(dirname "$TESTERGEBNISSE")":/t caddy:2 mkdir -p "/t/$(basename "$TESTERGEBNISSE")"
 	docker run --rm -v "$TESTERGEBNISSE":/z caddy:2 chmod a+rwX /z
 	# IDENTITAET_UUID=0 (1.5.0): Teststand ohne Umstellung auf UUID, nur zum Vergleich mit dem alten Verhalten
-	docker run -d $NEUSTART --name $N-savesvc --network $N $ANMELDUNG -e WAECHTER=0 -e IDENTITAET_UUID=${IDENTITAET_UUID:-1} \
+	# --group-add 10021: Der Upload-Dienst legt neue Spiel-/Entwurfsordner mit 770 an. Live geben die Default-ACLs auf spiele/
+	# Speicher-Dienst und Caddy Leserechte; hier greift setfacl nicht (Dateien gehören root), also über die Gruppe (1.6.0).
+	docker run -d $NEUSTART --name $N-savesvc --network $N --group-add 10021 $ANMELDUNG -e WAECHTER=0 -e IDENTITAET_UUID=${IDENTITAET_UUID:-1} \
 		-e TESTPLAN_DIR=/testplan -e TESTERGEBNISSE=/tests/ergebnisse.db -v "$T/repo/${TESTPLAENE:-tests/manuell}:/testplan:ro" -v "$TESTERGEBNISSE:/tests" \
 		-e ADMINS=seb -e TESTER=emil -e INTERN_TOKEN=test-token -e UPLOAD_URL=http://$N-upload:8000 \
 		-e PROBE="$( [ "$ART" = probe ] && echo 1 || echo 0 )" -e DESIGN="$( [ "$ART" = design ] && echo 1 || echo 0 )" -e ZENTRALE_COMMIT="${ZENTRALE_COMMIT:-}" -e ZENTRALE_VERSION="${ZENTRALE_VERSION:-}" \
@@ -159,7 +161,7 @@ up)
 		-e MCP_URL="$( [ "$ART" = probe ] && echo "https://$MH" || echo "http://$MH:$PG" )" -e UPLOAD_OEFFENTLICH="$U" -e GAMES_OEFFENTLICH="$G" -v "$T/repo/site/handbuch:/handbuch:ro" \
 		-v "$T/udata:/data" -v "$T/config:/config:ro" -v "$T/spiele:/spiele" spielebibliothek-savesvc:$N \
 		uvicorn savesvc.upload:app_factory --factory --host 0.0.0.0 --port 8000 >/dev/null
-	docker run -d $NEUSTART --name $N-caddy --network $N --user 10020:10020 -e XDG_CONFIG_HOME=/tmp -e XDG_DATA_HOME=/tmp \
+	docker run -d $NEUSTART --name $N-caddy --network $N --user 10020:10020 --group-add 10021 -e XDG_CONFIG_HOME=/tmp -e XDG_DATA_HOME=/tmp \
 		$PORTS \
 		-v "$T/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$T/repo/site:/srv/site:ro" -v "$T/repo/lib:/srv/lib:ro" -v "$T/spiele:/srv/spiele:ro" -v "$T/config:/config:ro" \
 		caddy:2 >/dev/null
