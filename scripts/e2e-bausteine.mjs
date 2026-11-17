@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { setTimeout as warte } from "node:timers/promises";
-const G = process.env.E2E_G || "http://<NAS_GH>:18088";
+const G = process.env.E2E_G || "http://127.0.0.1:18088";
 const DIR = process.argv[2] || "/tmp/sb-e2e-bausteine";
 mkdirSync(DIR, { recursive: true });
 const PORT = 9334;

@@ -10,9 +10,11 @@
 # Voraussetzung: Zentrale ab 1.3.0 ist live. Nach einem UGOS-Update prüfen, ob die Datei noch da ist –
 # fehlt sie, meldet das der Wächter („Auftragsdienst meldet sich nicht mehr“).
 set -eu
-NAS="${NAS:-$NAS}"
+. "$(dirname "$0")/lokal.sh"   # NAS aus lokal.env
+nas_noetig
+NUTZER="${NAS%@*}"             # der NAS-Benutzer aus NAS=<benutzer>@<host>
 DATEI=/etc/cron.d/spielebibliothek-auftragsdienst
-ZEILE='* * * * * Sebi /usr/bin/python3 -I /volume1/docker/spielebibliothek/scripts/auftragsdienst.py >> /tmp/sb-auftragsdienst.log 2>&1'
+ZEILE='* * * * * '"$NUTZER"' /usr/bin/python3 -I /volume1/docker/spielebibliothek/scripts/auftragsdienst.py >> /tmp/sb-auftragsdienst.log 2>&1'
 if [ "${1:-}" = "--aus" ]; then
 	ssh -t -o LogLevel=ERROR "$NAS" "sudo rm -f $DATEI && echo '✓ Auftragsdienst ausgetragen.'"
 	exit 0

@@ -59,7 +59,7 @@ services:
       # Admin-Panel (games.cuby0401.uk/admin) und interne Schnittstelle zum Upload-Dienst
       ADMINS: seb
       # Wer bei der Übernahme ins CRM (erster Start von 1.4.x) die Rolle Tester bekommt. Danach zählt nur das CRM.
-      TESTER: emil
+      TESTER: ${TESTER:-}
       INTERN_TOKEN: ${INTERN_TOKEN:?INTERN_TOKEN fehlt in .env – deploy.sh legt es an}
       UPLOAD_URL: http://upload:8000
       BACKUP_UHRZEIT: "01:45"

@@ -1,5 +1,7 @@
 # Betrieb
 
+`$NAS` und `<NAS_GH>` stehen für die Adressen aus `lokal.env` (siehe `docs/entwicklung.md`).
+
 ## Ordner auf der NAS
 
 | Pfad | Inhalt | schreibt |

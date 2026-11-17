@@ -1,7 +1,7 @@
 # Cloudflare-Abgleich (Zentrale 1.3.0)
 
 Cloudflare verschickt den E-Mail-Code **nur an Adressen, die in einer Access-Richtlinie stehen** – bei allen anderen zeigt
-es trotzdem „Code wurde gesendet“. Steht eine Adresse falsch in „Kollegen“, kommt der Code nie an (so am 06.11.2026 bei Emil).
+es trotzdem „Code wurde gesendet“. Steht eine Adresse falsch in „Kollegen“, kommt der Code nie an (so am 06.11.2026 bei einem Tester).
 Der Abgleich sorgt dafür, dass die Richtlinien **„Kollegen“** (alle Personen mit Zugang laut CRM, siehe `docs/crm.md`) und **„Entwickler“** (alle mit Upload-Konto)
 genau zur Benutzerliste der Bibliothek passen.
 

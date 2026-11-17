@@ -14,7 +14,7 @@
 #   scripts/deploy.sh --zurueck 1.1.0    auf eine früher deployte Version zurück (aus dem Release-Archiv)
 #   scripts/deploy.sh --versionen        aufgehobene Versionen auf der NAS anzeigen
 #   scripts/deploy.sh --design           DESIGN-SPIELWIESE für die neue UI: Kopie der echten Daten, NUR über Tailscale,
-#                                        http://<NAS_GH>:18288 – ohne VERSION/CHANGELOG/Commit-Pflicht, jeder Branch.
+#                                        http://<NAS_GH>:18288 (Adresse aus lokal.env) – ohne VERSION/CHANGELOG/Commit-Pflicht, jeder Branch.
 #                                        Nimmt auch nicht committete Dateien mit. NIE eine Cloudflare-Route darauf legen (automatisch seb).
 #   scripts/deploy.sh --design --daten-behalten   Code erneuern, Daten der Spielwiese behalten
 #   scripts/deploy.sh --design --nur-site         nur site/ erneuern (CSS/JS), ohne Neustart – für schnelle Design-Runden
@@ -38,7 +38,14 @@
 
 set -eu
 
-NAS="${NAS:-$NAS}"
+. "$(dirname "$0")/lokal.sh"   # NAS, NAS_GH, NAS_PH, NAS_UH aus lokal.env (nicht im Git)
+nas_noetig
+# Das Repo ist öffentlich (17.11.2026): Die NAS-Adressen dürfen in keiner Datei stehen, die ins Git kommen kann.
+if git -C "$(dirname "$0")/.." grep --untracked -qIF -e "$NAS_GH" -e "$NAS_PH" -e "$NAS_UH" -- . ; then
+	echo "✗ NAS-Adresse aus lokal.env steht im Repo – erst ersetzen (\$NAS / <NAS_GH>), dann deployen:" >&2
+	git -C "$(dirname "$0")/.." grep --untracked -nIF -e "$NAS_GH" -e "$NAS_PH" -e "$NAS_UH" -- . >&2
+	exit 1
+fi
 ZIEL="${ZIEL:-/volume1/docker/spielebibliothek}"
 RELEASES="${RELEASES:-/volume1/docker/spielebibliothek-releases}"
 SPIELE=/volume1/games/spiele/seb
@@ -200,8 +207,9 @@ fi
 # ---------- Design-Spielwiese (neue UI, 10.11.2026) ----------
 # Bewusst ohne die Prüfungen für live/Probe: Hier wird ausprobiert, nichts davon geht ungeprüft live.
 if [ "$DESIGN" = 1 ]; then
-	DESIGN_URL=http://<NAS_GH>:18288
-	if [ "$WEG" = 1 ]; then ssh "$NAS" "ART=design sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh down"; exit 0; fi
+	DESIGN_URL=http://$NAS_GH:18288
+	DESIGN_HOSTS="GH=$NAS_GH PH=$NAS_PH UH=$NAS_UH"   # teststand.sh baut daraus die Hostnamen der Spielwiese
+	if [ "$WEG" = 1 ]; then ssh "$NAS" "ART=design $DESIGN_HOSTS sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh down"; exit 0; fi
 	node scripts/ui-pruefen.mjs || { echo "✗ Oberfläche nicht einheitlich – nichts deployt (docs/ui-bausteine.md)." >&2; exit 1; }
 	node scripts/kontrast-pruefen.mjs >/dev/null || { node scripts/kontrast-pruefen.mjs >&2; echo "✗ Farben zu kontrastarm – nichts deployt." >&2; exit 1; }
 	COMMIT="$(git rev-parse --short HEAD)"; [ -n "$(git status --porcelain)" ] && COMMIT="$COMMIT+"
@@ -211,7 +219,7 @@ if [ "$DESIGN" = 1 ]; then
 		{ git ls-files -co --exclude-standard site; echo VERSION; echo CHANGELOG.md; } | sort -u | while read -r f; do [ -f "$f" ] && echo "$f"; done \
 			| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
 			set -e; rm -rf /tmp/sb-design-repo && mkdir -p /tmp/sb-design-repo && tar -xf - -C /tmp/sb-design-repo
-			ART=design ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh site /tmp/sb-design-repo
+			ART=design $DESIGN_HOSTS ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh site /tmp/sb-design-repo
 			rm -rf /tmp/sb-design-repo"
 		echo "✓ site/ der Design-Spielwiese erneuert: $DESIGN_URL"; exit 0
 	fi
@@ -220,7 +228,7 @@ if [ "$DESIGN" = 1 ]; then
 	git ls-files -co --exclude-standard | grep -vx -e '.env' -e 'config/users.yaml' | while read -r f; do [ -f "$f" ] && echo "$f"; done \
 		| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
 		set -e; rm -rf /tmp/sb-design-repo && mkdir -p /tmp/sb-design-repo && tar -xf - -C /tmp/sb-design-repo
-		ART=design ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /tmp/sb-design-repo/scripts/teststand.sh up /tmp/sb-design-repo $BEHALTEN
+		ART=design $DESIGN_HOSTS ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /tmp/sb-design-repo/scripts/teststand.sh up /tmp/sb-design-repo $BEHALTEN
 		rm -rf /tmp/sb-design-repo"
 	echo "✓ Design-Spielwiese läuft: $DESIGN_URL  (nur über Tailscale, automatisch als seb)"
 	exit 0

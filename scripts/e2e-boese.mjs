@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { setTimeout as warte } from "node:timers/promises";
 // Auf der NAS (Auftragsdienst, 1.3.0) setzt scripts/e2e-nas.sh Hostnamen und Chrome per Umgebung
-const G = process.env.E2E_G || "http://<NAS_GH>:18088";
+const G = process.env.E2E_G || "http://127.0.0.1:18088";
 const chrome = spawn(process.env.CHROME_BIN || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   [...(process.env.CHROME_BIN ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] : []), "--headless=new", "--remote-debugging-port=9334", `--user-data-dir=${process.argv[2]}/chrome-profil2`, "--no-first-run", "about:blank"], { stdio: "ignore" });
 process.on("exit", () => chrome.kill());   // Chrome nie hängen lassen, auch bei Abbruch
