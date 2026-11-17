@@ -2,6 +2,23 @@
 
 Diese Datei gilt für jede Claude-Session, die in diesem Repo arbeitet. Sie ist verbindlich.
 
+## 0. Das Repo ist öffentlich – keine sensiblen Daten (Seb, 17.11.2026)
+
+Das komplette Projekt geht öffentlich auf GitHub: Code, Doku, CHANGELOG, Testpläne, Testdaten **und die Commit-Nachrichten**.
+Deshalb darf nie etwas hinein, das Personen oder die eigene Infrastruktur verrät:
+
+1. **Keine Namen echter Personen**: keine Kollegen, Tester, Entwickler, Familie oder Freunde – weder in Code und Kommentaren noch in
+   Doku, CHANGELOG, Testplänen (`tests/manuell/`), Beispielspielen oder Commit-Nachrichten. Stattdessen Rollen („ein Entwickler“,
+   „ein Tester“, „der Admin“) oder neutrale Platzhalter.
+2. **Keine echten E-Mail-Adressen**, Handles oder Benutzernamen echter Personen. In Tests und Beispielen nur `@example.com`.
+3. **Keine Adressen der eigenen Infrastruktur**: Tailscale-Namen und -IPs, ssh-Ziele, NAS-Namen gehören in `lokal.env` (gitignored,
+   Vorlage `lokal.env.example`). `deploy.sh` bricht ab, wenn eine Adresse aus `lokal.env` in einer Datei steht.
+4. **Keine Geheimnisse und keine echten Daten**: keine Passwörter, Tokens, Schlüssel, `.env`, `config/users.yaml`, Datenbanken, Backups,
+   Logs, Screenshots oder Fotos mit echten Inhalten, keine Inhalte aus Anfragen, Fehlerberichten oder dem CRM.
+5. **Vorfälle und Entscheidungen ohne Personenbezug beschreiben** („Ein Spieler meldete …“). Wer was gesagt oder gemacht hat, gehört in den
+   privaten Vault (`~/seb-brain`), nicht ins Repo.
+6. **Vor jedem Commit den Diff durchsehen** (`git diff --cached`, auch die Commit-Nachricht) – im Zweifel weglassen und Seb fragen.
+
 ## 1. Oberfläche: NUR aus den UI-Bausteinen (Seb, 10./11.11.2026, E85)
 
 Seb: „Es sollte alles einheitlich werden. Einheitlichkeit ist wichtig.“ Darum gibt es den Werkzeugkasten in `site/ui/`.
