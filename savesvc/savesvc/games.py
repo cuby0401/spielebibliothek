@@ -123,6 +123,23 @@ def erfolge(ordner: Path) -> list[dict]:
     return ergebnis
 
 
+MP_MAX = 16   # Spieler je Raum höchstens (Zuschauer kommen dazu), Zentrale 1.6.0
+
+
+def multiplayer(daten: dict) -> dict | None:
+    """game.json → "multiplayer": {"min": 2, "max": 4} (Zentrale 1.6.0, E88). true = 2 bis 8 Spieler. Sonst None."""
+    roh = daten.get("multiplayer")
+    if roh is True:
+        roh = {}
+    if not isinstance(roh, dict):
+        return None
+    def zahl(w, standard):
+        return w if isinstance(w, int) and not isinstance(w, bool) else standard
+    mx = max(1, min(MP_MAX, zahl(roh.get("max"), 8)))
+    mn = max(1, min(mx, zahl(roh.get("min"), 2)))
+    return {"min": mn, "max": mx}
+
+
 def _text(wert, laenge: int) -> str | None:
     return wert.strip()[:laenge] if isinstance(wert, str) and wert.strip() else None
 
@@ -187,6 +204,7 @@ def beschreibung(spiele_dir: Path, benutzer: str, ordner_name: str) -> dict:
         "warning": warnung,
         "tags": tags(daten),
         "erfolgeAnzahl": len(erfolge(ordner)),
+        "multiplayer": multiplayer(daten),
     }
     return _steckbrief_anwenden(ergebnis, spiele_dir / benutzer, ordner_name)
 

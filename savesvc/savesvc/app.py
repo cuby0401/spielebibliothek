@@ -429,6 +429,8 @@ def erstellen(einstellungen: Einstellungen | None = None, schluessel_quelle=None
     intern.registrieren(app, e, db, aktuelle_season)
     from . import gemeinschaft
     gemeinschaft.registrieren(app, e, db, spieler, spiel, ich_daten, benutzerliste, aktuelle_season)
+    from . import multiplayer   # Zentrale 1.6.0 (E88): Räume für Multiplayer-Spiele
+    multiplayer.registrieren(app, e, db, spieler, crm)
     from . import tester   # Tester-Panel (1.4.0): nur auf dem Testserver (TESTPLAN_DIR gesetzt)
     tester.einrichten(app, e, spieler)
 
