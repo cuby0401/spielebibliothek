@@ -391,7 +391,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
 
     # ---------- Fehler der Bibliothek selbst (Zentrale 1.4.0) ----------
     # Bisher wurden nur Fehler in Spielen gemeldet. Ein Absturz der Bibliotheksseite (z. B. „Spielen“ tut nichts bei
-    # Emil, 07.11.2026) blieb unsichtbar. Gespeichert wie Spielfehler unter der Kennung „zentrale“ (ohne „/“, kann also
+    # einem Tester, 07.11.2026) blieb unsichtbar. Gespeichert wie Spielfehler unter der Kennung „zentrale“ (ohne „/“, kann also
     # kein Spiel sein und erscheint nie bei einem Entwickler), sichtbar nur für Admins.
     ZENTRALE = "zentrale"
 
@@ -829,7 +829,7 @@ def registrieren(app: FastAPI, e, db, spieler, benutzerliste: Benutzerliste, akt
         try:
             for a in upload("GET", "/intern/ereignisse"):
                 # Nur, was die Person selbst getan hat – Konto anlegen, neues Passwort, Löschen macht der Admin
-                # (1.4.1, Seb 09.11.: Carl stand mit Datum statt „noch nie angemeldet“ da, angemeldet hatte er sich nie)
+                # (1.4.1, Seb 09.11.: jemand stand mit Datum statt „noch nie angemeldet“ da, angemeldet hatte er sich nie)
                 if isinstance(a, dict) and a.get("aktion") not in VOM_ADMIN:
                     merken(a.get("player", ""), a.get("zeit"))
         except HTTPException:

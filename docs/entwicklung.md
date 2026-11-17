@@ -3,6 +3,10 @@
 Für alle, die an der Bibliothek selbst arbeiten (Seb, Claude-Sitzungen). Die Spezifikation und alle Entscheidungen (E1–E38)
 stehen im Vault `seb-brain` unter `Projekte/Spielebibliothek/`. Diese Datei ist die Kurzfassung für den Code.
 
+**Adressen der NAS:** stehen nicht im Repo, sondern in `lokal.env` im Repo-Wurzelordner (in `.gitignore`, Vorlage
+`lokal.env.example`): `NAS` (ssh-Ziel) sowie `NAS_GH`, `NAS_PH`, `NAS_UH` (Tailscale-Name, -IP und Kurzname für Teststand
+und Design-Spielwiese). Die Skripte lesen sie selbst ein; in dieser Doku stehen sie als `$NAS` bzw. `<NAS_GH>`.
+
 ## Dienste
 
 | Dienst | Code | Darf | Erreichbar |

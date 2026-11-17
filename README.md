@@ -38,7 +38,7 @@ docs/          betrieb.md (NAS, Backup), entwicklung.md (Aufbau, Regeln, Tests �
 | 6b | Eigener ZIP-Upload ersetzt File Browser (archiviert) | ✓ 05.11.2026 |
 | 8 | Backup über borgmatic, Wiederherstellung getestet | ✓ 05.11.2026 |
 | 10 | GameSave-Migration, Bestenliste mit Spalten, Kontextmenü, Anträge, Admin-Panel, Ansicht als …, Entwürfe, Versionen, Fehlerberichte | ✓ 05.11.2026 |
-| 9 | Anleitung, erster Kollege | Paul und Emil freigeschaltet, Abnahme offen |
+| 9 | Anleitung, erster Kollege | erste Kollegen freigeschaltet, Abnahme offen |
 | 11 | Zwischenspeicher bei Sitzungsablauf, Was ist neu, Daumen, Testspiele | ✓ 05.11.2026 |
 | 12 | Versionierung: Entwurf → Update-Fenster mit Prüfung → Versionsnummer, Rollback mit Spielständen, Handbuch, Startvorlage | 05.11.2026 |
 

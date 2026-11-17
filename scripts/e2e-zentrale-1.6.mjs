@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { request as httpAnfrage } from "node:http";
 import { setTimeout as warte } from "node:timers/promises";
-const G = process.env.E2E_G || "http://<NAS_GH>:18088", U = process.env.E2E_U || "http://<NAS_UH>:18090";
+const G = process.env.E2E_G || "http://127.0.0.1:18088", U = process.env.E2E_U || "http://upload.localhost:18090";
 const DIR = process.argv[2], PW = process.argv[3];
 const chrome = spawn(process.env.CHROME_BIN || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   [...(process.env.CHROME_BIN ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] : []), "--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${DIR}/chrome-profil`, "--no-first-run", "about:blank"], { stdio: "ignore" });

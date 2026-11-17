@@ -30,7 +30,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "savesvc"))
 from savesvc import cloudflare as cf  # noqa: E402  (bewusst ohne Abhängigkeiten, siehe Modul)
 
-NAS = os.environ.get("NAS", "$NAS")
+def _lokal(name: str) -> str:
+    """Adresse der NAS: Umgebungsvariable oder lokal.env im Repo-Wurzelordner (nicht im Git, Vorlage lokal.env.example)."""
+    if os.environ.get(name):
+        return os.environ[name]
+    datei = Path(__file__).resolve().parents[1] / "lokal.env"
+    if datei.is_file():
+        for zeile in datei.read_text(encoding="utf-8").splitlines():
+            k, _, v = zeile.partition("=")
+            if k.strip() == name and not zeile.lstrip().startswith("#"):
+                return v.strip()
+    raise SystemExit(f"{name} fehlt: lokal.env im Repo-Wurzelordner anlegen (Vorlage lokal.env.example).")
+
+
+NAS = _lokal("NAS")
 CONTAINER = "spielebibliothek-savesvc"
 SCHLUESSELBUND = ("spielebibliothek-cloudflare", "schreiben")    # Dienst, Konto
 SICHERUNGEN = Path.home() / "Library/Application Support/spielebibliothek/cloudflare"

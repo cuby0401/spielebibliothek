@@ -1,6 +1,6 @@
 {
   "version": "1.6.0",
-  "hinweis": "Neu in 1.6.0: Multiplayer (Spiele für mehrere Spieler in einem Raum) und der MCP-Server, über den Claude selbst Entwürfe hochladen kann. Zum Testen gibt es das Beispielspiel „Vier gewinnt“. Für die Multiplayer-Tests braucht ihr zwei Personen (z. B. Seb und Emil) oder zwei Geräte mit zwei Konten. Hier stehen nur Dinge, die in 1.6.0 NEU sind, jedes einzeln.",
+  "hinweis": "Neu in 1.6.0: Multiplayer (Spiele für mehrere Spieler in einem Raum) und der MCP-Server, über den Claude selbst Entwürfe hochladen kann. Zum Testen gibt es das Beispielspiel „Vier gewinnt“. Für die Multiplayer-Tests braucht ihr zwei Personen (z. B. du und ein Tester) oder zwei Geräte mit zwei Konten. Hier stehen nur Dinge, die in 1.6.0 NEU sind, jedes einzeln.",
   "tests": [
     {
       "id": "mp-lobby",

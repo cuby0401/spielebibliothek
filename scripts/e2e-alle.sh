@@ -8,7 +8,7 @@
 # Einzelne Tests: E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh
 set -eu
 cd "$(dirname "$0")/.."
-NAS="${NAS:-$NAS}"
+. scripts/lokal.sh   # NAS-Adressen aus lokal.env – nur für den Teststand auf der NAS nötig
 ORT="${E2E_ORT:-$(docker info >/dev/null 2>&1 && echo mac || echo nas)}"
 TMP=$(mktemp -d)
 if [ "$ORT" = mac ]; then
@@ -20,6 +20,8 @@ if [ "$ORT" = mac ]; then
 		rm -rf "$TMP"
 	}
 else
+	nas_noetig
+	export E2E_G="http://$NAS_GH:18088" E2E_U="http://$NAS_UH:18090"
 	aufraeumen() {
 		ssh -o LogLevel=ERROR "$NAS" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:sbtest >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
 		rm -rf "$TMP"
@@ -51,7 +53,7 @@ fi
 # Teststand frisch aufbauen, Spiel von „paul“ anlegen, Upload-Passwort zurückgeben (gemeinsam mit dem Auftragsdienst)
 teststand_einmal() {
 	if [ "$ORT" = mac ]; then sh "$REPO/scripts/e2e-teststand.sh" "$REPO" 2>"$TMP/teststand.log"
-	else ssh -o LogLevel=ERROR "$NAS" 'sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo' 2>"$TMP/teststand.log"; fi
+	else ssh -o LogLevel=ERROR "$NAS" "GH=$NAS_GH PH=$NAS_PH UH=$NAS_UH sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo" 2>"$TMP/teststand.log"; fi
 }
 # Ein zweiter Versuch, falls der Aufbau einmal hakt (1.4.1); schlägt auch der fehl, steht der Grund im Log
 teststand() {

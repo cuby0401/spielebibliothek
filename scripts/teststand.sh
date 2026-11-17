@@ -19,7 +19,8 @@
 #
 #   Design-Spielwiese (10.11.2026, neue UI): KOPIE der echten Daten wie die Probe, aber NUR über Tailscale erreichbar
 #                  ART=design sh teststand.sh up <repo-dir> [--daten-behalten] | down     (sonst: scripts/deploy.sh --design)
-#                  games → http://<NAS_GH>:18288  play → http://<NAS_PH>:18289  upload → http://<NAS_UH>:18290
+#                  games → http://$GH:18288  play → http://$PH:18289  upload → http://$UH:18290
+#                  GH/PH/UH = Tailscale-Name, Tailscale-IP und Kurzname der NAS – deploy.sh reicht sie aus lokal.env herein.
 #                  Automatisch als seb angemeldet (DEV_USER). Deshalb: NIE eine Cloudflare-Route auf 18288–18290 legen
 #                  (Lehre vom 07.11.2026). Kein Wächter, kein Home Assistant, kein SMTP, kein Backup, kein Cloudflare-Abgleich.
 #
@@ -27,9 +28,11 @@
 # In der Probe nicht mehr (07.11.2026): Nach dem Anlegen der Tunnel-Routen war sie kurz ohne Anmeldung als „seb“ im Internet.
 set -eu
 ART=${ART:-test}
-GH=${GH:-<NAS_GH>}
-PH=${PH:-<NAS_PH>}
-UH=${UH:-<NAS_UH>}
+# Hostnamen: von e2e-alle.sh / deploy.sh gesetzt (Adressen der NAS stehen in lokal.env, nicht im Git).
+# Ohne Angabe die des Teststands auf dem Mac.
+GH=${GH:-127.0.0.1}
+PH=${PH:-localhost}
+UH=${UH:-upload.localhost}
 MH=${MH:-mcp.localhost}   # MCP-Server (1.6.0): Testserver test-mcp.cuby0401.uk, sonst nur über den Host-Kopf erreichbar
 if [ "$ART" = probe ]; then
 	N=sbprobe; T=/volume1/docker/spielebibliothek-probe; PG=18188; PP=18189; PU=18190
@@ -43,9 +46,12 @@ if [ "$ART" = probe ]; then
 	NEUSTART="--restart unless-stopped"   # 1.5.0: nach einem NAS-Neustart (z. B. Update am 09.11.2026) von selbst wieder da
 elif [ "$ART" = design ]; then
 	N=sbdesign; T=/volume1/docker/spielebibliothek-design; PG=18288; PP=18289; PU=18290
+	if [ "${1:-}" != down ] && [ "$GH" = 127.0.0.1 ]; then
+		echo "✗ Design-Spielwiese: GH/PH/UH fehlen – über scripts/deploy.sh --design starten (liest lokal.env)." >&2; exit 1
+	fi
 	G="http://$GH:$PG"; P="http://$PH:$PP"; U="http://$UH:$PU"
 	# Tailscale läuft auf der NAS als Container (Host-Netz, --tun=userspace-networking): Es reicht Zugriffe auf
-	# <NAS_PH>:<Port> an 127.0.0.1:<Port> weiter. Deshalb nur an 127.0.0.1 lauschen – so kommt Tailscale ran, das LAN nicht.
+	# <Tailscale-IP>:<Port> an 127.0.0.1:<Port> weiter. Deshalb nur an 127.0.0.1 lauschen – so kommt Tailscale ran, das LAN nicht.
 	TS=${TS:-127.0.0.1}
 	ANMELDUNG="-e DEV_USER=seb -e DEV_ALLOW=1"
 	COOKIE_SECURE=0
