@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vier gewinnt</title>
+<!-- GameSave zuerst einbinden. Multiplayer: in der game.json "multiplayer": {"min": 2, "max": 2} -->
+<script src="/lib/gamesave.js"></script>
+<style>
+	body { margin: 0; font: 16px/1.4 system-ui, sans-serif; background: #f5f6f8; color: #1f2430; display: grid; place-items: center; min-height: 100vh; }
+	main { text-align: center; padding: 16px; }
+	#status { min-height: 1.5em; font-weight: 600; margin: 8px 0 12px; }
+	#brett { display: grid; grid-template-columns: repeat(7, 48px); gap: 6px; background: #1d4ed8; padding: 10px; border-radius: 14px; }
+	.feld { width: 48px; height: 48px; border-radius: 50%; background: #fff; border: 0; padding: 0; cursor: pointer; }
+	.feld[data-farbe="0"] { background: #facc15; }
+	.feld[data-farbe="1"] { background: #ef4444; }
+	#brett.aus .feld { cursor: default; }
+	button.neu { margin-top: 14px; font: inherit; padding: 8px 18px; border-radius: 10px; border: 0; background: #1d4ed8; color: #fff; cursor: pointer; }
+	#spieler { margin-top: 10px; color: #5b6170; font-size: 14px; }
+	#fehler { color: #b91c1c; min-height: 1.4em; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+	<div id="status">Verbinde …</div>
+	<div id="brett" class="aus"></div>
+	<div id="fehler"></div>
+	<button class="neu" id="neu" hidden>Neues Spiel</button>
+	<div id="spieler"></div>
+</main>
+<script>
+// ---------------- Regeln: laufen nur beim Host ----------------
+// Der Host rechnet jeden Zug, legt den Stand im Raum ab und schickt jedem seine Sicht.
+// Geht der Host, übernimmt ein anderer Spieler mit genau diesem Stand – das Spiel läuft weiter.
+const ZEILEN = 6, SPALTEN = 7;
+
+function vierInReihe(brett, z, s) {
+	const farbe = brett[z][s];
+	for (const [dz, ds] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+		let n = 1;
+		for (const r of [1, -1]) {
+			let zz = z + dz * r, ss = s + ds * r;
+			while (zz >= 0 && zz < ZEILEN && ss >= 0 && ss < SPALTEN && brett[zz][ss] === farbe) { n++; zz += dz * r; ss += ds * r; }
+		}
+		if (n >= 4) return true;
+	}
+	return false;
+}
+
+const regeln = {
+	// spieler: IDs aller verbundenen Mitspieler (ohne Zuschauer), Reihenfolge wie beim Betreten
+	neu(spieler) {
+		if (spieler.length < 2) throw new Error("Zu zweit spielen – lade jemanden ein.");
+		return { brett: Array.from({ length: ZEILEN }, () => Array(SPALTEN).fill(null)), spieler: spieler.slice(0, 2), dran: 0, sieger: null, voll: false };
+	},
+	// aktion kommt vom Spieler "von" – nie glauben, immer prüfen
+	zug(z, aktion, von) {
+		if (z.sieger !== null || z.voll) throw new Error("Das Spiel ist vorbei.");
+		if (z.spieler[z.dran] !== von) throw new Error("Du bist nicht dran.");
+		const s = aktion && aktion.spalte;
+		if (!Number.isInteger(s) || s < 0 || s >= SPALTEN) throw new Error("Ungültige Spalte.");
+		let zeile = -1;
+		for (let i = ZEILEN - 1; i >= 0; i--) if (z.brett[i][s] === null) { zeile = i; break; }
+		if (zeile < 0) throw new Error("Die Spalte ist voll.");
+		z.brett[zeile][s] = z.dran;
+		if (vierInReihe(z.brett, zeile, s)) z.sieger = von;
+		else if (z.brett[0].every((f) => f !== null)) z.voll = true;
+		else z.dran = 1 - z.dran;
+		return z;
+	},
+	// Was ein Spieler sehen darf. Bei Vier gewinnt ist nichts geheim – bei Kartenspielen hier fremde Hände weglassen.
+	sicht(z, fuer) {
+		return { ...z, meineFarbe: z.spieler.indexOf(fuer) };
+	},
+};
+
+// ---------------- Anzeige: läuft bei allen ----------------
+const brettEl = document.getElementById("brett"), statusEl = document.getElementById("status"), fehlerEl = document.getElementById("fehler");
+const neuKnopf = document.getElementById("neu"), spielerEl = document.getElementById("spieler");
+let spiel = null, letzteSicht = null;
+
+function name(raum, id) { const s = raum.spieler.find((x) => x.id === id); return s ? s.name : id; }
+
+function zeigen(sicht, raum) {
+	letzteSicht = sicht;
+	fehlerEl.textContent = "";
+	brettEl.replaceChildren();
+	const leer = sicht === null;
+	for (let z = 0; z < ZEILEN; z++) for (let s = 0; s < SPALTEN; s++) {
+		const f = document.createElement("button");
+		f.className = "feld"; f.dataset.spalte = s;
+		const farbe = leer ? null : sicht.brett[z][s];
+		if (farbe !== null) f.dataset.farbe = farbe;
+		f.addEventListener("click", () => { if (spiel && !leer) spiel.zug({ spalte: s }); });
+		brettEl.append(f);
+	}
+	const amZug = !leer && sicht.sieger === null && !sicht.voll && sicht.spieler[sicht.dran] === raum.ich;
+	brettEl.classList.toggle("aus", !amZug);
+	if (leer) statusEl.textContent = raum.istHost ? (raum.spieler.filter((s) => s.verbunden && !s.zuschauer).length < 2 ? "Warte auf einen Mitspieler …" : "Bereit – starte das Spiel!") : "Warte, bis der Host startet …";
+	else if (sicht.sieger !== null) statusEl.textContent = sicht.sieger === raum.ich ? "Du hast gewonnen! 🎉" : name(raum, sicht.sieger) + " hat gewonnen.";
+	else if (sicht.voll) statusEl.textContent = "Unentschieden.";
+	else statusEl.textContent = amZug ? "Du bist dran" + (sicht.meineFarbe === 0 ? " (Gelb)." : " (Rot).") : name(raum, sicht.spieler[sicht.dran]) + " ist dran.";
+	neuKnopf.hidden = !raum.istHost;
+	neuKnopf.textContent = leer ? "Spiel starten" : "Neues Spiel";
+	spielerEl.textContent = raum.spieler.map((s) => s.name + (s.host ? " (Host)" : "") + (s.verbunden ? "" : " – weg")).join(" · ");
+}
+
+neuKnopf.addEventListener("click", () => {
+	try { spiel.neu(); } catch (e) { fehlerEl.textContent = e.message; }
+});
+
+GameSave.multiplayer.spiel(regeln, {
+	zeigen,
+	fehler: (text) => { fehlerEl.textContent = text; },
+}).then((s) => {
+	spiel = s;
+	// Spielerliste oder Host ändern sich: Anzeige auffrischen (z. B. Knopf „Spiel starten“ beim neuen Host)
+	s.raum.beiAenderung(() => { if (letzteSicht === null || s.raum.istHost) zeigen(letzteSicht, s.raum); });
+	if (letzteSicht === null) zeigen(null, s.raum);
+}).catch((e) => { statusEl.textContent = e.message; });
+</script>
+</body>
+</html>

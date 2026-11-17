@@ -13,3 +13,10 @@ for sv in (1, 2):
     with zipfile.ZipFile(ziel / f"e2e-v{sv}.zip", "w") as z:
         z.writestr("index.html", spiel)
         z.writestr("game.json", json.dumps({"title": "E2E", "description": "Test", "saveVersion": sv}))
+
+# Zentrale 1.6.0: Multiplayer-Beispiel „Vier gewinnt“ als ZIP für den Upload im Ende-zu-Ende-Test
+beispiel = Path(__file__).resolve().parent.parent / "examples" / "vier-gewinnt"
+with zipfile.ZipFile(ziel / "vier-gewinnt.zip", "w") as z:
+    for datei in sorted(beispiel.iterdir()):
+        if datei.is_file() and not datei.name.startswith("."):
+            z.write(datei, datei.name)

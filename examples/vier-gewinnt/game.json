@@ -1,0 +1,7 @@
+{
+  "title": "Vier gewinnt",
+  "description": "Beispiel für Multiplayer: zu zweit im selben Raum, wer zuerst vier in einer Reihe hat, gewinnt.",
+  "thumbnail": "thumb.svg",
+  "tags": ["Zu zweit", "Klassiker"],
+  "multiplayer": { "min": 2, "max": 2 }
+}

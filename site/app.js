@@ -353,7 +353,11 @@ function spielansichtBauen() {
 	const erfolge = UI.karte({ id: "erfolge", titel: "Erfolge", inhalt: UI.h("div", { id: "erfolge-liste" }) });
 	erfolge.querySelector(".b-karte__titel").id = "erfolge-titel";
 	erfolge.hidden = true;
-	const buehne = UI.buehne({ id: "buehne", rahmenId: "rahmen", seiteLabel: "Bestenliste und Erfolge", seite: [bestenliste, erfolge] });
+	// Multiplayer (1.6.0): Raum-Karte über der Bestenliste, nur im Raum sichtbar
+	const raum = UI.karte({ id: "mp-karte", titel: "Raum", inhalt: UI.h("div", { id: "mp-inhalt" }) });
+	raum.querySelector(".b-karte__titel").id = "mp-titel";
+	raum.hidden = true;
+	const buehne = UI.buehne({ id: "buehne", rahmenId: "rahmen", seiteLabel: "Raum, Bestenliste und Erfolge", seite: [raum, bestenliste, erfolge] });
 	el("spielansicht").append(
 		UI.h("div", { class: "b-seite__kopf" }, zurueck,
 			UI.h("div", { class: "b-seite__titelzeile" },
@@ -481,6 +485,8 @@ async function erfolgeZeigen(spiel) {
 function spielBeenden() {
 	if (aktuellesSpiel === null) return;
 	zeitStop();
+	mpLobbyStoppen();
+	el("mp-karte").hidden = true;
 	aktuellesSpiel = null;
 	Bridge.beenden();
 	el("rahmen").replaceChildren(); // laufendes Spiel beenden
@@ -536,7 +542,7 @@ async function zeigeSeite(name) {
 // Upload-Seite (für „Zurück zum Hochladen“ im Entwurf, 1.3.1) – Adresse aus dem Link in der Kopfleiste
 const uploadAdresse = () => (el("upload-link").getAttribute("href") || "").replace(/\/+$/, "");
 
-async function zeigeSpiel(id, entwurfSpiel, eigenerOrdner = null) {
+async function zeigeSpiel(id, entwurfSpiel, eigenerOrdner = null, raumCode = null) {
 	const spiel = entwurfSpiel || spiele.find((s) => s.id === id && s.complete);
 	if (!spiel) {
 		location.hash = "#/";
@@ -578,6 +584,8 @@ async function zeigeSpiel(id, entwurfSpiel, eigenerOrdner = null) {
 	document.title = titelVorsilbe() + spiel.title + (entwurfSpiel ? " (Entwurf)" : "") + " – Spielebibliothek";
 	erfolgeZeigen(spiel);
 	if (!entwurfSpiel) zeitStart(spiel.id);
+	el("mp-karte").hidden = true;
+	if (spiel.multiplayer) { mpLobby(spiel, raumCode); return; }   // erst Lobby, dann Spiel (1.6.0)
 	try {
 		const iframe = await Bridge.starten(spiel, el("rahmen"));
 		iframe.focus();
@@ -605,8 +613,8 @@ function route() {
 	bisherigeRoute = location.hash;
 	const ent = location.hash.match(/^#\/entwurf\/([a-z0-9][a-z0-9_-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*)$/);
 	if (ent) { letzteRoute = location.hash; return zeigeEntwurf(ent[1], ent[2]); }
-	const m = location.hash.match(/^#\/spiel\/(.+)$/);
-	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1]); }
+	const m = location.hash.match(/^#\/spiel\/([^?]+)(?:\?raum=([A-Za-z]{4}))?$/);
+	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1], null, null, m[2] ? m[2].toUpperCase() : null); }
 	if (location.hash === "#/anmeldungen") { location.replace("#/sicherheit"); return; }   // alte Links (vor 1.4.0)
 	const pr = location.hash.match(/^#\/profil(?:\/([a-z0-9][a-z0-9_~-]*))?$/);
 	if (pr) { profilName = pr[1] ? decodeURIComponent(pr[1]) : (ich.ansicht ? `${ich.player}~${ich.ansicht}` : ich.player); return zeigeSeite("profil"); }
@@ -620,6 +628,152 @@ function route() {
 	if (s && seiten[s[1]]) return zeigeSeite(s[1]);
 	letzteRoute = "#/";
 	zeigeUebersicht();
+}
+
+// ---------- Multiplayer (Zentrale 1.6.0, E88) ----------
+// Spiele mit "multiplayer" in der game.json: Erst die Lobby (Raum erstellen, mit Code beitreten, offene Räume), dann das
+// Spiel. Rechts neben dem Spiel steht die Raum-Karte (Code, Einladen, Spieler, Rauswerfen, Verlassen).
+let mpLobbyTimer = null;
+const mpSpielerText = (m) => m.min === m.max ? `${m.max} Spieler` : `${m.min}–${m.max} Spieler`;
+const mpIstEntwurf = (spiel) => spiel.id.includes("~");
+
+function mpLobbyStoppen() {
+	clearInterval(mpLobbyTimer);
+	mpLobbyTimer = null;
+}
+
+async function mpRaeumeLaden(spiel, ziel) {
+	let d;
+	try { d = await Bridge.json("GET", `/api/mp/${idPfad(spiel.id)}/raeume`); } catch { return; }
+	if (aktuellesSpiel !== spiel.id || !ziel.isConnected) return;
+	ziel.replaceChildren(d.raeume.length
+		? UI.liste(d.raeume.map((r) => ({ ikon: "personen", titel: `Raum ${r.code}`,
+			text: `${r.host ? anzeige(r.host) : "?"} · ${r.spieler} von ${r.max} Spielern`, rechts: r.voll ? "voll – zuschauen" : undefined,
+			onclick: () => mpBeitreten(spiel, { code: r.code, zuschauer: r.voll }) })), { label: "Offene Räume" })
+		: UI.leer({ klein: true, ikon: "personen", titel: "Gerade keine offenen Räume", text: "Erstelle einen Raum und lade Mitspieler ein." }));
+}
+
+function mpLobby(spiel, code = null) {
+	mpLobbyStoppen();
+	Bridge.mp.trennen();
+	el("mp-karte").hidden = true;
+	if (!mpIstEntwurf(spiel) && location.hash.includes("?raum=")) history.replaceState(null, "", `#/spiel/${spiel.id}`);
+	if (code) { mpBeitreten(spiel, { code }); return; }
+	const feld = UI.feld({ label: "Raumcode", platzhalter: "z. B. KXRT", max: 4 });
+	const beitreten = () => {
+		const c = (feld.wert || "").trim().toUpperCase();
+		if (!/^[A-Z]{4}$/.test(c)) { feld.fehlerSetzen("Der Raumcode hat vier Buchstaben."); return; }
+		mpBeitreten(spiel, { code: c });
+	};
+	feld.eingabe.addEventListener("keydown", (ev) => { if (ev.key === "Enter") beitreten(); });
+	const liste = UI.h("div", { id: "mp-raeume" }, UI.laden({ art: "skelett", zeilen: 2 }));
+	el("rahmen").replaceChildren(UI.karte({ id: "mp-lobby", titel: "Mehrspieler", untertitel: mpSpielerText(spiel.multiplayer) + (mpIstEntwurf(spiel)
+		? " · Entwurf: Öffne den Entwurf in einem zweiten Tab, um gegen dich selbst zu spielen." : ""),
+	inhalt: UI.stapel([
+		UI.knopf({ art: "primaer", text: "Neuen Raum erstellen", ikon: "plus", id: "mp-neu", onclick: () => mpBeitreten(spiel, { neu: true }) }),
+		UI.leiste([feld, UI.knopf({ art: "standard", text: "Beitreten", id: "mp-beitreten", onclick: beitreten })]),
+		UI.abschnitt({ titel: "Offene Räume", aktionen: [UI.knopf({ art: "leise", groesse: "s", nurIkon: true, ikon: "aktualisieren", label: "Aktualisieren",
+			onclick: () => mpRaeumeLaden(spiel, liste) })], inhalt: liste }),
+	], { abstand: "l" }) }));
+	mpRaeumeLaden(spiel, liste);
+	mpLobbyTimer = setInterval(() => { if (document.visibilityState === "visible") mpRaeumeLaden(spiel, liste); }, 5000);
+}
+
+async function mpBeitreten(spiel, wie) {
+	mpLobbyStoppen();
+	el("rahmen").replaceChildren(UI.laden({ label: wie.neu ? "Raum wird erstellt …" : "Raum wird betreten …" }));
+	try {
+		await Bridge.mp.verbinden(spiel.id, wie);
+	} catch (e) {
+		if (aktuellesSpiel !== spiel.id) return;
+		meldung(e.message, "fehler");
+		mpLobby(spiel);
+		return;
+	}
+	if (aktuellesSpiel !== spiel.id) { Bridge.mp.trennen(); return; }
+	Bridge.mp.beiRaum = (r) => { if (aktuellesSpiel === spiel.id) mpKarteZeigen(spiel, r); };
+	Bridge.mp.beiVerbindung = (ok) => { const h = el("mp-verbindung"); if (h) h.hidden = ok; };
+	Bridge.mp.beiFehler = (text) => meldung(text, "fehler");
+	Bridge.mp.beiEnde = (code, text) => {
+		if (aktuellesSpiel !== spiel.id) return;
+		if (code !== 1000 && text) meldung(text, code === 4000 ? "" : "fehler");
+		mpLobby(spiel);
+	};
+	const r = Bridge.mp.raum;
+	mpKarteZeigen(spiel, r);
+	// Neu laden führt zurück in denselben Raum
+	if (!mpIstEntwurf(spiel)) history.replaceState(null, "", `#/spiel/${spiel.id}?raum=${r.code}`);
+	try {
+		const iframe = await Bridge.starten(spiel, el("rahmen"));
+		iframe.focus();
+	} catch (e) {
+		if (!(e instanceof Bridge.SitzungAbgelaufen)) { meldung("Das Spiel konnte nicht gestartet werden: " + e.message, "fehler"); mpLobby(spiel); }
+	}
+}
+
+async function mpEinladen(spiel, r) {
+	let leute = [];
+	try { leute = await Bridge.json("GET", "/api/mp/mitspieler"); } catch (e) { meldung(e.message, "fehler"); return; }
+	const imRaum = new Set(r.spieler.map((s) => s.id));
+	leute = leute.filter((p) => !imRaum.has(p.id));
+	if (!leute.length) { UI.hinweisDialog({ titel: "Mitspieler einladen", text: "Alle sind schon im Raum." }); return; }
+	const gewaehlt = new Set();
+	let api;
+	const senden = UI.knopf({ art: "primaer", text: "Einladen", deaktiviert: true, onclick: async () => {
+		senden.laden(true);
+		try {
+			const d = await Bridge.json("POST", `/api/mp/${idPfad(spiel.id)}/einladen`, { code: r.code, an: [...gewaehlt] });
+			meldung(d.eingeladen === 1 ? "Einladung verschickt." : `${d.eingeladen} Einladungen verschickt.`, "erfolg");
+			api.schliessen(true);
+		} catch (e) { senden.laden(false); meldung(e.message, "fehler"); }
+	} });
+	api = UI.dialog({ id: "mp-einladen", titel: "Mitspieler einladen", text: "Sie bekommen eine Meldung in der Glocke mit einem Link in diesen Raum.",
+		inhalt: UI.stapel(leute.slice(0, 50).map((p) => UI.haken({ label: p.name, onwechsel: (an) => {
+			if (an) gewaehlt.add(p.id); else gewaehlt.delete(p.id);
+			senden.aus(!gewaehlt.size || gewaehlt.size > 10);
+		} }))),
+		aktionen: [UI.knopf({ art: "standard", text: "Abbrechen", onclick: () => api.schliessen(null) }), senden] });
+	api.oeffnen();
+}
+
+function mpKarteZeigen(spiel, r) {
+	if (!r) return;
+	const istHost = r.host === r.ich;
+	const link = `${location.origin}/#/spiel/${spiel.id}?raum=${r.code}`;
+	const kopieren = async (text, erfolg) => {
+		try { await navigator.clipboard.writeText(text); meldung(erfolg, "erfolg"); } catch { UI.hinweisDialog({ titel: "Bitte selbst kopieren", text }); }
+	};
+	const spielerZeilen = r.spieler.map((s) => {
+		const aktionen = istHost && s.id !== r.ich ? [
+			s.verbunden && !s.zuschauer ? UI.knopf({ art: "leise", groesse: "s", nurIkon: true, ikon: "stern", label: `${s.name} zum Host machen`,
+				onclick: () => Bridge.mp.senden({ t: "host", wer: s.id }) }) : null,
+			UI.knopf({ art: "gefahr-leise", groesse: "s", nurIkon: true, ikon: "schliessen", label: `${s.name} rauswerfen`, onclick: async () => {
+				if (await UI.bestaetigen({ titel: `${s.name} rauswerfen?`, text: "Wer rausgeworfen wurde, kann diesem Raum nicht wieder beitreten.", ja: "Rauswerfen", gefahr: true })) {
+					Bridge.mp.senden({ t: "rauswerfen", wer: s.id });
+				}
+			} }),
+		].filter(Boolean) : undefined;
+		const status = [s.host && "Host", s.zuschauer && "schaut zu", !s.verbunden && "Verbindung weg"].filter(Boolean).join(" · ") || "spielt mit";
+		return { avatar: { name: s.name, groesse: "s" }, titel: s.name + (s.id === r.ich ? " (du)" : ""), text: status, aktionen };
+	});
+	const verbindung = UI.hinweis({ art: "warnung", text: "Verbindung verloren – verbinde neu …" });
+	verbindung.id = "mp-verbindung";
+	verbindung.hidden = true;
+	el("mp-inhalt").replaceChildren(UI.stapel([
+		verbindung,
+		UI.leiste([UI.code(r.code, { gross: true, id: "mp-code" }),
+			UI.knopf({ art: "standard", groesse: "s", ikon: "kopieren", text: "Code", label: "Raumcode kopieren", onclick: () => kopieren(r.code, "Raumcode kopiert.") })]),
+		UI.leiste([
+			UI.knopf({ art: "standard", groesse: "s", ikon: "extern", text: "Link kopieren", onclick: () => kopieren(link, "Einladungslink kopiert.") }),
+			r.entwurf ? null : UI.knopf({ art: "standard", groesse: "s", ikon: "glocke", text: "Einladen", id: "mp-einladen-knopf", onclick: () => mpEinladen(spiel, r) }),
+		].filter(Boolean)),
+		UI.liste(spielerZeilen, { ohneRahmen: true, label: "Spieler im Raum" }),
+		istHost ? UI.schalter({ label: "Bei „Offene Räume“ zeigen", hinweis: "Sonst kommt nur rein, wer den Code oder Link hat.", an: r.offen,
+			onwechsel: (an) => Bridge.mp.senden({ t: "offen", an }) }) : null,
+		UI.knopf({ art: "standard", groesse: "s", ikon: "abmelden", text: "Raum verlassen", id: "mp-verlassen", onclick: () => Bridge.mp.senden({ t: "verlassen" }) }),
+	].filter(Boolean)));
+	el("mp-titel").textContent = `Raum ${r.code} · ${r.spieler.filter((s) => s.verbunden && !s.zuschauer).length}/${r.max}`;
+	el("mp-karte").hidden = false;
 }
 
 // ---------- Glocke (Zentrale 1.2.0) ----------
