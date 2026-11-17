@@ -311,8 +311,8 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
     <h3>Der einfache Weg: <code>GameSave.multiplayer.spiel</code></h3>
     <p>Du schreibst die Regeln wie auf einem Spieleserver – drei Funktionen, die nur mit dem Zustand (einfaches JSON) arbeiten:</p>
 <pre><code>const regeln = {
-  // Neues Spiel. spieler = IDs der verbundenen Mitspieler (ohne Zuschauer)
-  neu(spieler, optionen) {
+  // Neues Spiel. spieler = IDs der verbundenen Mitspieler (ohne Zuschauer), vorher = letzter Zustand oder null
+  neu(spieler, optionen, vorher) {
     if (spieler.length &lt; 2) throw new Error("Zu zweit spielen");
     return { spieler, dran: 0, haende: austeilen(spieler), stapel: [...] };
   },
@@ -329,6 +329,8 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
   },
   // optional: jemand kommt, geht oder verliert die Verbindung
   spielerGeaendert(zustand, spieler) { return zustand; },
+  // optional: Zeitgeber – siehe unten
+  frist(zustand) { return null; },
 };
 
 const spiel = await GameSave.multiplayer.spiel(regeln, {
@@ -344,6 +346,36 @@ spiel.raum.istHost;         // z. B. Knopf „Spiel starten“ nur beim Host zei
         Zufall (Mischen) passiert in <code>neu</code>/<code>zug</code> beim Host und landet im Zustand.</li>
       <li><code>zug</code> bekommt eine Kopie des Zustands. Gib den neuen Zustand zurück (oder den geänderten).</li>
       <li>Höchstens <strong>256 KB</strong> Zustand und <strong>64 KB</strong> je Sicht/Zug, höchstens 40 Nachrichten je Sekunde.</li>
+      <li><strong>Siegzähler über mehrere Runden:</strong> <code>neu</code> bekommt als drittes Argument den bisherigen Zustand
+        (<code>null</code> beim ersten Spiel), z. B. <code>siege: vorher ? vorher.siege : {}</code>. Er gilt, solange der Raum besteht.</li>
+    </ul>
+    <h3>Zeitgeber: Wenn von selbst etwas passieren muss</h3>
+    <p>Zugzeit, Bedenkzeit, eine Karte nur ein paar Sekunden zeigen: Dafür gibt es <code>frist</code>. Den Zeitpunkt legst du <strong>im Zustand</strong>
+      ab (<code>Date.now()</code> + Millisekunden). Ist er erreicht, ruft der Host <code>zug(zustand, aktion, null)</code> auf –
+      <code>von === null</code> heißt: Die Uhr ist abgelaufen, nicht ein Spieler.</p>
+<pre><code>zug(zustand, aktion, von) {
+  if (von === null) {                       // Zeit um: Zug weitergeben
+    zustand.dran = (zustand.dran + 1) % zustand.spieler.length;
+  } else {
+    if (zustand.spieler[zustand.dran] !== von) throw new Error("Du bist nicht dran");
+    /* … Zug ausführen … */
+    zustand.dran = (zustand.dran + 1) % zustand.spieler.length;
+  }
+  zustand.zugBis = Date.now() + 60000;      // nächster Spieler hat 1 Minute
+  return zustand;
+},
+frist(zustand) {
+  return zustand.zugBis ? { bis: zustand.zugBis, aktion: { zeitUm: true } } : null;   // null = keine Uhr
+},</code></pre>
+    <ul>
+      <li>Die Uhr läuft nur beim Host. <strong>Wechselt der Host</strong>, stellt der neue sie aus dem Zustand neu – sie läuft also weiter.
+        Ist die Zeit beim Wechsel schon um (der alte Host war ja bis zu 10 Sekunden weg), löst sie sofort aus.</li>
+      <li>Jeder neue Zustand stellt die Uhr neu. Dieselbe Frist löst nur einmal aus: Setz in <code>zug</code> einen neuen Zeitpunkt
+        oder lösche ihn (<code>zustand.zugBis = null</code>).</li>
+      <li>Für die Anzeige der Restzeit schickst du <code>zugBis</code> in der Sicht mit und zählst im Browser jedes Spielers selbst herunter.
+        Die Uhren der Geräte können ein paar Sekunden auseinanderliegen.</li>
+      <li>Kurze Sperren (z. B. 2,5 Sekunden nach einer gelegten Karte nichts annehmen) brauchen keine Frist: in <code>zug</code> den Zeitpunkt
+        prüfen und zu frühe Züge mit <code>throw</code> ablehnen.</li>
     </ul>
     <h3>Der Raum</h3>
 <pre><code>const raum = spiel.raum;   // oder: const raum = await GameSave.multiplayer.raum();
@@ -368,6 +400,8 @@ raum.beiAenderung(() =&gt; spielerlisteMalen(raum.spieler));</code></pre>
       <li><strong>Jedes Spiel ist ein eigener Ordner</strong> mit eigener <code>game.json</code> und eigener Kachel. Gemeinsame Dateien (Töne, Hilfe, Bilder)
         kopierst du in jedes Spiel.</li>
     </ul>
+    <p data-hinweis="info">Der Host hat den kompletten Zustand in seinem Browser, auch fremde Karten. Wer sich mit den Entwicklerwerkzeugen
+      des Browsers auskennt, könnte als Host nachsehen. Unter Freunden ist das in Kauf genommen: Dafür läuft kein Code der Entwickler auf dem Server.</p>
     <p data-hinweis="info">Räume liegen nur im Arbeitsspeicher der Bibliothek. Wird sie neu gestartet (z. B. bei einem Update), sind laufende Räume weg und
       alle landen wieder in der Lobby. Räume ohne Spieler verschwinden nach 15 Minuten. Mit <code>GameSave.save</code> Gespeichertes bleibt immer.</p>
 

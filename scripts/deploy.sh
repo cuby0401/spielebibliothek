@@ -212,6 +212,7 @@ if [ "$DESIGN" = 1 ]; then
 	if [ "$WEG" = 1 ]; then ssh "$NAS" "ART=design $DESIGN_HOSTS sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh down"; exit 0; fi
 	node scripts/ui-pruefen.mjs || { echo "✗ Oberfläche nicht einheitlich – nichts deployt (docs/ui-bausteine.md)." >&2; exit 1; }
 	node scripts/kontrast-pruefen.mjs >/dev/null || { node scripts/kontrast-pruefen.mjs >&2; echo "✗ Farben zu kontrastarm – nichts deployt." >&2; exit 1; }
+	node scripts/gamesave-mp-test.js lib/gamesave.js || { echo "✗ GameSave.multiplayer fehlerhaft – nichts deployt." >&2; exit 1; }
 	COMMIT="$(git rev-parse --short HEAD)"; [ -n "$(git status --porcelain)" ] && COMMIT="$COMMIT+"
 	VERSION_DESIGN="$(tr -d ' \n' < VERSION)-design"
 	# verfolgte und neue (nicht ignorierte) Dateien – auch noch nicht committete Arbeit kommt mit
@@ -278,6 +279,7 @@ fi
 if command -v node >/dev/null 2>&1; then
 	node scripts/ui-pruefen.mjs || { echo "✗ Oberfläche nicht einheitlich – nichts deployt (docs/ui-bausteine.md)." >&2; exit 1; }
 	node scripts/kontrast-pruefen.mjs >/dev/null || { node scripts/kontrast-pruefen.mjs >&2; echo "✗ Farben zu kontrastarm – nichts deployt." >&2; exit 1; }
+	node scripts/gamesave-mp-test.js lib/gamesave.js || { echo "✗ GameSave.multiplayer fehlerhaft – nichts deployt." >&2; exit 1; }
 fi
 
 if [ "$TESTS" = 1 ]; then

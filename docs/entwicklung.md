@@ -63,6 +63,8 @@ git ls-files -co --exclude-standard savesvc | tar -cf - -T - | ssh $NAS \
 - Ende-zu-Ende: `scripts/teststand.sh` (eigener Teststand auf der NAS) und headless Chrome über das DevTools-Protokoll.
 - Nach jeder Änderung an Caddyfile oder Bridge: Testspiel „Böse“ öffnen – alle Angriffe müssen abgewehrt sein.
 - Zwischenspeicher in `lib/bridge.js` (Sitzungsablauf/offline): `node scripts/bridge-test.js lib/bridge.js` (stellt Browser und Server nach).
+- Multiplayer-Hilfe in `lib/gamesave.js` (Zeitgeber `frist`, Host-Wechsel, Siegzähler): `node scripts/gamesave-mp-test.js lib/gamesave.js`
+  (zwei nachgestellte Tabs, läuft in `deploy.sh` mit).
 - Versionierung Ende-zu-Ende (Upload → Entwurf → Update-Fenster → Migration → Rollback): `scripts/e2e-versionierung.mjs`, Anleitung im Dateikopf.
 - Zentrale 1.1 (Offline, Update hochladen, Hilfe-Center) und 1.2 (Suche, Glocke, Erfolge, Spiel der Woche, Spielzeit, Profil): `scripts/e2e-zentrale-1.1.mjs`, `scripts/e2e-zentrale-1.2.mjs`, 1.2.1 (Profil, Glocke archivieren, Symbole, Größen): `scripts/e2e-zentrale-1.3.mjs`, 1.3.0 (Beschreibung und Vorschaubild, „noch nie angemeldet“, Cloudflare-Hinweis): `scripts/e2e-zentrale-1.3-steckbrief.mjs`, 1.3.1 (Zurück zum Hochladen, Antragsseite, Bilder an Anträgen): `scripts/e2e-zentrale-1.3.1-antraege.mjs`. Einzelne Tests: `E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh`.
 - 1.6.0 (Multiplayer mit zwei Tabs im Entwurf, MCP-Schlüssel, Freigabe-Seite der Claude-App): `scripts/e2e-zentrale-1.6.mjs`.

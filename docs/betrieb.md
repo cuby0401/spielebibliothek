@@ -37,7 +37,7 @@ kann UGOS die ACLs überschreiben. Danach `nas-setup.sh` erneut laufen lassen.
 scripts/deploy.sh --examples
 ```
 
-Dann `http://192.168.178.100:8088` (LAN) bzw. `http://<NAS_GH>:8088` (Tailnet) öffnen.
+Dann `http://<NAS_LAN>:8088` (LAN) bzw. `http://<NAS_GH>:8088` (Tailnet) öffnen.
 **Abnahme:** Kachel „Zähler“ erscheint, „Spielen“ startet das Spiel im iframe, +1 zählt hoch.
 
 Prüfen, dass die Sandbox greift (Browser-Konsole, Kontext auf das iframe umschalten):
@@ -113,7 +113,7 @@ Ein- und Ausschalten stehen im **Sicherheitsprotokoll** (Admin-Panel → Not-Aus
 Die Probe-Zentrale ist zugleich der Testserver für die Tester:
 
 - **Adressen:** `https://test.cuby0401.uk` (Bibliothek), `test-play` (Spiele), `test-upload` (Upload). Tunnel-Routen auf
-  `http://192.168.178.100:18188/18189/18190`, geschützt durch die Access-Anwendung **„Spielebibliothek Test“**
+  `http://<NAS_LAN>:18188/18189/18190`, geschützt durch die Access-Anwendung **„Spielebibliothek Test“**
   (AUD `04f54bd3…`, Richtlinie „Tester“: Seb + Tester). Wer dort rein darf, regelt allein diese Richtlinie.
 - **Anmeldung:** echt, per E-Mail-Code – kein `DEV_USER` mehr. Die Ports hängen nur an der LAN-Adresse der NAS.
   **Nie Tunnel-Routen auf einen Dienst mit `DEV_USER` anlegen** (07.11.2026 war die Probe so für wenige Minuten offen).
@@ -125,7 +125,7 @@ Die Probe-Zentrale ist zugleich der Testserver für die Tester:
 - **Ergebnisse:** `/volume1/docker/spielebibliothek-tests/ergebnisse.db` (überlebt Neubauten), im Admin-Panel der Probe bei der Freigabe.
 - **Tester benachrichtigen:** `deploy.sh --probe` schickt allen mit der CRM-Rolle „Tester“ eine Glocke (ab 1.4.0 live).
 - **Neuen Tester aufnehmen:** E-Mail in die Richtlinie „Tester“ der Access-Anwendung, Rolle „Tester“ im CRM (für Link und Glocke).
-- **MCP-Server auf dem Testserver (1.6.0):** Tunnel-Route `test-mcp.cuby0401.uk` → `http://192.168.178.100:18188` (gleicher Port
+- **MCP-Server auf dem Testserver (1.6.0):** Tunnel-Route `test-mcp.cuby0401.uk` → `http://<NAS_LAN>:18188` (gleicher Port
   wie `test`, Caddy wählt nach dem Hostnamen). **Ohne Access-Anwendung** – der MCP-Server meldet selbst an (Schlüssel/OAuth).
 
 ## MCP-Server (Zentrale 1.6.0, E88)

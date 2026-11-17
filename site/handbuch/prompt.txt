@@ -37,6 +37,8 @@ MULTIPLAYER (nur für Spiele mit mehreren Spielern)
 - Alles, was zum Spiel gehört (auch gemischte Karten, wer dran ist), steht im zustand als einfaches JSON – keine Variablen nebenher. Sonst kann ein neuer Host nicht weitermachen.
 - Züge immer mit spiel.zug(aktion) schicken, neues Spiel nur beim Host mit spiel.neu(). sicht === null heißt: noch nicht gestartet. Den Knopf „Spiel starten“ nur zeigen, wenn spiel.raum.istHost.
 - In sicht() fremde Geheimnisse (Handkarten, Stapel) weglassen. Höchstens 256 KB Zustand, 64 KB je Sicht.
+- Zeitgeber (Zugzeit, Bedenkzeit): den Zeitpunkt im zustand ablegen (z. B. zustand.zugBis = Date.now() + 60000) und in den Regeln frist(zustand) → { bis: zustand.zugBis, aktion } oder null angeben. Bei Ablauf ruft der Host zug(zustand, aktion, null) auf (von === null = die Uhr). Nach Ablauf in zug() einen neuen Zeitpunkt setzen oder ihn auf null setzen. Kein eigenes setTimeout für Spielregeln – das ginge bei einem Host-Wechsel verloren.
+- Siegzähler über mehrere Runden: neu(spieler, optionen, vorher) bekommt den bisherigen Zustand (oder null).
 
 GAME.JSON (Pflicht)
 { "title": "...", "description": "ein Satz", "thumbnail": "thumb.svg", "saveVersion": 1, "tags": ["..."],

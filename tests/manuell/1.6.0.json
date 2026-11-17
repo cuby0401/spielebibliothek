@@ -1,6 +1,6 @@
 {
   "version": "1.6.0",
-  "hinweis": "Neu in 1.6.0: Multiplayer (Spiele für mehrere Spieler in einem Raum) und der MCP-Server, über den Claude selbst Entwürfe hochladen kann. Zum Testen gibt es das Beispielspiel „Vier gewinnt“. Für die Multiplayer-Tests braucht ihr zwei Personen (z. B. du und ein Tester) oder zwei Geräte mit zwei Konten. Hier stehen nur Dinge, die in 1.6.0 NEU sind, jedes einzeln.",
+  "hinweis": "Neu in 1.6.0: Multiplayer (Spiele für mehrere Spieler in einem Raum) und der MCP-Server, über den Claude selbst Entwürfe hochladen kann. Zum Testen gibt es das Beispielspiel „Vier gewinnt“ (auf dem Testserver in deinen Spielen). Für die Multiplayer-Tests braucht ihr zwei Personen (z. B. du und ein Tester) oder zwei Geräte mit zwei Konten. Hier stehen nur Dinge, die in 1.6.0 NEU sind, jedes einzeln.",
   "tests": [
     {
       "id": "mp-lobby",
@@ -84,6 +84,37 @@
         "Person 1 (Host) klickt „Raum verlassen“."
       ],
       "erwartet": "Person 1 ist wieder in der Lobby. Bei Person 2 steht sie jetzt allein in der Raum-Karte mit „Host“, die Steine liegen unverändert, und sie sieht den Knopf „Neues Spiel“."
+    },
+    {
+      "id": "mp-zugzeit",
+      "bereich": "Multiplayer",
+      "titel": "Zugzeit läuft ab (Zeitgeber)",
+      "schritte": [
+        "Beide sind im selben Raum, Person 1 (Host) klickt „Spiel starten“.",
+        "Person 1 setzt keinen Stein und wartet 30 Sekunden. Unter dem Status zählt „Noch … s für diesen Zug“ herunter."
+      ],
+      "erwartet": "Bei beiden zählt die Restzeit gleich herunter. Nach 30 Sekunden ist ohne Klick Person 2 dran (bei ihr „Du bist dran (Rot).“), die Uhr beginnt wieder bei 30 s. Es wurde kein Stein gesetzt."
+    },
+    {
+      "id": "mp-zugzeit-host-wechsel",
+      "bereich": "Multiplayer",
+      "titel": "Zugzeit läuft nach einem Host-Wechsel weiter",
+      "schritte": [
+        "Beide spielen, Person 2 ist dran, die Uhr läuft.",
+        "Person 1 (Host) klickt „Raum verlassen“, tritt sofort mit dem Raumcode wieder bei.",
+        "Person 2 setzt keinen Stein."
+      ],
+      "erwartet": "Person 2 ist jetzt Host. Die Uhr springt nicht auf 30 s zurück, sondern läuft weiter. Ist sie abgelaufen, ist Person 1 dran."
+    },
+    {
+      "id": "mp-siegzaehler",
+      "bereich": "Multiplayer",
+      "titel": "Siegzähler über mehrere Runden",
+      "schritte": [
+        "Beide spielen eine Runde bis zum Sieg.",
+        "Der Host klickt „Neues Spiel“ und ihr spielt noch eine Runde zu Ende."
+      ],
+      "erwartet": "Unter der Spielerliste steht „Siege: <Name> 1 · <Name> 0“ und nach der zweiten Runde der richtige Stand. „Neues Spiel“ setzt den Siegzähler nicht zurück. Nach „Raum verlassen“ beider Spieler und einem neuen Raum beginnt er wieder bei 0."
     },
     {
       "id": "mp-neu-laden",

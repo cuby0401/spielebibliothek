@@ -18,21 +18,25 @@
 	button.neu { margin-top: 14px; font: inherit; padding: 8px 18px; border-radius: 10px; border: 0; background: #1d4ed8; color: #fff; cursor: pointer; }
 	#spieler { margin-top: 10px; color: #5b6170; font-size: 14px; }
 	#fehler { color: #b91c1c; min-height: 1.4em; font-size: 14px; }
+	#uhr, #siege { color: #5b6170; font-size: 14px; min-height: 1.4em; }
 </style>
 </head>
 <body>
 <main>
 	<div id="status">Verbinde …</div>
+	<div id="uhr"></div>
 	<div id="brett" class="aus"></div>
 	<div id="fehler"></div>
 	<button class="neu" id="neu" hidden>Neues Spiel</button>
 	<div id="spieler"></div>
+	<div id="siege"></div>
 </main>
 <script>
 // ---------------- Regeln: laufen nur beim Host ----------------
 // Der Host rechnet jeden Zug, legt den Stand im Raum ab und schickt jedem seine Sicht.
 // Geht der Host, übernimmt ein anderer Spieler mit genau diesem Stand – das Spiel läuft weiter.
 const ZEILEN = 6, SPALTEN = 7;
+const ZUGZEIT = 30000;   // 30 Sekunden je Zug, danach ist der andere dran (Zeitgeber über frist)
 
 function vierInReihe(brett, z, s) {
 	const farbe = brett[z][s];
@@ -49,13 +53,16 @@ function vierInReihe(brett, z, s) {
 
 const regeln = {
 	// spieler: IDs aller verbundenen Mitspieler (ohne Zuschauer), Reihenfolge wie beim Betreten
-	neu(spieler) {
+	// vorher: der letzte Zustand im Raum (oder null) – daraus kommt der Siegzähler
+	neu(spieler, optionen, vorher) {
 		if (spieler.length < 2) throw new Error("Zu zweit spielen – lade jemanden ein.");
-		return { brett: Array.from({ length: ZEILEN }, () => Array(SPALTEN).fill(null)), spieler: spieler.slice(0, 2), dran: 0, sieger: null, voll: false };
+		return { brett: Array.from({ length: ZEILEN }, () => Array(SPALTEN).fill(null)), spieler: spieler.slice(0, 2), dran: 0, sieger: null, voll: false,
+			zugBis: Date.now() + ZUGZEIT, siege: vorher && vorher.siege ? vorher.siege : {} };
 	},
-	// aktion kommt vom Spieler "von" – nie glauben, immer prüfen
+	// aktion kommt vom Spieler "von" – nie glauben, immer prüfen. von === null: Die Zugzeit ist abgelaufen.
 	zug(z, aktion, von) {
 		if (z.sieger !== null || z.voll) throw new Error("Das Spiel ist vorbei.");
+		if (von === null) { z.dran = 1 - z.dran; z.zugBis = Date.now() + ZUGZEIT; return z; }   // Zeit um: der andere ist dran
 		if (z.spieler[z.dran] !== von) throw new Error("Du bist nicht dran.");
 		const s = aktion && aktion.spalte;
 		if (!Number.isInteger(s) || s < 0 || s >= SPALTEN) throw new Error("Ungültige Spalte.");
@@ -63,10 +70,15 @@ const regeln = {
 		for (let i = ZEILEN - 1; i >= 0; i--) if (z.brett[i][s] === null) { zeile = i; break; }
 		if (zeile < 0) throw new Error("Die Spalte ist voll.");
 		z.brett[zeile][s] = z.dran;
-		if (vierInReihe(z.brett, zeile, s)) z.sieger = von;
+		if (vierInReihe(z.brett, zeile, s)) { z.sieger = von; z.siege[von] = (z.siege[von] || 0) + 1; }
 		else if (z.brett[0].every((f) => f !== null)) z.voll = true;
 		else z.dran = 1 - z.dran;
+		z.zugBis = z.sieger === null && !z.voll ? Date.now() + ZUGZEIT : null;   // nach Spielende keine Uhr mehr
 		return z;
+	},
+	// Zeitgeber: Der Host führt bei Ablauf zug(z, null, null) aus – auch ein neuer Host nach einem Wechsel
+	frist(z) {
+		return z.zugBis ? { bis: z.zugBis, aktion: null } : null;
 	},
 	// Was ein Spieler sehen darf. Bei Vier gewinnt ist nichts geheim – bei Kartenspielen hier fremde Hände weglassen.
 	sicht(z, fuer) {
@@ -77,7 +89,14 @@ const regeln = {
 // ---------------- Anzeige: läuft bei allen ----------------
 const brettEl = document.getElementById("brett"), statusEl = document.getElementById("status"), fehlerEl = document.getElementById("fehler");
 const neuKnopf = document.getElementById("neu"), spielerEl = document.getElementById("spieler");
+const uhrEl = document.getElementById("uhr"), siegeEl = document.getElementById("siege");
 let spiel = null, letzteSicht = null;
+
+// Restzeit bei jedem Spieler selbst herunterzählen (die Uhren der Geräte können etwas auseinanderliegen)
+setInterval(() => {
+	const z = letzteSicht;
+	uhrEl.textContent = z && z.zugBis ? "Noch " + Math.max(0, Math.ceil((z.zugBis - Date.now()) / 1000)) + " s für diesen Zug" : "";
+}, 250);
 
 function name(raum, id) { const s = raum.spieler.find((x) => x.id === id); return s ? s.name : id; }
 
@@ -103,6 +122,7 @@ function zeigen(sicht, raum) {
 	neuKnopf.hidden = !raum.istHost;
 	neuKnopf.textContent = leer ? "Spiel starten" : "Neues Spiel";
 	spielerEl.textContent = raum.spieler.map((s) => s.name + (s.host ? " (Host)" : "") + (s.verbunden ? "" : " – weg")).join(" · ");
+	siegeEl.textContent = leer || !sicht.siege ? "" : "Siege: " + sicht.spieler.map((id) => name(raum, id) + " " + (sicht.siege[id] || 0)).join(" · ");
 }
 
 neuKnopf.addEventListener("click", () => {

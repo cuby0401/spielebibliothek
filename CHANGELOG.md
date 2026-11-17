@@ -18,6 +18,10 @@ sind alle Multiplayer. Kommt vor den Tickets (die werden 1.7.0). Plan im Vault: 
   prüft die Züge beim Host, legt den Stand im Raum ab und schickt jedem Spieler nur seine Sicht. Geht der Host, übernimmt ein anderer
   mit genau diesem Stand. Darunter `raum()` mit `senden`, `beiNachricht`, `standSichern`, `beiHostwerden`. Lokal spielen zwei Tabs
   gegeneinander, im Entwurf darf man gegen sich selbst spielen. Auf der NAS läuft kein Code der Entwickler.
+- **Neu: Zeitgeber und Siegzähler** (nach den Antworten des ersten Multiplayer-Entwicklers): `frist(zustand) → {bis, aktion}` – bei Ablauf
+  führt der Host `zug(zustand, aktion, null)` aus, nach einem Host-Wechsel läuft die Uhr aus dem Zustand weiter (Zugzeit, Bedenkzeit,
+  Karte kurz zeigen). `neu(spieler, optionen, vorher)` bekommt den bisherigen Zustand, z. B. für einen Siegzähler im Raum.
+  Korrigiert: Ein sofortiges `spiel.neu()` direkt nach `await spiel(…)` konnte vom übernommenen leeren Raumstand überschrieben werden.
 - **Neu: Beispielspiel „Vier gewinnt“** (`examples/vier-gewinnt`) und die Multiplayer-Vorlage im Handbuch.
 - **Neu: MCP-Server für Claude** unter `mcp.cuby0401.uk`: Claude liest das Handbuch, holt die Vorlage, sieht die eigenen Spiele und
   ihre Dateien, lädt Entwürfe hoch und liest Prüfung und Fehlerberichte. Veröffentlichen bleibt beim Entwickler. Anmeldung für
@@ -25,8 +29,10 @@ sind alle Multiplayer. Kommt vor den Tickets (die werden 1.7.0). Plan im Vault: 
   (Access + Upload-Passwort). Andere KIs bekommen einen Hinweis.
 - **Neu im Handbuch:** Kapitel 9c „Multiplayer“ und 9d „Claude direkt verbinden (MCP)“, Prompt-Block mit Multiplayer-Regeln.
 - **Einrichtung (Seb):** Tunnel-Route `mcp.cuby0401.uk` → `http://caddy:8080` ohne Access-Anwendung, für den Testserver
-  `test-mcp.cuby0401.uk` → `http://192.168.178.100:18188`. Siehe `docs/betrieb.md`.
-- **Tests:** `test_multiplayer.py` (11), `test_mcp.py` (6), Ende-zu-Ende `scripts/e2e-zentrale-1.6.mjs` (zwei Tabs spielen Vier gewinnt,
+  `test-mcp.cuby0401.uk` → `http://<NAS_LAN>:18188`. Siehe `docs/betrieb.md`.
+- **Testserver:** Speicher-Dienst und Caddy bekommen dort die Gruppe des Upload-Dienstes, sonst waren neu hochgeladene Entwürfe nicht
+  lesbar (live regeln das die ACLs).
+- **Tests:** `scripts/gamesave-mp-test.js` (Zeitgeber, Host-Wechsel, Siegzähler), `test_multiplayer.py` (11), `test_mcp.py` (6), Ende-zu-Ende `scripts/e2e-zentrale-1.6.mjs` (zwei Tabs spielen Vier gewinnt,
   Host-Wechsel, Rauswerfen, MCP-Schlüssel, Freigabe der Claude-App).
 
 ## 1.5.0 – 13.11.2026
