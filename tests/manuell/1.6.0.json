@@ -1,0 +1,232 @@
+{
+  "version": "1.6.0",
+  "hinweis": "Neu in 1.6.0: Multiplayer (Spiele für mehrere Spieler in einem Raum) und der MCP-Server, über den Claude selbst Entwürfe hochladen kann. Zum Testen gibt es das Beispielspiel „Vier gewinnt“. Für die Multiplayer-Tests braucht ihr zwei Personen (z. B. Seb und Emil) oder zwei Geräte mit zwei Konten. Hier stehen nur Dinge, die in 1.6.0 NEU sind, jedes einzeln.",
+  "tests": [
+    {
+      "id": "mp-lobby",
+      "bereich": "Multiplayer",
+      "titel": "Ein Multiplayer-Spiel startet mit der Lobby",
+      "schritte": [
+        "Öffne den Testserver (oben rechts „Testserver öffnen ↗“).",
+        "Öffne das Spiel „Vier gewinnt“."
+      ],
+      "erwartet": "Statt des Spiels erscheint die Karte „Mehrspieler“ mit „2 Spieler“, dem Knopf „Neuen Raum erstellen“, einem Feld „Raumcode“ mit „Beitreten“ und dem Bereich „Offene Räume“ („Gerade keine offenen Räume“, falls niemand spielt)."
+    },
+    {
+      "id": "mp-raum-erstellen",
+      "bereich": "Multiplayer",
+      "titel": "Raum erstellen",
+      "schritte": [
+        "Öffne auf dem Testserver „Vier gewinnt“.",
+        "Klick auf „Neuen Raum erstellen“."
+      ],
+      "erwartet": "Das Spiel erscheint und zeigt „Warte auf einen Mitspieler …“. Rechts (am Handy darunter) steht die Karte „Raum ABCD · 1/2“ mit dem Code aus vier Buchstaben, den Knöpfen „Code“, „Link kopieren“ und „Einladen“, dir als einzigem Spieler („(du)“, „Host“), dem Schalter „Bei „Offene Räume“ zeigen“ und „Raum verlassen“. In der Adresszeile steht am Ende „?raum=ABCD“."
+    },
+    {
+      "id": "mp-code-beitreten",
+      "bereich": "Multiplayer",
+      "titel": "Mit dem Raumcode beitreten",
+      "schritte": [
+        "Person 1 erstellt in „Vier gewinnt“ einen Raum und sagt Person 2 den Code.",
+        "Person 2 öffnet „Vier gewinnt“, tippt den Code ins Feld „Raumcode“ (klein geschrieben geht auch) und klickt „Beitreten“."
+      ],
+      "erwartet": "Bei beiden stehen zwei Spieler in der Raum-Karte (mit Anzeigenamen), oben „2/2“. Person 1 ist Host und sieht im Spiel „Spiel starten“, Person 2 sieht „Warte, bis der Host startet …“."
+    },
+    {
+      "id": "mp-offene-raeume",
+      "bereich": "Multiplayer",
+      "titel": "Offene Räume und der Schalter dafür",
+      "schritte": [
+        "Person 1 erstellt einen Raum.",
+        "Person 2 öffnet „Vier gewinnt“ und schaut unter „Offene Räume“ (aktualisiert sich alle 5 Sekunden).",
+        "Person 1 schaltet „Bei „Offene Räume“ zeigen“ aus. Person 2 wartet ein paar Sekunden."
+      ],
+      "erwartet": "Zuerst steht der Raum mit Code, Name von Person 1 und „1 von 2 Spielern“ in der Liste; ein Klick darauf tritt bei. Nach dem Ausschalten verschwindet der Raum aus der Liste, beitreten geht dann nur noch mit Code oder Link."
+    },
+    {
+      "id": "mp-einladen-glocke",
+      "bereich": "Multiplayer",
+      "titel": "Mitspieler über die Glocke einladen",
+      "schritte": [
+        "Person 1 erstellt einen Raum und klickt in der Raum-Karte auf „Einladen“.",
+        "Haken bei Person 2 setzen, „Einladen“ klicken.",
+        "Person 2 öffnet die Glocke und klickt auf die Einladung."
+      ],
+      "erwartet": "Person 1 sieht „Einladung verschickt.“. Bei Person 2 steht in der Glocke „<Name> lädt dich zu „Vier gewinnt“ ein (Raum ABCD).“ Der Klick führt direkt in den Raum, ohne Lobby."
+    },
+    {
+      "id": "mp-einladungslink",
+      "bereich": "Multiplayer",
+      "titel": "Einladungslink",
+      "schritte": [
+        "Person 1 erstellt einen Raum und klickt „Link kopieren“.",
+        "Den Link Person 2 schicken (z. B. per Chat). Person 2 öffnet ihn."
+      ],
+      "erwartet": "„Einladungslink kopiert.“ erscheint. Person 2 landet direkt im Raum von Person 1."
+    },
+    {
+      "id": "mp-spielen",
+      "bereich": "Multiplayer",
+      "titel": "Eine Runde Vier gewinnt",
+      "schritte": [
+        "Beide sind im selben Raum. Person 1 (Host) klickt „Spiel starten“.",
+        "Person 2 klickt sofort auf eine Spalte, obwohl Person 1 dran ist.",
+        "Abwechselnd Steine setzen, bis jemand vier in einer Reihe hat."
+      ],
+      "erwartet": "Nach dem Start steht bei Person 1 „Du bist dran (Gelb).“, bei Person 2 „<Name> ist dran.“. Der Klick außer der Reihe zeigt „Du bist nicht dran.“ und setzt keinen Stein. Jeder Stein erscheint sofort bei beiden. Am Ende steht beim Gewinner „Du hast gewonnen! 🎉“, beim anderen „<Name> hat gewonnen.“."
+    },
+    {
+      "id": "mp-host-geht",
+      "bereich": "Multiplayer",
+      "titel": "Der Host geht, das Spiel läuft weiter",
+      "schritte": [
+        "Beide spielen eine Runde, ein paar Steine liegen schon.",
+        "Person 1 (Host) klickt „Raum verlassen“."
+      ],
+      "erwartet": "Person 1 ist wieder in der Lobby. Bei Person 2 steht sie jetzt allein in der Raum-Karte mit „Host“, die Steine liegen unverändert, und sie sieht den Knopf „Neues Spiel“."
+    },
+    {
+      "id": "mp-neu-laden",
+      "bereich": "Multiplayer",
+      "titel": "Neu laden im Raum",
+      "schritte": [
+        "Beide spielen, ein paar Steine liegen.",
+        "Person 2 lädt die Seite neu (F5 bzw. Wischen)."
+      ],
+      "erwartet": "Person 2 landet nach dem Neuladen wieder im selben Raum (kein Umweg über die Lobby) und sieht dieselben Steine. Bei Person 1 steht Person 2 kurz als „Verbindung weg“ und dann wieder normal."
+    },
+    {
+      "id": "mp-verbindung-weg",
+      "bereich": "Multiplayer",
+      "titel": "Verbindung kurz weg",
+      "schritte": [
+        "Beide sind im selben Raum.",
+        "Person 2 schaltet WLAN für etwa 5 Sekunden aus (oder Flugmodus) und dann wieder an."
+      ],
+      "erwartet": "Bei Person 2 erscheint in der Raum-Karte „Verbindung verloren – verbinde neu …“, nach dem Einschalten verschwindet der Hinweis von selbst und sie ist wieder im Raum, mit demselben Spielstand."
+    },
+    {
+      "id": "mp-rauswerfen",
+      "bereich": "Multiplayer",
+      "titel": "Rauswerfen",
+      "schritte": [
+        "Beide sind im selben Raum, Person 1 ist Host.",
+        "Person 1 klickt in der Raum-Karte neben Person 2 auf das X („rauswerfen“) und bestätigt.",
+        "Person 2 versucht, mit dem Code wieder beizutreten."
+      ],
+      "erwartet": "Vor dem Rauswerfen kommt eine Rückfrage. Person 2 landet in der Lobby mit der Meldung „Du wurdest aus dem Raum geworfen.“ und kann diesem Raum nicht wieder beitreten (gleiche Meldung). Person 2 sieht keine X-Knöpfe bei anderen, weil sie nicht Host ist."
+    },
+    {
+      "id": "mp-host-weitergeben",
+      "bereich": "Multiplayer",
+      "titel": "Host weitergeben",
+      "schritte": [
+        "Beide sind im selben Raum, Person 1 ist Host.",
+        "Person 1 klickt neben Person 2 auf den Stern („zum Host machen“)."
+      ],
+      "erwartet": "Bei beiden steht jetzt „Host“ bei Person 2. Person 2 sieht im Spiel den Knopf zum Starten bzw. „Neues Spiel“ und in der Raum-Karte die Knöpfe zum Rauswerfen, Person 1 nicht mehr."
+    },
+    {
+      "id": "mp-handy",
+      "bereich": "Multiplayer",
+      "titel": "Multiplayer auf dem iPhone",
+      "schritte": [
+        "Öffne den Testserver auf dem iPhone und dort „Vier gewinnt“.",
+        "Erstelle einen Raum oder tritt einem bei und spiel ein paar Züge."
+      ],
+      "erwartet": "Lobby, Spiel und Raum-Karte (unter dem Spiel) passen auf den Bildschirm, nichts ist abgeschnitten, alle Knöpfe lassen sich antippen."
+    },
+    {
+      "id": "mp-entwurf-zwei-tabs",
+      "bereich": "Multiplayer",
+      "titel": "Entwickler: im Entwurf gegen sich selbst spielen",
+      "nurAdmin": true,
+      "schritte": [
+        "Upload-Seite des Testservers: „Vier gewinnt“ aus examples/vier-gewinnt als ZIP unter dem Ordner „vier-test“ hochladen.",
+        "Beim Entwurf „Testen“ klicken, „Neuen Raum erstellen“, den Code merken.",
+        "Denselben Entwurf in einem zweiten Tab öffnen und mit dem Code beitreten."
+      ],
+      "erwartet": "Im zweiten Tab bist du ein zweiter Spieler („Name (2)“), beide Tabs können gegeneinander spielen. Die Lobby nennt den Tipp mit dem zweiten Tab. „Einladen“ gibt es im Entwurf nicht. Danach den Entwurf wieder verwerfen."
+    },
+    {
+      "id": "handbuch-multiplayer-claude",
+      "bereich": "Handbuch",
+      "titel": "Neue Kapitel im Handbuch",
+      "schritte": [
+        "Öffne auf dem Testserver das Handbuch (Hilfe → Handbuch).",
+        "Lies im Inhaltsverzeichnis „Multiplayer – mehrere Spieler in einem Raum“ und „Claude direkt verbinden (MCP)“."
+      ],
+      "erwartet": "Beide Kapitel sind da (9c und 9d) und verständlich: wie ein Multiplayer-Spiel gebaut wird (Regeln beim Host, game.json, Testen in zwei Tabs, Umstieg von eigenem Server) und wie man Claude Code bzw. die Claude-App verbindet."
+    },
+    {
+      "id": "ki-schluessel",
+      "bereich": "MCP",
+      "titel": "Schlüssel für Claude Code erstellen und widerrufen",
+      "nurAdmin": true,
+      "schritte": [
+        "Upload-Seite des Testservers öffnen und mit dem Upload-Passwort anmelden.",
+        "Ganz unten bei „KI-Zugang (Claude)“ auf „Schlüssel für Claude Code“ klicken, Namen „Test“ eingeben.",
+        "Den Befehl mit „Kopieren“ kopieren und „Fertig“ klicken."
+      ],
+      "erwartet": "Ein Fenster zeigt den Befehl „claude mcp add --transport http spielebibliothek https://test-mcp.cuby0401.uk/mcp --header …“ mit Hinweis, dass der Schlüssel nur jetzt sichtbar ist. Danach steht „Test (Claude Code)“ in der Liste mit „noch nicht benutzt“, darunter die Adresse für die Claude-App."
+    },
+    {
+      "id": "ki-claude-code",
+      "bereich": "MCP",
+      "titel": "Claude Code mit der Bibliothek verbinden",
+      "nurAdmin": true,
+      "schritte": [
+        "Vorher: Tunnel-Route test-mcp.cuby0401.uk eingerichtet (siehe Übergabe).",
+        "Den kopierten Befehl im Terminal ausführen.",
+        "Claude Code starten und fragen: „Welche Spiele habe ich in der Spielebibliothek?“"
+      ],
+      "erwartet": "Claude benutzt das Werkzeug „meine_spiele“ und nennt deine Spiele auf dem Testserver. In der Liste auf der Upload-Seite steht beim Schlüssel jetzt „zuletzt benutzt …“."
+    },
+    {
+      "id": "ki-hochladen",
+      "bereich": "MCP",
+      "titel": "Claude lädt einen Entwurf hoch",
+      "nurAdmin": true,
+      "schritte": [
+        "In Claude Code (verbunden wie im Test davor): „Bau mir für die Spielebibliothek ein kleines Würfelspiel für 2 bis 4 Spieler und lade es als Entwurf mit dem Ordner wuerfel-test hoch.“",
+        "Den Link zum Testen öffnen, den Claude nennt, und das Spiel in zwei Tabs ausprobieren.",
+        "Auf der Upload-Seite nachsehen."
+      ],
+      "erwartet": "Claude liest zuerst das Handbuch (Kapitel Multiplayer), lädt dann hoch und nennt zwei Links (Testen, Veröffentlichen) und sagt, dass du selbst veröffentlichst. Auf der Upload-Seite steht „wuerfel-test“ als Entwurf, nichts ist veröffentlicht. Danach den Entwurf verwerfen."
+    },
+    {
+      "id": "ki-claude-app",
+      "bereich": "MCP",
+      "titel": "Claude-App verbinden",
+      "nurAdmin": true,
+      "schritte": [
+        "In der Claude-App: Einstellungen → Konnektoren → Eigenen Konnektor hinzufügen. Name „Spielebibliothek Test“, Adresse https://test-mcp.cuby0401.uk/mcp → Verbinden.",
+        "Auf der Seite, die sich öffnet, falls nötig mit E-Mail-Code und Upload-Passwort anmelden, dann „Erlauben“.",
+        "Im Chat fragen: „Was steht im Handbuch der Spielebibliothek zum Thema Multiplayer?“"
+      ],
+      "erwartet": "Die Freigabe-Seite zeigt „„Claude“ möchte auf deine Spiele zugreifen“ mit „Darf“/„Darf nicht“. Nach „Erlauben“ geht es zurück in die App, der Konnektor ist verbunden. Claude antwortet mit Inhalten aus Kapitel 9c. Auf der Upload-Seite steht „Claude (Claude-App)“ unter KI-Zugang."
+    },
+    {
+      "id": "ki-widerrufen",
+      "bereich": "MCP",
+      "titel": "Zugang widerrufen",
+      "nurAdmin": true,
+      "schritte": [
+        "Upload-Seite → KI-Zugang (Claude) → beim Schlüssel „Test“ auf „Widerrufen“ und bestätigen.",
+        "In Claude Code noch einmal fragen: „Welche Spiele habe ich?“"
+      ],
+      "erwartet": "Der Schlüssel verschwindet aus der Liste. Claude Code bekommt keine Antwort mehr von der Bibliothek (nicht angemeldet). Danach mit „claude mcp remove spielebibliothek“ aufräumen."
+    },
+    {
+      "id": "ki-andere-ki",
+      "bereich": "MCP",
+      "titel": "Hinweis bei einer anderen KI (nur, wenn du eine hast)",
+      "nurAdmin": true,
+      "schritte": [
+        "Nur wenn du z. B. ChatGPT mit Konnektoren (Entwicklermodus) nutzen kannst: dort https://test-mcp.cuby0401.uk/mcp verbinden.",
+        "Auf der Freigabe-Seite schauen, dann erlauben und „Zeig meine Spiele“ fragen."
+      ],
+      "erwartet": "Die Freigabe-Seite zeigt oben gelb „Keine Claude-Anwendung …“. Die Antworten der Bibliothek beginnen mit „Hinweis: Die Spielebibliothek ist für Claude gebaut …“. Ohne andere KI: Test überspringen."
+    }
+  ]
+}

@@ -127,6 +127,8 @@ function mcp(pfad, { methode = "POST", body, token, form } = {}) {
   ok(await bis(A, `!!document.getElementById("mp-lobby")`), "Rausgeworfen: zurück in der Lobby");
 
   // 7) MCP: Schlüssel für Claude Code auf der Upload-Seite, Werkzeuge über den MCP-Server
+  // Tab A nach vorn: Im Hintergrund-Tab laufen keine Animationen, Dialoge schließen dort nie fertig
+  await cdp("Page.bringToFront", {}, A);
   await cdp("Page.navigate", { url: U + "/" }, A);
   ok(await bis(A, `!document.getElementById("bereich").hidden && !!document.getElementById("ki-zugang")`), "Upload-Seite: Bereich „KI-Zugang (Claude)“");
   ok(await bis(A, `document.getElementById("ki-zugang").textContent.includes("Noch keine KI verbunden")`), "Noch kein KI-Zugang");
@@ -134,7 +136,8 @@ function mcp(pfad, { methode = "POST", body, token, form } = {}) {
   ok(await bis(A, `!!document.querySelector("dialog[open] input")`), "Name für den Schlüssel wird abgefragt");
   await eval_(A, `{ const i = document.querySelector("dialog[open] input"); i.value = "E2E-Laptop"; i.dispatchEvent(new Event("input"));
     document.querySelector("dialog[open] .b-dialog__fuss .b-knopf--primaer").click(); } true`);
-  ok(await bis(A, `!!document.getElementById("ki-schluessel") && document.getElementById("ki-schluessel").textContent.includes("claude mcp add")`), "Befehl für Claude Code wird angezeigt");
+  const befehlDa = await bis(A, `!!document.getElementById("ki-schluessel") && document.getElementById("ki-schluessel").textContent.includes("claude mcp add")`);
+  ok(befehlDa, "Befehl für Claude Code wird angezeigt" + (befehlDa ? "" : " – Meldungen: " + await eval_(A, `JSON.stringify(UI.meldungsVerlauf()) + JSON.stringify([...document.querySelectorAll("dialog")].map((d) => d.id + ":" + d.open + ":" + d.textContent.slice(0, 160)))`)));
   const befehl = await eval_(A, `document.querySelector("#ki-schluessel pre").textContent`);
   const schluessel = (befehl.match(/Bearer (sbk_[A-Za-z0-9_-]+)/) || [])[1];
   ok(!!schluessel, "Schlüssel steht im Befehl");
