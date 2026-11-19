@@ -649,6 +649,7 @@ def erstellen(e: Einstellungen | None = None, schluessel_quelle=None, daten: Pat
     mcp.registrieren(app, e, store, zugaenge, spieler, angemeldet, spiele_von=spiele_von, entwurf_installieren=entwurf_installieren,
                      pruefung=pruefung, ordnerpfad=ordnerpfad, speicher=speicher,
                      handbuch_dir=Path(os.environ.get("MCP_HANDBUCH", "/handbuch")),
+                     zugelassen=lambda player: player in set(spieler.benutzerliste.alle().values()),   # CRM-Sperre (1.6.2)
                      mcp_url=os.environ.get("MCP_URL", "https://mcp.cuby0401.uk"),
                      upload_url=os.environ.get("UPLOAD_OEFFENTLICH", "https://upload.cuby0401.uk"),
                      games_url=os.environ.get("GAMES_OEFFENTLICH", "https://games.cuby0401.uk"))

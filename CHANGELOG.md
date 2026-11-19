@@ -5,6 +5,23 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.6.2 – 19.11.2026
+
+Patch: zwei Sicherheitspunkte aus der Prüfung vor dem Live-Gang von 1.6.0 und ein Darstellungsfehler der Lobby.
+
+- **Sicherheit: Gesperrte verlieren den KI-Zugang.** Vor `/mcp` steht kein Cloudflare Access. Bisher behielt eine im CRM gesperrte
+  oder archivierte Person ihren Claude-Code-Schlüssel bzw. ihr Claude-App-Token. Jetzt prüft der MCP-Server bei jeder Anfrage und
+  beim Erneuern des Tokens, ob die Person noch zugelassen ist (steht im Export `users.yaml`). Wird die Sperre aufgehoben, gilt der
+  Zugang wieder.
+- **Sicherheit: Nur Rücksprung-Adressen von Claude.** Die Claude-App darf sich nur noch mit `https://claude.ai/api/mcp/auth_callback`
+  bzw. `https://claude.com/api/mcp/auth_callback` registrieren, Claude Code mit `http://localhost`/`127.0.0.1`. Fremde Adressen,
+  Benutzernamen in der Adresse und andere Ports werden abgelehnt. Registrierungen sind zusätzlich je IP-Adresse begrenzt
+  (10 je Stunde), damit einer allein die Grenze nicht für alle ausschöpft.
+- **Behoben: Weiße Fläche unter der Lobby.** Die Lobby stand im Spielrahmen (16:10, im dunklen Thema heller Hintergrund). Neu am
+  Baustein `UI.buehne`: `.inhalt(an)` – der Rahmen ist dann so hoch wie sein Inhalt und hat keine eigene Fläche.
+- **Tests:** 4 neue Tests in `test_mcp.py` (Sperre, Token-Erneuerung, Rücksprung-Adressen, Grenze je IP),
+  2 neue Prüfpunkte in `e2e-zentrale-1.6.mjs` (kein leerer Rahmen unter der Lobby).
+
 ## 1.6.1 – 17.11.2026
 
 Kleines Update für Multiplayer nach den Antworten des ersten Multiplayer-Entwicklers (Zugzeiten, Bedenkzeit, Siegzähler im Raum).

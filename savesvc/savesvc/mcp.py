@@ -47,7 +47,10 @@ CODE_GILT = 300                        # s: Freigabe-Code
 MCP_BODY_MAX = 30 * 1024 * 1024        # ein Upload über MCP (JSON mit Dateien)
 DATEI_LESEN_MAX = 300 * 1024           # eine Datei über „dateien“ lesen
 SCHLUESSEL_MAX = 10                    # Claude-Code-Schlüssel je Entwickler
-CLIENTS_PRO_STUNDE = 30                # dynamische Registrierungen (alle zusammen)
+CLIENTS_PRO_STUNDE = 200               # dynamische Registrierungen (alle zusammen)
+CLIENTS_PRO_IP = 10                    # … und je IP-Adresse (1.6.2), damit einer allein die Grenze nicht für alle ausschöpft
+# Rücksprung-Adressen der Claude-App (1.6.2). Claude Code meldet sich lokal (http://localhost:<port>/…).
+CLAUDE_RUECKSPRUNG = {("claude.ai", "/api/mcp/auth_callback"), ("claude.com", "/api/mcp/auth_callback")}
 HINWEIS_ANDERE_KI = ("Hinweis: Die Spielebibliothek ist für Claude gebaut und nur damit getestet. Mit einer anderen KI kann "
                      "manches anders laufen – bei Problemen bitte Claude (Claude Code oder die Claude-App) benutzen.")
 PFAD_MUSTER = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9 ._()+\-/]{1,200}$")
@@ -111,13 +114,13 @@ class Zugaenge:
                                                        _hash(erneuern), time.time() + ERNEUERN_GILT, jetzt_iso()))
         return {"access_token": zugriff, "token_type": "Bearer", "expires_in": ZUGRIFF_GILT, "refresh_token": erneuern, "scope": "spiele"}
 
-    def erneuern(self, token: str, client_id: str) -> dict | None:
+    def erneuern(self, token: str, client_id: str, zugelassen=None) -> dict | None:
         """Erneuerungs-Token einlösen: beide Tokens werden ersetzt (das alte Erneuerungs-Token gilt nicht mehr)."""
         zugriff, erneuern = "sba_" + secrets.token_urlsafe(32), "sbr_" + secrets.token_urlsafe(32)
         with self._v() as v:
-            z = v.execute("SELECT id FROM mcp_zugang WHERE erneuern_hash=? AND client_id=? AND widerrufen IS NULL AND erneuern_ablauf > ?",
+            z = v.execute("SELECT id, player FROM mcp_zugang WHERE erneuern_hash=? AND client_id=? AND widerrufen IS NULL AND erneuern_ablauf > ?",
                           (_hash(token), client_id, time.time())).fetchone()
-            if not z:
+            if not z or (zugelassen is not None and not zugelassen(z["player"])):
                 return None
             v.execute("UPDATE mcp_zugang SET hash=?, ablauf=?, erneuern_hash=?, erneuern_ablauf=? WHERE id=?",
                       (_hash(zugriff), time.time() + ZUGRIFF_GILT, _hash(erneuern), time.time() + ERNEUERN_GILT, z["id"]))
@@ -326,10 +329,14 @@ class McpFehler(Exception):
 
 
 def registrieren(app: FastAPI, e, store, zugaenge: Zugaenge, spieler, angemeldet, *, spiele_von, entwurf_installieren,
-                 pruefung, ordnerpfad, speicher, handbuch_dir: Path, mcp_url: str, upload_url: str, games_url: str) -> None:
+                 pruefung, ordnerpfad, speicher, handbuch_dir: Path, mcp_url: str, upload_url: str, games_url: str,
+                 zugelassen=None) -> None:
+    """zugelassen(player) → False, wenn die Person im CRM gesperrt oder archiviert ist (1.6.2): Sie steht dann nicht mehr in
+    users.yaml. Ohne diese Prüfung behielte sie über einen Schlüssel den Zugang, denn vor /mcp steht kein Cloudflare Access."""
+    zugelassen = zugelassen or (lambda player: True)
     mcp_url, upload_url, games_url = mcp_url.rstrip("/"), upload_url.rstrip("/"), games_url.rstrip("/")
     sitzungen: dict[str, bool] = {}            # Mcp-Session-Id → ist Claude?
-    registrierungen: list[float] = []
+    registrierungen: list[tuple[float, str]] = []   # (Zeit, IP)
 
     def links(player: str, ordner: str) -> dict:
         return {"testen": f"{games_url}/#/entwurf/{player}/{ordner}", "veroeffentlichen": f"{upload_url}/#spiel-{ordner}"}
@@ -539,7 +546,7 @@ def registrieren(app: FastAPI, e, store, zugaenge: Zugaenge, spieler, angemeldet
             return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Anfrage zu groß (höchstens 30 MB)"}}, 413)
         kopf = request.headers.get("authorization", "")
         player = zugaenge.pruefen(kopf[7:].strip()) if kopf[:7].lower() == "bearer " else None
-        if not player or not store.vorhanden(player):
+        if not player or not store.vorhanden(player) or not zugelassen(player):
             return nicht_angemeldet()
         if body is None or not isinstance(body, (dict, list)):
             return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Kein gültiges JSON-RPC"}}, 400)
@@ -581,21 +588,31 @@ def registrieren(app: FastAPI, e, store, zugaenge: Zugaenge, spieler, angemeldet
     def uri_ok(uri: Any) -> bool:
         if not isinstance(uri, str) or len(uri) > 500:
             return False
-        t = urlsplit(uri)
-        return (t.scheme == "https" and bool(t.netloc)) or (t.scheme == "http" and t.hostname in ("localhost", "127.0.0.1"))
+        try:
+            t = urlsplit(uri)
+            t.port                                    # wirft bei kaputtem Port
+        except ValueError:
+            return False
+        if t.username or t.password or t.fragment:
+            return False
+        # Nur Claude (1.6.2): die Claude-App auf claude.ai/claude.com, Claude Code lokal auf diesem Rechner
+        return ((t.scheme == "https" and (t.hostname, t.path) in CLAUDE_RUECKSPRUNG and t.port in (None, 443))
+                or (t.scheme == "http" and t.hostname in ("localhost", "127.0.0.1")))
 
     @app.post("/oauth/register", status_code=201)
-    def registrieren_(body: dict = Body(...)):
+    def registrieren_(request: Request, body: dict = Body(...)):
         jetzt_ = time.time()
-        while registrierungen and jetzt_ - registrierungen[0] > 3600:
+        while registrierungen and jetzt_ - registrierungen[0][0] > 3600:
             registrierungen.pop(0)
-        if len(registrierungen) >= CLIENTS_PRO_STUNDE:
+        # Hinter dem Cloudflare-Tunnel steht die echte Adresse im Kopf Cf-Connecting-Ip
+        ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+        if len(registrierungen) >= CLIENTS_PRO_STUNDE or sum(1 for _, i in registrierungen if i == ip) >= CLIENTS_PRO_IP:
             raise HTTPException(429, "zu viele Registrierungen – später noch einmal")
         uris = body.get("redirect_uris")
         if not isinstance(uris, list) or not 1 <= len(uris) <= 5 or not all(uri_ok(u) for u in uris):
             return JSONResponse({"error": "invalid_redirect_uri"}, 400)
         name = str(body.get("client_name") or "KI-Anwendung")[:80]
-        registrierungen.append(jetzt_)
+        registrierungen.append((jetzt_, ip))
         client_id = zugaenge.client_neu(name, uris)
         return {"client_id": client_id, "client_name": name, "redirect_uris": uris, "token_endpoint_auth_method": "none",
                 "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"]}
@@ -609,12 +626,12 @@ def registrieren(app: FastAPI, e, store, zugaenge: Zugaenge, spieler, angemeldet
             return fehler("invalid_client")
         if grant_type == "authorization_code":
             player = zugaenge.code_einloesen(code, client_id, redirect_uri, code_verifier)
-            if not player or not store.vorhanden(player):
+            if not player or not store.vorhanden(player) or not zugelassen(player):
                 return fehler("invalid_grant")
             store.ereignis(player, f"KI-Zugang verbunden: {client['name']}")
             return JSONResponse(zugaenge.oauth_neu(player, client_id, client["name"]), headers={"Cache-Control": "no-store"})
         if grant_type == "refresh_token":
-            neu = zugaenge.erneuern(refresh_token, client_id)
+            neu = zugaenge.erneuern(refresh_token, client_id, zugelassen)
             return JSONResponse(neu, headers={"Cache-Control": "no-store"}) if neu else fehler("invalid_grant")
         return fehler("unsupported_grant_type")
 

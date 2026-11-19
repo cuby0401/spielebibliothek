@@ -853,7 +853,8 @@
 				o.aktion ? (o.aktion instanceof Node ? o.aktion : knopf({ art: "standard", groesse: "s", ...o.aktion })) : null));
 	}
 	// Bühne für ein laufendes Spiel: großer Rahmen links (rahmenId bekommt das iframe), schmale Spalte rechts (seite). Handy: untereinander.
-	// Am Element: .gross(an) → füllt die Fensterhöhe, .ohneSeite(an) → Spalte weg
+	// Am Element: .gross(an) → füllt die Fensterhöhe, .ohneSeite(an) → Spalte weg, .inhalt(an) → Rahmen zeigt Inhalt statt Spiel
+	// (z. B. Lobby): so hoch wie der Inhalt, ohne eigene Fläche
 	function buehne(o = {}) {
 		const rahmen = h("div", { class: "b-buehne__rahmen", id: o.rahmenId || null });
 		const seite = h("aside", { class: "b-buehne__seite", "aria-label": o.seiteLabel || null }, o.seite || []);
@@ -861,6 +862,7 @@
 		b.rahmen = rahmen; b.seite = seite;
 		b.gross = (an) => b.toggleAttribute("data-gross", !!an);
 		b.ohneSeite = (an) => b.toggleAttribute("data-ohne-seite", !!an);
+		b.inhalt = (an) => b.toggleAttribute("data-inhalt", !!an);
 		return b;
 	}
 	// Rangliste (Bestenlisten): spalten [{titel}] für die Werte, eintraege [{platz, name, href, titel, werte: [Text], ich}], rang = Index der Rangspalte

@@ -184,3 +184,66 @@ def test_oauth_fuer_die_claude_app(mc):
     assert mc.post("/oauth/token", data={"grant_type": "refresh_token", "refresh_token": tok["refresh_token"], "client_id": cid}).status_code == 400
     namen = [z["name"] for z in mc.get("/api/upload/mcp/zugaenge", headers=mc.als()).json()["zugaenge"]]
     assert namen == ["Claude"]
+
+
+def _users(umgebung, text):
+    import os
+    import time
+    umgebung.users.write_text(text)
+    t = time.time() + 5
+    os.utime(umgebung.users, (t, t))          # neue Änderungszeit, damit die Liste sicher neu gelesen wird
+
+
+def test_gesperrte_person_verliert_den_ki_zugang(mc, request):
+    """1.6.2: Vor /mcp steht kein Cloudflare Access – eine Sperre im CRM (Person fehlt in users.yaml) muss trotzdem greifen."""
+    umgebung = request.getfixturevalue("umgebung")
+    vorher = umgebung.users.read_text()
+    t = schluessel(mc)
+    assert rpc(mc, t, "tools/list").status_code == 200
+    _users(umgebung, "seb@example.com: seb\n")                         # paul gesperrt → nicht mehr im Export
+    assert rpc(mc, t, "tools/list").status_code == 401
+    _users(umgebung, vorher)                                          # Sperre aufgehoben → Schlüssel gilt wieder
+    assert rpc(mc, t, "tools/list").status_code == 200
+
+
+def test_gesperrte_person_bekommt_kein_neues_token(mc, request):
+    umgebung = request.getfixturevalue("umgebung")
+    vorher = umgebung.users.read_text()
+    ziel = "https://claude.ai/api/mcp/auth_callback"
+    cid = mc.post("/oauth/register", json={"client_name": "Claude", "redirect_uris": [ziel]}).json()["client_id"]
+    verifier = secrets.token_urlsafe(48)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    body = {"client_id": cid, "redirect_uri": ziel, "state": "s", "code_challenge": challenge, "code_challenge_method": "S256", "erlauben": True}
+    code = parse_qs(urlsplit(mc.post("/api/upload/mcp/freigeben", headers=mc.als(), json=body).json()["weiter"]).query)["code"][0]
+    tok = mc.post("/oauth/token", data={"grant_type": "authorization_code", "code": code, "redirect_uri": ziel, "client_id": cid,
+                                        "code_verifier": verifier}).json()
+    _users(umgebung, "seb@example.com: seb\n")
+    r = mc.post("/oauth/token", data={"grant_type": "refresh_token", "refresh_token": tok["refresh_token"], "client_id": cid})
+    assert r.status_code == 400 and r.json()["error"] == "invalid_grant"
+    _users(umgebung, vorher)
+
+
+@pytest.mark.parametrize("uri, ok", [
+    ("https://claude.ai/api/mcp/auth_callback", True),
+    ("https://claude.com/api/mcp/auth_callback", True),
+    ("http://localhost:33418/callback", True),
+    ("http://127.0.0.1:9/rueckweg", True),
+    ("https://boese.example/api/mcp/auth_callback", False),
+    ("https://claude.ai/anderer/pfad", False),
+    ("https://claude.ai.boese.example/api/mcp/auth_callback", False),
+    ("https://nutzer@claude.ai/api/mcp/auth_callback", False),
+    ("https://claude.ai:8443/api/mcp/auth_callback", False),
+    ("http://claude.ai/api/mcp/auth_callback", False),
+])
+def test_nur_ruecksprung_adressen_von_claude(mc, uri, ok):
+    r = mc.post("/oauth/register", json={"client_name": "x", "redirect_uris": [uri]})
+    assert (r.status_code == 201) == ok, (uri, r.status_code)
+
+
+def test_registrierungen_je_ip_begrenzt(mc):
+    from savesvc import mcp
+    for _ in range(mcp.CLIENTS_PRO_IP):
+        assert mc.post("/oauth/register", json={"redirect_uris": ["http://localhost:1/cb"]}, headers={"Cf-Connecting-Ip": "203.0.113.1"}).status_code == 201
+    assert mc.post("/oauth/register", json={"redirect_uris": ["http://localhost:1/cb"]}, headers={"Cf-Connecting-Ip": "203.0.113.1"}).status_code == 429
+    # Eine andere Adresse ist davon nicht betroffen
+    assert mc.post("/oauth/register", json={"redirect_uris": ["http://localhost:1/cb"]}, headers={"Cf-Connecting-Ip": "203.0.113.2"}).status_code == 201

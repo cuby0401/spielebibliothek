@@ -585,6 +585,7 @@ async function zeigeSpiel(id, entwurfSpiel, eigenerOrdner = null, raumCode = nul
 	erfolgeZeigen(spiel);
 	if (!entwurfSpiel) zeitStart(spiel.id);
 	el("mp-karte").hidden = true;
+	el("buehne").inhalt(false);
 	if (spiel.multiplayer) { mpLobby(spiel, raumCode); return; }   // erst Lobby, dann Spiel (1.6.0)
 	try {
 		const iframe = await Bridge.starten(spiel, el("rahmen"));
@@ -657,6 +658,7 @@ function mpLobby(spiel, code = null) {
 	mpLobbyStoppen();
 	Bridge.mp.trennen();
 	el("mp-karte").hidden = true;
+	el("buehne").inhalt(true);   // Lobby statt Spiel: kein leerer Spielrahmen darunter (1.6.2)
 	if (!mpIstEntwurf(spiel) && location.hash.includes("?raum=")) history.replaceState(null, "", `#/spiel/${spiel.id}`);
 	if (code) { mpBeitreten(spiel, { code }); return; }
 	const feld = UI.feld({ label: "Raumcode", platzhalter: "z. B. KXRT", max: 4 });
@@ -681,6 +683,7 @@ function mpLobby(spiel, code = null) {
 
 async function mpBeitreten(spiel, wie) {
 	mpLobbyStoppen();
+	el("buehne").inhalt(true);
 	el("rahmen").replaceChildren(UI.laden({ label: wie.neu ? "Raum wird erstellt …" : "Raum wird betreten …" }));
 	try {
 		await Bridge.mp.verbinden(spiel.id, wie);
@@ -703,6 +706,7 @@ async function mpBeitreten(spiel, wie) {
 	mpKarteZeigen(spiel, r);
 	// Neu laden führt zurück in denselben Raum
 	if (!mpIstEntwurf(spiel)) history.replaceState(null, "", `#/spiel/${spiel.id}?raum=${r.code}`);
+	el("buehne").inhalt(false);
 	try {
 		const iframe = await Bridge.starten(spiel, el("rahmen"));
 		iframe.focus();

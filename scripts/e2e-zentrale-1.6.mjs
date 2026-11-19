@@ -86,10 +86,14 @@ function mcp(pfad, { methode = "POST", body, token, form } = {}) {
   await cdp("Page.navigate", { url: G + "/#/entwurf/seb/vier-gewinnt" }, A);
   ok(await bis(A, `!!document.getElementById("mp-lobby")`), "Lobby erscheint statt des Spiels");
   ok(await eval_(A, `document.getElementById("mp-lobby").textContent.includes("2 Spieler")`), "Lobby nennt die Spielerzahl aus der game.json");
+  ok(await eval_(A, `{ const r = document.getElementById("rahmen"); const b = r.getBoundingClientRect(), l = document.getElementById("mp-lobby").getBoundingClientRect();
+    document.getElementById("buehne").hasAttribute("data-inhalt") && Math.abs(b.bottom - l.bottom) < 2 && getComputedStyle(r).backgroundColor === "rgba(0, 0, 0, 0)" }`),
+    "1.6.2: Kein leerer Spielrahmen unter der Lobby");
   await eval_(A, `document.getElementById("mp-neu").click(); true`);
   ok(await bis(A, `!document.getElementById("mp-karte").hidden && /^[A-Z]{4}$/.test(document.getElementById("mp-code").textContent)`), "Raum erstellt, Raum-Karte mit Code");
   const code = await eval_(A, `document.getElementById("mp-code").textContent`);
   ok(await bisImSpiel(A, `document.getElementById("status").textContent.includes("Warte auf einen Mitspieler")`), "Spiel läuft im Raum: Host wartet auf Mitspieler");
+  ok(await eval_(A, `!document.getElementById("buehne").hasAttribute("data-inhalt")`), "1.6.2: Im Raum hat das Spiel wieder den vollen Rahmen");
 
   // 3) Tab B: mit Code beitreten
   const B = await tab();

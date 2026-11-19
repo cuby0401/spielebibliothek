@@ -126,7 +126,7 @@ Formularbausteine haben `.wert` (lesen/setzen) und `.eingabe` (das eigentliche S
 | `UI.raster(kinder, {art: karten\|kennzahlen})` | Kacheln/Karten im Raster | Kachelbreite folgt der Kachelgröße des Spielers |
 | `UI.mauer(karten, {spalte, breit})` | Karten unterschiedlicher Höhe ohne Lücken (Personenkarte im CRM) | jede Karte in die gerade kürzeste Spalte, Wichtiges zuerst übergeben; `spalte` = Mindestbreite (360), `breit` = Elemente über die ganze Breite darunter |
 | `UI.reihe(kinder)` | waagerecht scrollende Reihe (Startseite) | Breite je Kachel folgt der Kachelgröße des Spielers (`--b-kachel-min` × 1,25), auch bei voller Fensterbreite. |
-| `UI.buehne` | laufendes Spiel: großer Rahmen + schmale Spalte (Bestenliste, Erfolge) | `rahmenId, seite: [Elemente]`; am Element `.gross(an)` (Fensterhöhe), `.ohneSeite(an)`, Attribut `data-flach` (niedriger Rahmen, Technik-Test) |
+| `UI.buehne` | laufendes Spiel: großer Rahmen + schmale Spalte (Bestenliste, Erfolge) | `rahmenId, seite: [Elemente]`; am Element `.gross(an)` (Fensterhöhe), `.ohneSeite(an)`, `.inhalt(an)` (Rahmen zeigt Inhalt wie die Lobby statt eines Spiels: so hoch wie der Inhalt, ohne Fläche), Attribut `data-flach` (niedriger Rahmen, Technik-Test) |
 | `UI.fusszeile` | Fußzeile jeder Seite | `links: [{text, href}], rechts (Text), rechtsId` |
 | `UI.stapel(kinder, {abstand: s\|l, tag: ul})` / `UI.leiste(kinder, {verteilt})` | senkrecht bzw. waagerecht anordnen | |
 

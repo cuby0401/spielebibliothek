@@ -1,0 +1,43 @@
+{
+  "version": "1.6.2",
+  "hinweis": "Neu in 1.6.2: zwei Sicherheitskorrekturen am Claude-Zugang (MCP) und die weiße Fläche unter der Mehrspieler-Lobby. Hier stehen nur Dinge, die in 1.6.2 NEU sind.",
+  "tests": [
+    {
+      "id": "lobby-keine-weisse-flaeche",
+      "bereich": "Multiplayer",
+      "titel": "Keine weiße Fläche unter der Lobby",
+      "schritte": [
+        "Stelle unter Konto → Einstellungen das dunkle Thema ein.",
+        "Öffne „Vier gewinnt“ (Lobby erscheint).",
+        "Erstelle einen Raum."
+      ],
+      "erwartet": "Unter der Karte „Mehrspieler“ ist keine helle Fläche mehr, die Seite endet unter der Karte. Nach dem Erstellen des Raums hat das Spiel wieder seinen normalen, großen Rahmen."
+    },
+    {
+      "id": "ki-gesperrt",
+      "bereich": "MCP",
+      "titel": "Gesperrte Person verliert den Claude-Zugang",
+      "nurAdmin": true,
+      "schritte": [
+        "Lege für eine Test-Person mit Upload-Konto auf der Upload-Seite einen Schlüssel für Claude Code an (oder nimm deinen Test-Entwickler).",
+        "Prüfe in Claude Code mit diesem Schlüssel, dass „meine_spiele“ funktioniert.",
+        "Sperre die Person im Admin-Panel → CRM.",
+        "Frag Claude Code noch einmal nach „meine_spiele“.",
+        "Hebe die Sperre wieder auf und frag noch einmal."
+      ],
+      "erwartet": "Nach dem Sperren lehnt der MCP-Server ab (Claude meldet, dass die Anmeldung fehlt oder ungültig ist). Nach dem Aufheben der Sperre geht es mit demselben Schlüssel wieder."
+    },
+    {
+      "id": "ki-claude-app-noch-ok",
+      "bereich": "MCP",
+      "titel": "Claude-App verbindet sich weiterhin",
+      "nurAdmin": true,
+      "schritte": [
+        "Entferne in der Claude-App den Konnektor „Spielebibliothek“, falls vorhanden.",
+        "Füge ihn neu hinzu (Adresse wie im Handbuch, Kapitel 9d) und erlaube den Zugriff auf der Upload-Seite.",
+        "Frag Claude nach deinen Spielen."
+      ],
+      "erwartet": "Die Verbindung klappt wie vorher, Claude listet deine Spiele. Die strengere Prüfung der Rücksprung-Adresse stört die Claude-App nicht."
+    }
+  ]
+}
