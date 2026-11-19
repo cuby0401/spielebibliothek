@@ -30,8 +30,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-def _lokal(name: str) -> str:
-    """Adresse der NAS: Umgebungsvariable oder lokal.env im Repo-Wurzelordner (nicht im Git, Vorlage lokal.env.example)."""
+def _lokal(name: str, standard: str | None = None) -> str:
+    """Wert aus der Umgebung oder lokal.env im Repo-Wurzelordner (nicht im Git, Vorlage lokal.env.example)."""
     if os.environ.get(name):
         return os.environ[name]
     datei = Path(__file__).resolve().parents[1] / "lokal.env"
@@ -40,24 +40,31 @@ def _lokal(name: str) -> str:
             k, _, v = zeile.partition("=")
             if k.strip() == name and not zeile.lstrip().startswith("#"):
                 return v.strip()
+    if standard is not None:
+        return standard
     raise SystemExit(f"{name} fehlt: lokal.env im Repo-Wurzelordner anlegen (Vorlage lokal.env.example).")
 
 
-NAS = _lokal("NAS")
+# Wo die Zentrale läuft (SERVER_ORT in lokal.env, seit 20.11.2026): nas oder vm – wie scripts/lokal.sh
+SERVER_ORT = _lokal("SERVER_ORT", "nas")
+if SERVER_ORT not in ("nas", "vm"):
+    raise SystemExit(f"SERVER_ORT in lokal.env muss nas oder vm sein, ist: {SERVER_ORT}")
+SERVER = _lokal("VM" if SERVER_ORT == "vm" else "NAS")
+ABLAGE = "/opt/stacks" if SERVER_ORT == "vm" else "/volume1/docker"
 REPO = Path(__file__).resolve().parents[1]
 VENV_PY = REPO / ".venv/bin/python"
 SPERRE = Path("/tmp/sb-auftraege-mac.lock")
 # Welcher Auftrag gerade läuft – bleibt nach einem Abbruch (Neustart des Dienstes, Mac aus) liegen und wird beim
 # nächsten Lauf als abgebrochen gemeldet, statt ewig auf „läuft“ zu stehen (09.11.2026)
 LAEUFT = Path.home() / "Library/Application Support/spielebibliothek-auftraege/laeuft.json"
-QUELLE = "/volume1/docker/spielebibliothek-quelle"
-PROBE = "/volume1/docker/spielebibliothek-probe"
+QUELLE = f"{ABLAGE}/spielebibliothek-quelle"
+PROBE = f"{ABLAGE}/spielebibliothek-probe"
 # Wo Aufträge angelegt werden: Admin-Panel der Live-Bibliothek und des Testservers (Probe)
 PANELS = {"live": "spielebibliothek-savesvc", "probe": "sbprobe-savesvc"}
 ARTEN = {"unit-tests", "e2e-tests"}
 ZIELE = {"live", "probe"}
 ZEITLIMIT = {"unit-tests": 10 * 60, "e2e-tests": 45 * 60}
-SSH = ["ssh", "-o", "LogLevel=ERROR", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", NAS]
+SSH = ["ssh", "-o", "LogLevel=ERROR", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", SERVER]
 os.environ["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + os.environ.get("PATH", "/usr/bin:/bin")
 
 # Läuft im Container (python -c), nutzt nur, was es seit 1.3.0 gibt – damit es auch gegen eine ältere Live-Version geht.
@@ -186,7 +193,7 @@ def e2e_tests(repo: Path, melden=lambda text: None) -> tuple[bool, str, str]:
             m = re.match(r"→ Ende-zu-Ende: (\S+)", zeile)
             if m:
                 nr += 1
-                melden(f"läuft {'auf dem Mac' if auf_dem_mac else '(Teststand auf der NAS)'} – Test {nr}/{gesamt}: {m.group(1)}")
+                melden(f"läuft {'auf dem Mac' if auf_dem_mac else '(Teststand auf dem Server)'} – Test {nr}/{gesamt}: {m.group(1)}")
             if datetime.now(timezone.utc).timestamp() > ende:
                 raise subprocess.TimeoutExpired(skript, ZEITLIMIT["e2e-tests"])
         ok = p.wait() == 0

@@ -5,7 +5,7 @@
   python3 scripts/cloudflare.py abgleichen           fehlende E-Mails eintragen – nach Anzeige und Bestätigung
   python3 scripts/cloudflare.py abgleichen --entfernen   zusätzlich E-Mails entfernen, die nicht mehr in der Bibliothek sind
   python3 scripts/cloudflare.py wiederherstellen <sicherung.json>   eine Richtlinie auf eine Sicherung zurücksetzen
-  python3 scripts/cloudflare.py lesetoken            Nur-Lese-Schlüssel für das Admin-Panel auf die NAS legen
+  python3 scripts/cloudflare.py lesetoken            Nur-Lese-Schlüssel für das Admin-Panel auf den Server legen
 
 Sicherheit (warum so umständlich, siehe auch docs/cloudflare-abgleich.md):
   - Der Schreib-Schlüssel kann in Cloudflare JEDE Access-Richtlinie ändern. Er liegt nur im macOS-Schlüsselbund
@@ -30,8 +30,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "savesvc"))
 from savesvc import cloudflare as cf  # noqa: E402  (bewusst ohne Abhängigkeiten, siehe Modul)
 
-def _lokal(name: str) -> str:
-    """Adresse der NAS: Umgebungsvariable oder lokal.env im Repo-Wurzelordner (nicht im Git, Vorlage lokal.env.example)."""
+def _lokal(name: str, standard: str | None = None) -> str:
+    """Wert aus der Umgebung oder lokal.env im Repo-Wurzelordner (nicht im Git, Vorlage lokal.env.example)."""
     if os.environ.get(name):
         return os.environ[name]
     datei = Path(__file__).resolve().parents[1] / "lokal.env"
@@ -40,19 +40,26 @@ def _lokal(name: str) -> str:
             k, _, v = zeile.partition("=")
             if k.strip() == name and not zeile.lstrip().startswith("#"):
                 return v.strip()
+    if standard is not None:
+        return standard
     raise SystemExit(f"{name} fehlt: lokal.env im Repo-Wurzelordner anlegen (Vorlage lokal.env.example).")
 
 
-NAS = _lokal("NAS")
+# Wo die Zentrale läuft (SERVER_ORT in lokal.env, seit 20.11.2026): nas oder vm – wie scripts/lokal.sh
+SERVER_ORT = _lokal("SERVER_ORT", "nas")
+if SERVER_ORT not in ("nas", "vm"):
+    raise SystemExit(f"SERVER_ORT in lokal.env muss nas oder vm sein, ist: {SERVER_ORT}")
+SERVER = _lokal("VM" if SERVER_ORT == "vm" else "NAS")
+ABLAGE = "/opt/stacks" if SERVER_ORT == "vm" else "/volume1/docker"
 CONTAINER = "spielebibliothek-savesvc"
 SCHLUESSELBUND = ("spielebibliothek-cloudflare", "schreiben")    # Dienst, Konto
 SICHERUNGEN = Path.home() / "Library/Application Support/spielebibliothek/cloudflare"
 
 
 def ssh(befehl: list[str], eingabe: str | None = None) -> str:
-    r = subprocess.run(["ssh", "-o", "LogLevel=ERROR", NAS, *befehl], input=eingabe, capture_output=True, text=True, timeout=60)
+    r = subprocess.run(["ssh", "-o", "LogLevel=ERROR", SERVER, *befehl], input=eingabe, capture_output=True, text=True, timeout=60)
     if r.returncode:
-        raise SystemExit(f"NAS: {r.stderr.strip() or r.stdout.strip() or 'Fehler ' + str(r.returncode)}")
+        raise SystemExit(f"Server ({SERVER_ORT}): {r.stderr.strip() or r.stdout.strip() or 'Fehler ' + str(r.returncode)}")
     return r.stdout
 
 

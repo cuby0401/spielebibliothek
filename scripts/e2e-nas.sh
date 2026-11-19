@@ -1,5 +1,6 @@
 #!/bin/sh
-# Alle Ende-zu-Ende-Tests direkt auf der NAS – für den Auftragsdienst (Zentrale 1.3.0). Gegenstück zu e2e-alle.sh (Mac).
+# Alle Ende-zu-Ende-Tests direkt auf dem Server (NAS oder Docker-VM) – für den Auftragsdienst (Zentrale 1.3.0).
+# Gegenstück zu e2e-alle.sh (Mac). Name aus NAS-Zeiten, der Auftragsdienst ruft ihn so auf.
 #   sh e2e-nas.sh <repo-dir>
 # Chrome läuft im Container sb-e2e (scripts/e2e-container), der Teststand wie immer unter /tmp/sb-teststand.
 # Hostnamen nur lokal: games 127.0.0.1:18088, play localhost:18089, upload 127.0.0.2:18090 (drei verschiedene Ursprünge).

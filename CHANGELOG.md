@@ -5,6 +5,23 @@ Versionen der Bibliothek selbst – nicht der Spiele. Schema `MAJOR.MINOR.PATCH`
 Vor jedem Deploy: Nummer in `VERSION` erhöhen und hier einen Abschnitt ergänzen – `scripts/deploy.sh` prüft beides.
 Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
+## 1.6.3 – 20.11.2026
+
+Betrieb: Die Zentrale zieht von der NAS auf eine Docker-VM. Für Spieler und Entwickler ändert sich nichts – gleiche Adressen,
+gleicher Tunnel. Nach dem Schema ein Patch.
+
+- **Ziel wählbar:** `SERVER_ORT=vm|nas` in `lokal.env` bestimmt, wohin `deploy.sh` (Deploy, `--zurueck`, `--versionen`, Not-Aus,
+  Probe), `e2e-alle.sh`, die Einrichtung des Auftragsdienstes, `cloudflare.py` und `auftraege-mac.py` gehen. Pfade je Ort stehen in
+  `scripts/lokal.sh`, Adressen nur in `lokal.env`. Der Adress-Wächter in `deploy.sh` prüft jetzt alle Adressen aus `lokal.env`.
+- **compose.yaml:** Spiele, Datenbank und Upload-Daten kommen aus `SPIELE_DIR`, `DATEN_DIR`, `UPLOAD_DATEN_DIR` (Standard = NAS).
+  Auf der VM liegen die Datenbanken lokal, die Spiele per SMB auf der NAS. Caddy und Speicher-Dienst lesen die Spiele über die
+  Gruppe 10021 (SMB kennt keine ACLs).
+- **Neu: `scripts/server-setup.sh`** richtet die VM ein (SMB-Freigabe, Ordner, Rechte, Cron der Sicherung).
+- **Neu: `scripts/sicherung-export.sh`:** nachts um 01:50 konsistente Kopien von `saves.db`, `upload.db`, Testergebnissen und
+  Konfiguration auf die NAS, die borgmatic um 02:00 außer Haus sichert.
+- **Probe:** lauscht an der LAN-Adresse des Servers aus `lokal.env` – die feste Adresse im Skript ist entfernt.
+- **Design-Spielwiese** geschlossen: gibt es auf der VM nicht, `deploy.sh --design` nur noch mit `SERVER_ORT=nas`.
+
 ## 1.6.2 – 19.11.2026
 
 Bots und Gruppen für Multiplayer, dazu zwei Sicherheitspunkte aus der Prüfung vor dem Live-Gang von 1.6.0 und ein Darstellungsfehler der

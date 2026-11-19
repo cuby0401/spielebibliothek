@@ -1,6 +1,6 @@
 # Spielebibliothek
 
-Bibliothek für kleine Browser-Spiele der Kollegen auf Sebs NAS.
+Bibliothek für kleine Browser-Spiele der Kollegen, selbst gehostet: Docker-VM für die Dienste, die Spiele liegen auf einer NAS.
 Spielen unter `games.cuby0401.uk`, Spieldateien unter `play.cuby0401.uk` (eigener Origin), Hochladen unter `upload.cuby0401.uk`.
 
 Die **Spezifikation** steht im Obsidian-Vault `seb-brain` unter `Projekte/Spielebibliothek.md`
@@ -19,8 +19,8 @@ lib/           gamesave.js (für Spiele, inkl. localStorage-Ersatz), bridge.js (
 savesvc/       Speicher-Dienst und Upload-Dienst (ein Image, FastAPI + SQLite); Tests: docker build --target test savesvc
 vorlage/       Startvorlage für neue Spiele → scripts/startvorlage.sh baut daraus site/handbuch/startvorlage.zip
 examples/      Testspiele: zaehler, legacy-localstorage, boese (Sicherheitstest), spike, spalten-demo, wortjagd
-scripts/       nas-setup.sh, deploy.sh, teststand.sh, startvorlage.sh
-docs/          betrieb.md (NAS, Backup), entwicklung.md (Aufbau, Regeln, Tests – vor Änderungen lesen)
+scripts/       deploy.sh, teststand.sh, startvorlage.sh, server-setup.sh (Docker-VM), nas-setup.sh (NAS), sicherung-export.sh
+docs/          betrieb.md (Server, Ordner, Backup, Umzug), entwicklung.md (Aufbau, Regeln, Tests – vor Änderungen lesen)
 ```
 
 ## Stand
@@ -54,11 +54,14 @@ scripts/deploy.sh --examples  # zusätzlich Testspiele nach spiele/seb/
 scripts/startvorlage.sh       # nach Änderungen an vorlage/ oder site/handbuch/prompt.txt – ZIP mit committen
 ```
 
+Wohin deployt wird, steht in `lokal.env` (nicht im Git, Vorlage `lokal.env.example`): `SERVER_ORT=vm` (Docker-VM, seit 20.11.2026)
+oder `nas`, dazu die Adressen. Ordner, Backup und Rückweg auf die NAS: `docs/betrieb.md`.
+
 Erreichbar nur über `https://games.cuby0401.uk` (Cloudflare Tunnel + Access).
 Für LAN-Tests den Port in `compose.yaml` vorübergehend einkommentieren.
 
-## Konfiguration auf der NAS (nicht im Git)
+## Konfiguration auf dem Server (nicht im Git)
 
-- `.env`: `TUNNEL_TOKEN`
+- `.env`: `TUNNEL_TOKEN`; auf der Docker-VM zusätzlich `SPIELE_DIR`, `DATEN_DIR`, `UPLOAD_DATEN_DIR` (siehe `.env.example`)
 - `config/users.yaml`: Login-E-Mail → Benutzername (Vorlage `users.example.yaml`), wirkt ohne Neustart
 - Upload-Konten (Entwickler): `docker exec spielebibliothek-upload python -m savesvc entwickler anlegen|passwort|sperren|liste <name>`

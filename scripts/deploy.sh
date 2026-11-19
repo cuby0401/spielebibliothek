@@ -1,20 +1,20 @@
 #!/bin/sh
-# Schiebt den Stack (die „Zentrale“) vom Mac auf die NAS und startet ihn – versioniert (E39).
+# Schiebt den Stack (die „Zentrale“) vom Mac auf den Server (NAS oder Docker-VM, SERVER_ORT in lokal.env) und startet ihn – versioniert (E39).
 #
 #   scripts/deploy.sh --probe            neue Version zuerst in die PROBE-Zentrale (Kopie der echten Daten, nur über Tailscale)
 #   scripts/deploy.sh --probe --daten-behalten   Probe aktualisieren, ohne die Daten neu zu kopieren
 #   scripts/deploy.sh                    neue Version LIVE – nur wenn genau dieser Commit in der Probe freigegeben wurde (E56).
 #                                        Seit 1.3.0 meist unnötig: „Für Live freigeben“ in der Probe spielt automatisch ein
-#                                        (Auftragsdienst auf der NAS, scripts/auftragsdienst.py). deploy.sh holt dann nur den Git-Tag nach.
+#                                        (Auftragsdienst auf dem Server, scripts/auftragsdienst.py). deploy.sh holt dann nur den Git-Tag nach.
 #   scripts/deploy.sh --ohne-probe       Live ohne Freigabe (nur im Notfall, z. B. dringender Hotfix)
-#   scripts/deploy.sh --examples         zusätzlich examples/* nach /volume1/games/spiele/seb/ kopieren
+#   scripts/deploy.sh --examples         zusätzlich examples/* nach <Spiele>/seb/ kopieren
 #   scripts/deploy.sh --no-start         nur übertragen, nicht starten
 #   scripts/deploy.sh --gruendlich       zusätzlich alle Ende-zu-Ende-Tests und „Böse“ im Teststand (ca. 6–8 Min., für große Updates)
 #   scripts/deploy.sh --ohne-tests       Tests überspringen (nur im Notfall)
 #   scripts/deploy.sh --zurueck 1.1.0    auf eine früher deployte Version zurück (aus dem Release-Archiv)
-#   scripts/deploy.sh --versionen        aufgehobene Versionen auf der NAS anzeigen
+#   scripts/deploy.sh --versionen        aufgehobene Versionen auf dem Server anzeigen
 #   scripts/deploy.sh --design           DESIGN-SPIELWIESE für die neue UI: Kopie der echten Daten, NUR über Tailscale,
-#                                        http://<NAS_GH>:18288 (Adresse aus lokal.env) – ohne VERSION/CHANGELOG/Commit-Pflicht, jeder Branch.
+#                                        http://<NAS_GH>:18288 (nur SERVER_ORT=nas; auf der VM geschlossen) – ohne VERSION/CHANGELOG/Commit-Pflicht, jeder Branch.
 #                                        Nimmt auch nicht committete Dateien mit. NIE eine Cloudflare-Route darauf legen (automatisch seb).
 #   scripts/deploy.sh --design --daten-behalten   Code erneuern, Daten der Spielwiese behalten
 #   scripts/deploy.sh --design --nur-site         nur site/ erneuern (CSS/JS), ohne Neustart – für schnelle Design-Runden
@@ -27,28 +27,32 @@
 #   0. Live nur nach Test in der Probe-Zentrale und „Für Live freigeben“ im Admin-Panel der Probe.
 #   1. Nur ein sauberer, committeter Stand wird deployt – mit neuer Nummer in VERSION und Eintrag „## <Version>“ in CHANGELOG.md.
 #      Dieselbe Nummer für einen anderen Commit wird abgelehnt (Git-Tag zentrale-v<Version>).
-#   2. Vorher laufen alle Unit-Tests auf dem Mac (Python 3.12 wie in Produktion, ca. 10 s, ohne uv auf der NAS). Rot = kein Deploy.
-#      Nach --probe laufen die Ende-zu-Ende-Tests im Hintergrund auf der NAS weiter – der Testserver wartet nicht darauf.
-#   3. Vorher wird die Datenbank gesichert: /volume1/games/data/backup/vor-deploy/<Anlass>-<Zeit>.db (die letzten 10).
-#   4. Vorher wird der laufende Stand archiviert: /volume1/docker/spielebibliothek-releases/<Version>.tar (die letzten 5).
+#   2. Vorher laufen alle Unit-Tests auf dem Mac (Python 3.12 wie in Produktion, ca. 10 s, ohne uv auf dem Server). Rot = kein Deploy.
+#      Nach --probe laufen die Ende-zu-Ende-Tests im Hintergrund auf dem Server weiter – der Testserver wartet nicht darauf.
+#   3. Vorher wird die Datenbank gesichert: <Daten>/backup/vor-deploy/<Anlass>-<Zeit>.db (die letzten 10).
+#   4. Vorher wird der laufende Stand archiviert: <Ablage>/spielebibliothek-releases/<Version>.tar (die letzten 5).
+#      Pfade je Server (NAS: /volume1/…, VM: /opt/stacks/…) stehen in scripts/lokal.sh.
 #   5. Spiele, Spielstände, .env und config/ liegen außerhalb und werden nie angefasst.
 #
 # Übertragen werden alle von git verfolgten Dateien außer examples/. Dateien, die im Repo gelöscht wurden,
-# werden auf der NAS ebenfalls entfernt. Warum tar statt rsync: macOS liefert openrsync, das mit dem rsync der NAS nicht zusammenspielt.
+# werden auf dem Server ebenfalls entfernt. Warum tar statt rsync: macOS liefert openrsync, das mit dem rsync der NAS nicht zusammenspielt.
 
 set -eu
 
-. "$(dirname "$0")/lokal.sh"   # NAS, NAS_GH, NAS_PH, NAS_UH aus lokal.env (nicht im Git)
-nas_noetig
-# Das Repo ist öffentlich (17.11.2026): Die NAS-Adressen dürfen in keiner Datei stehen, die ins Git kommen kann.
-if git -C "$(dirname "$0")/.." grep --untracked -qIF -e "$NAS_GH" -e "$NAS_PH" -e "$NAS_UH" -- . ; then
-	echo "✗ NAS-Adresse aus lokal.env steht im Repo – erst ersetzen (\$NAS / <NAS_GH>), dann deployen:" >&2
-	git -C "$(dirname "$0")/.." grep --untracked -nIF -e "$NAS_GH" -e "$NAS_PH" -e "$NAS_UH" -- . >&2
-	exit 1
+. "$(dirname "$0")/lokal.sh"   # SERVER_ORT, SERVER, Adressen und Pfade SB_* aus lokal.env (nicht im Git)
+server_noetig
+# Das Repo ist öffentlich (17.11.2026): Die eigenen Adressen dürfen in keiner Datei stehen, die ins Git kommen kann.
+adressen > /tmp/sb-adressen.$$
+if git -C "$(dirname "$0")/.." grep --untracked -qIF -f /tmp/sb-adressen.$$ -- . ; then
+	echo "✗ Adresse aus lokal.env steht im Repo – erst ersetzen (\$SERVER / <NAS_GH>), dann deployen:" >&2
+	git -C "$(dirname "$0")/.." grep --untracked -nIF -f /tmp/sb-adressen.$$ -- . >&2
+	rm -f /tmp/sb-adressen.$$; exit 1
 fi
-ZIEL="${ZIEL:-/volume1/docker/spielebibliothek}"
-RELEASES="${RELEASES:-/volume1/docker/spielebibliothek-releases}"
-SPIELE=/volume1/games/spiele/seb
+rm -f /tmp/sb-adressen.$$
+echo "  Server: $SERVER_ORT"
+ZIEL="${ZIEL:-$SB_STACK}"
+RELEASES="${RELEASES:-$SB_RELEASES}"
+SPIELE=$SB_SPIELE/seb
 
 BEISPIELE=0
 STARTEN=1
@@ -60,7 +64,7 @@ NUR_SITE=0
 WEG=0
 OHNE_PROBE=0
 BEHALTEN=""
-PROBE_DIR=/volume1/docker/spielebibliothek-probe
+PROBE_DIR=$SB_PROBE
 PROBE_URL=https://test.cuby0401.uk
 ZURUECK=""
 NOTAUS=""
@@ -77,7 +81,7 @@ while [ $# -gt 0 ]; do
 		--ohne-probe) OHNE_PROBE=1 ;;
 		--daten-behalten) BEHALTEN="--daten-behalten" ;;
 		--zurueck) shift; ZURUECK="${1:-}"; [ -n "$ZURUECK" ] || { echo "--zurueck braucht eine Version, z. B. 1.1.0" >&2; exit 2; } ;;
-		--versionen) ssh "$NAS" "ls -1t $RELEASES 2>/dev/null | sed 's/\.tar\$//' || echo '(noch keine)'"; exit 0 ;;
+		--versionen) ssh "$SERVER" "ls -1t $RELEASES 2>/dev/null | sed 's/\.tar\$//' | grep . || echo '(noch keine)'"; exit 0 ;;
 		--notaus) NOTAUS=ein ;;
 		--notaus-aus) NOTAUS=aus ;;
 		--notaus-status) NOTAUS=status ;;
@@ -95,19 +99,19 @@ export COPYFILE_DISABLE=1 # keine ._-Dateien von macOS
 if [ -n "$NOTAUS" ]; then
 	if [ "$PROBE" = 1 ]; then C=sbprobe-savesvc; T=""; else C=spielebibliothek-savesvc; T=spielebibliothek-cloudflared; fi
 	case "$NOTAUS" in
-		ein) ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -m savesvc notaus ein --von mac --grund 'am Mac ausgelöst (deploy.sh --notaus)' ${T:+&& docker stop $T >/dev/null && echo 'Tunnel gestoppt'}" ;;
+		ein) ssh -o LogLevel=ERROR "$SERVER" "docker exec $C python -m savesvc notaus ein --von mac --grund 'am Mac ausgelöst (deploy.sh --notaus)' ${T:+&& docker stop $T >/dev/null && echo 'Tunnel gestoppt'}" ;;
 		aus)
 			printf 'Not-Aus wirklich aufheben? Vorher sicherstellen, dass das Leck geschlossen ist. [ja/nein] '
 			read -r ANTWORT; [ "$ANTWORT" = ja ] || { echo "Abgebrochen – Not-Aus bleibt an."; exit 1; }
-			ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -m savesvc notaus aus --von mac ${T:+&& docker start $T >/dev/null && echo 'Tunnel läuft wieder'}" ;;
-		status) ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -m savesvc notaus status; ${T:+docker inspect -f 'Tunnel läuft: {{.State.Running}}' $T}" ;;
+			ssh -o LogLevel=ERROR "$SERVER" "docker exec $C python -m savesvc notaus aus --von mac ${T:+&& docker start $T >/dev/null && echo 'Tunnel läuft wieder'}" ;;
+		status) ssh -o LogLevel=ERROR "$SERVER" "docker exec $C python -m savesvc notaus status; ${T:+docker inspect -f 'Tunnel läuft: {{.State.Running}}' $T}" ;;
 	esac
 	exit $?
 fi
 
 # Git-Tags für Versionen nachholen, die der Auftragsdienst nach einer Freigabe live eingespielt hat (1.3.0)
 tag_nachholen() {
-	LIVE_JSON=$(ssh -o LogLevel=ERROR "$NAS" "cat $ZIEL/site/zentrale.json 2>/dev/null" || true)
+	LIVE_JSON=$(ssh -o LogLevel=ERROR "$SERVER" "cat $ZIEL/site/zentrale.json 2>/dev/null" || true)
 	LV=$(printf '%s' "$LIVE_JSON" | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p')
 	LC=$(printf '%s' "$LIVE_JSON" | sed -n 's/.*"commit": *"\([^"]*\)".*/\1/p')
 	[ -n "$LV" ] && [ -n "$LC" ] || return 0
@@ -117,7 +121,7 @@ tag_nachholen() {
 	git push -q origin "zentrale-v$LV" || echo "Hinweis: Tag zentrale-v$LV lokal angelegt, Push fehlgeschlagen"
 }
 
-# Gemeinsame Nacharbeiten auf der NAS (nach Deploy und nach --zurueck): Rechte, Konfiguration, Token
+# Gemeinsame Nacharbeiten auf dem Server (nach Deploy und nach --zurueck): Rechte, Konfiguration, Token
 NACHARBEIT='
 	[ -f .env ] || cp .env.example .env
 	mkdir -p config
@@ -160,9 +164,9 @@ STARTBEFEHL="cd $ZIEL && docker compose up -d --build --remove-orphans && docker
 # ---------- Zurück auf eine frühere Version ----------
 if [ -n "$ZURUECK" ]; then
 	# Not-Aus (1.4.0): das Zurückspringen startet alle Container neu, auch den Tunnel
-	if ssh -o LogLevel=ERROR "$NAS" "test -f $ZIEL/config/notaus.json"; then echo "Not-Aus ist aktiv – erst scripts/deploy.sh --notaus-aus" >&2; exit 3; fi
+	if ssh -o LogLevel=ERROR "$SERVER" "test -f $ZIEL/config/notaus.json"; then echo "Not-Aus ist aktiv – erst scripts/deploy.sh --notaus-aus" >&2; exit 3; fi
 	echo "→ Zentrale zurück auf $ZURUECK"
-	ssh "$NAS" "
+	ssh "$SERVER" "
 		set -e
 		[ -f $RELEASES/$ZURUECK.tar ] || { echo 'Version $ZURUECK ist nicht archiviert. Vorhanden:'; ls -1t $RELEASES | sed 's/\.tar\$//'; exit 1; }
 		cp $RELEASES/$ZURUECK.tar /tmp/sb-zurueck.tar
@@ -199,7 +203,7 @@ if [ -n "$ZURUECK" ]; then
 		rm -f .deploy-liste /tmp/sb-zurueck.tar
 		$NACHARBEIT
 	"
-	if [ "$STARTEN" = 1 ]; then ssh "$NAS" "$STARTBEFEHL"; fi
+	if [ "$STARTEN" = 1 ]; then ssh "$SERVER" "$STARTBEFEHL"; fi
 	echo "✓ Zentrale läuft wieder mit Version $ZURUECK. Datenbank-Sicherung von vorher: data/backup/vor-deploy/vor-zurueck-$ZURUECK-*.db"
 	exit 0
 fi
@@ -207,9 +211,12 @@ fi
 # ---------- Design-Spielwiese (neue UI, 10.11.2026) ----------
 # Bewusst ohne die Prüfungen für live/Probe: Hier wird ausprobiert, nichts davon geht ungeprüft live.
 if [ "$DESIGN" = 1 ]; then
-	DESIGN_URL=http://$NAS_GH:18288
-	DESIGN_HOSTS="GH=$NAS_GH PH=$NAS_PH UH=$NAS_UH"   # teststand.sh baut daraus die Hostnamen der Spielwiese
-	if [ "$WEG" = 1 ]; then ssh "$NAS" "ART=design $DESIGN_HOSTS sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh down"; exit 0; fi
+	# Nur auf der NAS (Tailscale-Container dort). Auf der Docker-VM gibt es keine Spielwiese (geschlossen 20.11.2026).
+	[ "$SERVER_ORT" = nas ] || { echo "✗ Die Design-Spielwiese gibt es nur auf der NAS (SERVER_ORT=nas), auf der VM ist sie geschlossen." >&2; exit 1; }
+	namen_noetig
+	DESIGN_URL=http://$SERVER_GH:18288
+	DESIGN_HOSTS="GH=$SERVER_GH PH=$SERVER_PH UH=$SERVER_UH $SB_UMGEBUNG"   # teststand.sh baut daraus die Hostnamen der Spielwiese
+	if [ "$WEG" = 1 ]; then ssh "$SERVER" "ART=design $DESIGN_HOSTS sh $SB_ABLAGE/spielebibliothek-design/repo/scripts/teststand.sh down"; exit 0; fi
 	node scripts/ui-pruefen.mjs || { echo "✗ Oberfläche nicht einheitlich – nichts deployt (docs/ui-bausteine.md)." >&2; exit 1; }
 	node scripts/kontrast-pruefen.mjs >/dev/null || { node scripts/kontrast-pruefen.mjs >&2; echo "✗ Farben zu kontrastarm – nichts deployt." >&2; exit 1; }
 	node scripts/gamesave-mp-test.js lib/gamesave.js || { echo "✗ GameSave.multiplayer fehlerhaft – nichts deployt." >&2; exit 1; }
@@ -218,16 +225,16 @@ if [ "$DESIGN" = 1 ]; then
 	# verfolgte und neue (nicht ignorierte) Dateien – auch noch nicht committete Arbeit kommt mit
 	if [ "$NUR_SITE" = 1 ]; then
 		{ git ls-files -co --exclude-standard site; echo VERSION; echo CHANGELOG.md; } | sort -u | while read -r f; do [ -f "$f" ] && echo "$f"; done \
-			| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+			| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$SERVER" "
 			set -e; rm -rf /tmp/sb-design-repo && mkdir -p /tmp/sb-design-repo && tar -xf - -C /tmp/sb-design-repo
-			ART=design $DESIGN_HOSTS ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /volume1/docker/spielebibliothek-design/repo/scripts/teststand.sh site /tmp/sb-design-repo
+			ART=design $DESIGN_HOSTS ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh $SB_ABLAGE/spielebibliothek-design/repo/scripts/teststand.sh site /tmp/sb-design-repo
 			rm -rf /tmp/sb-design-repo"
 		echo "✓ site/ der Design-Spielwiese erneuert: $DESIGN_URL"; exit 0
 	fi
 	if [ -n "$BEHALTEN" ]; then DATEN="bisherigen Daten"; else DATEN="frischer Kopie der echten Daten"; fi
 	echo "→ Design-Spielwiese (Commit $COMMIT) mit $DATEN"
 	git ls-files -co --exclude-standard | grep -vx -e '.env' -e 'config/users.yaml' | while read -r f; do [ -f "$f" ] && echo "$f"; done \
-		| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+		| tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$SERVER" "
 		set -e; rm -rf /tmp/sb-design-repo && mkdir -p /tmp/sb-design-repo && tar -xf - -C /tmp/sb-design-repo
 		ART=design $DESIGN_HOSTS ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_DESIGN sh /tmp/sb-design-repo/scripts/teststand.sh up /tmp/sb-design-repo $BEHALTEN
 		rm -rf /tmp/sb-design-repo"
@@ -256,7 +263,7 @@ fi
 tag_nachholen
 # Schon live (z. B. vom Auftragsdienst nach der Freigabe)? Dann nichts mehr zu tun.
 if [ "$PROBE" = 0 ]; then
-	if [ "$(ssh -o LogLevel=ERROR "$NAS" "sed -n 's/.*\"commit\": *\"\([^\"]*\)\".*/\1/p' $ZIEL/site/zentrale.json 2>/dev/null" || true)" = "$COMMIT" ]; then
+	if [ "$(ssh -o LogLevel=ERROR "$SERVER" "sed -n 's/.*\"commit\": *\"\([^\"]*\)\".*/\1/p' $ZIEL/site/zentrale.json 2>/dev/null" || true)" = "$COMMIT" ]; then
 		echo "✓ Zentrale $VERSION_ZENTRALE (Commit $COMMIT) ist bereits live."
 		exit 0
 	fi
@@ -264,7 +271,7 @@ fi
 
 # Live nur mit Freigabe aus der Probe (früh prüfen, damit niemand umsonst auf Tests wartet)
 if [ "$PROBE" = 0 ] && [ "$OHNE_PROBE" = 0 ]; then
-	FREIGABE=$(ssh "$NAS" "cat $PROBE_DIR/data/freigabe.json 2>/dev/null" || true)
+	FREIGABE=$(ssh "$SERVER" "cat $PROBE_DIR/data/freigabe.json 2>/dev/null" || true)
 	FC=$(printf '%s' "$FREIGABE" | sed -n 's/.*"commit": *"\([^"]*\)".*/\1/p')
 	if [ "$FC" != "$COMMIT" ]; then
 		echo "✗ Commit $COMMIT ist nicht in der Probe-Zentrale freigegeben (freigegeben: ${FC:-nichts})." >&2
@@ -283,8 +290,8 @@ if command -v node >/dev/null 2>&1; then
 fi
 
 if [ "$TESTS" = 1 ]; then
-	# Seit 08.11.2026 auf dem Mac (ca. 10 s statt 8 Min. auf der NAS) – mit Python 3.12 wie in Produktion, über uv.
-	# Die NAS-Runde im Container läuft weiter über den Auftragsdienst (Zeitplan im Admin-Panel, nach jedem Probe-Bau).
+	# Seit 08.11.2026 auf dem Mac (ca. 10 s statt 8 Min. auf dem Server) – mit Python 3.12 wie in Produktion, über uv.
+	# Die Runde auf dem Server im Container läuft weiter über den Auftragsdienst (Zeitplan im Admin-Panel, nach jedem Probe-Bau).
 	if command -v uv >/dev/null 2>&1; then
 		echo "→ Unit-Tests auf dem Mac (Python 3.12) …"
 		if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))' 2>/dev/null; then
@@ -298,30 +305,30 @@ if [ "$TESTS" = 1 ]; then
 		fi
 		echo "  ✓ $(tail -1 /tmp/sb-deploy-test.log | tr -d '=')"
 	else
-		echo "→ Tests auf der NAS (uv fehlt auf dem Mac – dauert ca. 8 Minuten) …"
-		if ! git ls-files savesvc | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+		echo "→ Tests auf dem Server (uv fehlt auf dem Mac – dauert ca. 8 Minuten) …"
+		if ! git ls-files savesvc | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$SERVER" "
 			rm -rf /tmp/sb-deploy-test && mkdir -p /tmp/sb-deploy-test && tar -xf - -C /tmp/sb-deploy-test && cd /tmp/sb-deploy-test/savesvc &&
 			docker build -q --target test -t savesvc-deploytest . >/dev/null && docker run --rm savesvc-deploytest > /tmp/sb-deploy-test.log 2>&1;
 			r=\$?; tail -1 /tmp/sb-deploy-test.log; docker rmi savesvc-deploytest >/dev/null 2>&1; rm -rf /tmp/sb-deploy-test; exit \$r"; then
-			echo "✗ Tests fehlgeschlagen – nichts deployt. Log auf der NAS: /tmp/sb-deploy-test.log" >&2
+			echo "✗ Tests fehlgeschlagen – nichts deployt. Log auf dem Server: /tmp/sb-deploy-test.log" >&2
 			exit 1
 		fi
 	fi
 fi
 
 if [ "$GRUENDLICH" = 1 ]; then
-	echo "→ Ende-zu-Ende-Tests im Teststand (ca. 3 Min. auf dem Mac mit Docker Desktop, sonst ca. 6–8 Min. auf der NAS) …"
+	echo "→ Ende-zu-Ende-Tests im Teststand (ca. 3 Min. auf dem Mac mit Docker Desktop, sonst ca. 6–8 Min. auf dem Server) …"
 	sh scripts/e2e-alle.sh || { echo "✗ Ende-zu-Ende-Tests fehlgeschlagen – nichts deployt." >&2; exit 1; }
 fi
 
 # ---------- Probe-Zentrale aufsetzen ----------
 if [ "$PROBE" = 1 ]; then
 	echo "→ Probe-Zentrale $VERSION_ZENTRALE (Commit $COMMIT) mit ${BEHALTEN:+bisherigen Daten}${BEHALTEN:-frischer Kopie der echten Daten}"
-	git ls-files | grep -vx -e '.env' -e 'config/users.yaml' | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$NAS" "
+	git ls-files | grep -vx -e '.env' -e 'config/users.yaml' | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh "$SERVER" "
 		set -e
 		cat > /tmp/sb-probe.tar
 		rm -rf /tmp/sb-probe-repo && mkdir -p /tmp/sb-probe-repo && tar -xf /tmp/sb-probe.tar -C /tmp/sb-probe-repo
-		ART=probe ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_ZENTRALE sh /tmp/sb-probe-repo/scripts/teststand.sh up /tmp/sb-probe-repo $BEHALTEN
+		ART=probe $SB_UMGEBUNG ZENTRALE_COMMIT=$COMMIT ZENTRALE_VERSION=$VERSION_ZENTRALE sh /tmp/sb-probe-repo/scripts/teststand.sh up /tmp/sb-probe-repo $BEHALTEN
 		# unveränderter Stand für den Live-Deploy nach der Freigabe (die Probe selbst läuft mit ersetzten Hostnamen)
 		mv /tmp/sb-probe.tar $PROBE_DIR/release.tar && chmod 644 $PROBE_DIR/release.tar
 		printf '{\"version\": \"%s\", \"commit\": \"%s\"}\n' '$VERSION_ZENTRALE' '$COMMIT' > $PROBE_DIR/release.json
@@ -331,19 +338,19 @@ if [ "$PROBE" = 1 ]; then
 	# Tester (1.4.0): Glocke auf der Live-Seite für alle mit der Rolle Tester – erst ab 1.4.0 live möglich, vorher still übersprungen
 	if [ -f "tests/manuell/$VERSION_ZENTRALE.json" ]; then
 		ANZAHL=$(grep -c '"id":' "tests/manuell/$VERSION_ZENTRALE.json" || true)
-		ssh -o LogLevel=ERROR "$NAS" "docker exec spielebibliothek-savesvc python -m savesvc tester-melden $VERSION_ZENTRALE $ANZAHL 2>/dev/null" | sed 's/^/  /' || true
+		ssh -o LogLevel=ERROR "$SERVER" "docker exec spielebibliothek-savesvc python -m savesvc tester-melden $VERSION_ZENTRALE $ANZAHL 2>/dev/null" | sed 's/^/  /' || true
 	fi
 	# Ende-zu-Ende-Tests NICHT abwarten (08.11.2026): Der Testserver ist sofort da, die Tests laufen parallel im Teststand
-	# auf der NAS (Auftragsdienst, Ziel „probe“ = genau dieser Stand). Ergebnis: Admin-Panel → Aufgaben, rot = rote Glocke.
+	# auf dem Server (Auftragsdienst, Ziel „probe“ = genau dieser Stand). Ergebnis: Admin-Panel → Aufgaben, rot = rote Glocke.
 	# Seit 1.4.1: immer als Auftrag – meldet sich der Mac (scripts/auftraege-mac.py, Docker Desktop läuft), holt er ihn
-	# und die Tests laufen dort (ca. 3 Min.), sonst übernimmt der Auftragsdienst auf der NAS (ca. 10 Min.).
-	# Ist der Mac bereit, landet der Auftrag im Testserver-Panel (dort führt nur der Mac aus), sonst im Live-Panel (NAS).
+	# und die Tests laufen dort (ca. 3 Min.), sonst übernimmt der Auftragsdienst auf dem Server (ca. 10 Min.).
+	# Ist der Mac bereit, landet der Auftrag im Testserver-Panel (dort führt nur der Mac aus), sonst im Live-Panel (Server).
 	if [ "$TESTS" = 1 ]; then
-		C=spielebibliothek-savesvc; WO="auf der NAS, ca. 10 Min. – Admin-Panel der Live-Bibliothek → Aufgaben"
+		C=spielebibliothek-savesvc; WO="auf dem Server, ca. 10 Min. – Admin-Panel der Live-Bibliothek → Aufgaben"
 		if [ -f "$HOME/Library/LaunchAgents/uk.cuby0401.spielebibliothek-auftraege.plist" ] && docker info >/dev/null 2>&1; then
 			C=sbprobe-savesvc; WO="auf dem Mac, ca. 3 Min. – Admin-Panel des Testservers → Aufgaben, Log ~/Library/Logs/spielebibliothek-auftraege.log"
 		fi
-		AID=$(ssh -o LogLevel=ERROR "$NAS" "docker exec $C python -c 'from pathlib import Path; from savesvc.db import Datenbank; print(Datenbank(Path(\"/data/saves.db\")).auftrag_anlegen(\"e2e-tests\", \"probe\", \"deploy\", \"mac\"))'" 2>/dev/null || true)
+		AID=$(ssh -o LogLevel=ERROR "$SERVER" "docker exec $C python -c 'from pathlib import Path; from savesvc.db import Datenbank; print(Datenbank(Path(\"/data/saves.db\")).auftrag_anlegen(\"e2e-tests\", \"probe\", \"deploy\", \"mac\"))'" 2>/dev/null || true)
 		case "$AID" in
 			''|None) echo "  (Ende-zu-Ende-Tests nicht angestoßen – läuft schon einer? Sonst im Admin-Panel → Aufgaben starten)" ;;
 			*) echo "  Ende-zu-Ende-Tests laufen jetzt im Hintergrund $WO (Auftrag $AID), bei Rot eine rote Glocke" ;;
@@ -356,14 +363,14 @@ fi
 
 LISTE=$(git ls-files | grep -vx -e '.env' -e 'config/users.yaml')
 
-echo "→ Zentrale $VERSION_ZENTRALE (Commit $COMMIT) nach $NAS:$ZIEL"
+echo "→ Zentrale $VERSION_ZENTRALE (Commit $COMMIT) nach $SERVER:$ZIEL"
 # Seit 1.3.0: gleicher Ablauf wie der Auftragsdienst – Release-Tar übertragen, scripts/nas-deploy.sh daraus ausführen
 # shellcheck disable=SC2086
-tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$NAS" "cat > /tmp/sb-release.tar"
-ssh "$NAS" "
+tar --no-mac-metadata --no-xattrs -cf - $LISTE | ssh "$SERVER" "cat > /tmp/sb-release.tar"
+ssh "$SERVER" "
 	set -e
 	tar -xOf /tmp/sb-release.tar scripts/nas-deploy.sh > /tmp/sb-nas-deploy.sh
-	STARTEN=$STARTEN sh /tmp/sb-nas-deploy.sh /tmp/sb-release.tar '$VERSION_ZENTRALE' '$COMMIT'
+	ZIEL=$ZIEL RELEASES=$RELEASES QUELLE=$SB_QUELLE STARTEN=$STARTEN sh /tmp/sb-nas-deploy.sh /tmp/sb-release.tar '$VERSION_ZENTRALE' '$COMMIT'
 	rm -f /tmp/sb-release.tar /tmp/sb-nas-deploy.sh
 "
 ZEIT="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
@@ -372,7 +379,7 @@ if [ "$BEISPIELE" = 1 ]; then
 	for d in examples/*/; do
 		name=$(basename "$d")
 		echo "→ Testspiel $name nach $SPIELE/$name"
-		tar --no-mac-metadata --no-xattrs -C "$d" -cf - . | ssh "$NAS" "
+		tar --no-mac-metadata --no-xattrs -C "$d" -cf - . | ssh "$SERVER" "
 			set -e
 			rm -rf '$SPIELE/$name' && mkdir -p '$SPIELE/$name'
 			tar --no-same-owner -xf - -C '$SPIELE/$name'

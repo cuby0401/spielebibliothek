@@ -1,8 +1,8 @@
 #!/bin/sh
-# Teststand frisch aufbauen und für die Ende-zu-Ende-Tests vorbereiten – läuft auf der NAS (Zentrale 1.3.0).
+# Teststand frisch aufbauen und für die Ende-zu-Ende-Tests vorbereiten – läuft auf dem Server (Zentrale 1.3.0).
 # Gemeinsam genutzt von scripts/e2e-alle.sh (Mac, über ssh) und scripts/e2e-nas.sh (Auftragsdienst).
 #   sh e2e-teststand.sh <repo-dir>      → gibt das Upload-Passwort von seb aus
-# Hostnamen wie in teststand.sh über GH/PH/UH (Mac: Tailscale-Namen, NAS: 127.0.0.1/localhost/127.0.0.2).
+# Hostnamen wie in teststand.sh über GH/PH/UH (vom Mac: Namen des Servers aus lokal.env, Auftragsdienst: 127.0.0.1/localhost/127.0.0.2).
 set -eu
 REPO="$1"
 sh "$REPO/scripts/teststand.sh" up "$REPO" >&2; sleep 3   # Ausgaben nach stderr – e2e-alle.sh legt sie ins Log

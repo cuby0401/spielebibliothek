@@ -3,13 +3,15 @@
 # Braucht auf dem Mac: Google Chrome und Node ≥ 22. Der Teststand wird für jeden Test frisch aufgebaut und am Ende wieder
 # entfernt – die echte Bibliothek wird nicht angefasst.
 #
-# Seit 1.4.1 (NAS entlasten): Läuft Docker Desktop auf dem Mac, steht auch der Teststand auf dem Mac – die NAS hat dann
-# nichts zu tun. Sonst wie bisher auf der NAS (über ssh). Erzwingen: E2E_ORT=mac oder E2E_ORT=nas.
+# Seit 1.4.1 (NAS entlasten): Läuft Docker Desktop auf dem Mac, steht auch der Teststand auf dem Mac – der Server hat dann
+# nichts zu tun. Sonst auf dem Server aus lokal.env (SERVER_ORT: NAS oder Docker-VM, über ssh).
+# Erzwingen: E2E_ORT=mac oder E2E_ORT=server (alter Name: nas).
 # Einzelne Tests: E2E_TESTS="zentrale-1.3-steckbrief" sh scripts/e2e-alle.sh
 set -eu
 cd "$(dirname "$0")/.."
-. scripts/lokal.sh   # NAS-Adressen aus lokal.env – nur für den Teststand auf der NAS nötig
-ORT="${E2E_ORT:-$(docker info >/dev/null 2>&1 && echo mac || echo nas)}"
+. scripts/lokal.sh   # Server-Adressen aus lokal.env – nur für den Teststand auf dem Server nötig
+ORT="${E2E_ORT:-$(docker info >/dev/null 2>&1 && echo mac || echo server)}"
+[ "$ORT" = nas ] && ORT=server
 TMP=$(mktemp -d)
 if [ "$ORT" = mac ]; then
 	export LOKAL=1 GH=127.0.0.1 PH=localhost UH=upload.localhost
@@ -20,10 +22,10 @@ if [ "$ORT" = mac ]; then
 		rm -rf "$TMP"
 	}
 else
-	nas_noetig
-	export E2E_G="http://$NAS_GH:18088" E2E_U="http://$NAS_UH:18090"
+	server_noetig; namen_noetig
+	export E2E_G="http://$SERVER_GH:18088" E2E_U="http://$SERVER_UH:18090"
 	aufraeumen() {
-		ssh -o LogLevel=ERROR "$NAS" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:sbtest >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
+		ssh -o LogLevel=ERROR "$SERVER" "sh /tmp/sb-repo/scripts/teststand.sh down >/dev/null 2>&1; docker rmi spielebibliothek-savesvc:sbtest >/dev/null 2>&1; rm -rf /tmp/sb-repo" 2>/dev/null || true
 		rm -rf "$TMP"
 	}
 fi
@@ -39,7 +41,7 @@ if [ "$ORT" = mac ]; then
 	echo $$ > "$SPERRE/pid"
 	trap 'aufraeumen; rm -rf "$SPERRE"' EXIT
 fi
-echo "  Teststand auf: $ORT"
+if [ "$ORT" = mac ]; then echo "  Teststand auf: mac"; else echo "  Teststand auf: Server ($SERVER_ORT)"; fi
 
 python3 -I scripts/e2e-vorbereiten.py "$TMP"
 # Dateiliste: im Git-Repo alle versionierten und neuen Dateien, sonst (Release-Stand beim Auftrag auf dem Mac, 1.4.1) alles
@@ -47,13 +49,13 @@ dateien() { if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git ls-
 if [ "$ORT" = mac ]; then
 	mkdir -p "$REPO" && dateien | tar --no-mac-metadata --no-xattrs -cf - -T - | tar -xf - -C "$REPO"
 else
-	dateien | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$NAS" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
+	dateien | tar --no-mac-metadata --no-xattrs -cf - -T - | ssh -o LogLevel=ERROR "$SERVER" "rm -rf /tmp/sb-repo && mkdir -p /tmp/sb-repo && tar -xf - -C /tmp/sb-repo"
 fi
 
 # Teststand frisch aufbauen, Spiel von „paul“ anlegen, Upload-Passwort zurückgeben (gemeinsam mit dem Auftragsdienst)
 teststand_einmal() {
 	if [ "$ORT" = mac ]; then sh "$REPO/scripts/e2e-teststand.sh" "$REPO" 2>"$TMP/teststand.log"
-	else ssh -o LogLevel=ERROR "$NAS" "GH=$NAS_GH PH=$NAS_PH UH=$NAS_UH sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo" 2>"$TMP/teststand.log"; fi
+	else ssh -o LogLevel=ERROR "$SERVER" "GH=$SERVER_GH PH=$SERVER_PH UH=$SERVER_UH sh /tmp/sb-repo/scripts/e2e-teststand.sh /tmp/sb-repo" 2>"$TMP/teststand.log"; fi
 }
 # Ein zweiter Versuch, falls der Aufbau einmal hakt (1.4.1); schlägt auch der fehl, steht der Grund im Log
 teststand() {

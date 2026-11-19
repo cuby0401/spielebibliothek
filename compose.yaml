@@ -1,6 +1,11 @@
 # Spielebibliothek – Docker-Compose-Stack
-# Liegt auf der NAS unter /volume1/docker/spielebibliothek/compose.yaml
+# Liegt auf dem Server im Stack-Ordner (NAS: /volume1/docker/spielebibliothek, Docker-VM: /opt/stacks/spielebibliothek).
 # Spezifikation: seb-brain → Projekte/Spielebibliothek/Architektur/Docker-Compose
+#
+# Wo Spiele und Datenbanken liegen, steht in der .env des Servers (Standard = NAS):
+#   SPIELE_DIR        Spiele, Entwürfe, Versionen          NAS: /volume1/games/spiele   VM: per SMB von der NAS
+#   DATEN_DIR         saves.db und backup/                 NAS: /volume1/games/data     VM: lokale Platte (nie auf einer Freigabe)
+#   UPLOAD_DATEN_DIR  upload.db und Sitzungs-Schlüssel     NAS: /volume1/games/filebrowser/upload   VM: lokale Platte
 #
 # Stand: Phase 6b (caddy, savesvc, upload, cloudflared; kein Port am Host).
 
@@ -11,8 +16,10 @@ services:
     image: caddy:2
     container_name: spielebibliothek-caddy
     restart: unless-stopped
-    # Feste UID, bekommt auf /volume1/games/spiele nur r-X per ACL (siehe scripts/nas-setup.sh)
+    # Feste UID, bekommt auf den Spielen nur r-X per ACL (NAS, scripts/nas-setup.sh) bzw. über die Gruppe 10021 (VM: Spiele
+    # per SMB, dort gibt es keine ACLs – scripts/server-setup.sh). Der Ordner ist ohnehin nur lesend eingebunden.
     user: "10020:10020"
+    group_add: ["10021"]
     read_only: true
     cap_drop: [ALL]
     # Das caddy-Binary trägt die File-Capability cap_net_bind_service. Fehlt sie im
@@ -30,7 +37,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./site:/srv/site:ro
       - ./lib:/srv/lib:ro
-      - /volume1/games/spiele:/srv/spiele:ro
+      - ${SPIELE_DIR:-/volume1/games/spiele}:/srv/spiele:ro
       # Nur für den Not-Aus (1.4.0, Nachtest 08.11.): Caddy prüft, ob config/notaus.json existiert – lesen darf es dort nichts (nur u:10020:x)
       - ./config:/config:ro
     # Kein Port am Host: erreichbar nur über cloudflared (seit Phase 2, 05.11.2026).
@@ -44,7 +51,8 @@ services:
     image: spielebibliothek-savesvc
     container_name: spielebibliothek-savesvc
     restart: unless-stopped
-    # UID 10022 ist im Image gesetzt: rwX auf data/, r-X auf spiele/ (scripts/nas-setup.sh)
+    # UID 10022 ist im Image gesetzt: rwX auf data/, r-X auf spiele/ (scripts/nas-setup.sh bzw. Gruppe 10021 auf der VM)
+    group_add: ["10021"]
     read_only: true
     tmpfs:
       - /tmp
@@ -54,7 +62,7 @@ services:
       # nicht geheim: Team-Domain und AUD-Tag der Access-Anwendung "games"
       ACCESS_TEAM_DOMAIN: cold-glitter-fc3b.cloudflareaccess.com
       ACCESS_AUD: 16a18e7f5f0f0cf8060c0c274276a4f5f895aa0a38abdb90c6c75575d902a2b1
-      # Konsistente DB-Kopie für borgmatic (sichert um 02:00 data/backup/, nicht die laufende saves.db)
+      # Konsistente DB-Kopie (NAS: borgmatic sichert um 02:00 data/backup/; VM: scripts/sicherung-export.sh legt sie um 01:50 auf die NAS)
       BACKUP_ZIEL: /data/backup/saves-latest.db
       # Admin-Panel (games.cuby0401.uk/admin) und interne Schnittstelle zum Upload-Dienst
       ADMINS: seb
@@ -80,8 +88,8 @@ services:
       SMTP_ABSENDER: ${SMTP_ABSENDER:-}
       # DEV_USER ist hier VERBOTEN (würde die Anmeldung überspringen)
     volumes:
-      - /volume1/games/data:/data
-      - /volume1/games/spiele:/spiele:ro
+      - ${DATEN_DIR:-/volume1/games/data}:/data
+      - ${SPIELE_DIR:-/volume1/games/spiele}:/spiele:ro
       # config/users.yaml: E-Mail → Benutzername; nur auf der NAS, nicht im Git (Vorlage: users.example.yaml).
       # Seit 1.4.0 ein Export aus dem CRM (Datenbank) – für den Upload-Dienst und als Notfall-Rückweg. Schreibbar.
       - ./config:/config
@@ -115,11 +123,11 @@ services:
       UPLOAD_OEFFENTLICH: https://upload.cuby0401.uk
       GAMES_OEFFENTLICH: https://games.cuby0401.uk
     volumes:
-      - /volume1/games/spiele:/spiele
+      - ${SPIELE_DIR:-/volume1/games/spiele}:/spiele
       # Handbuch und Vorlagen für den MCP-Server (nur lesen)
       - ./site/handbuch:/handbuch:ro
       # Passwort-Hashes und Sitzungs-Schlüssel (Ordner liegt unter filebrowser/, dort hat UID 10021 schon Rechte)
-      - /volume1/games/filebrowser/upload:/data
+      - ${UPLOAD_DATEN_DIR:-/volume1/games/filebrowser/upload}:/data
       - ./config:/config:ro
     networks: [intern]
 

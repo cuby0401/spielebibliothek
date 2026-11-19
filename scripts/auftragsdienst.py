@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Auftragsdienst der Spielebibliothek – läuft jede Minute als Cron-Job auf der NAS unter Sebi (Zentrale 1.3.0).
+"""Auftragsdienst der Spielebibliothek – läuft jede Minute als Cron-Job auf dem Server (NAS oder Docker-VM) unter Sebi (Zentrale 1.3.0).
 
 Einrichten (einmalig, vom Mac):  sh scripts/auftragsdienst-einrichten.sh
-Log auf der NAS:                 /tmp/sb-auftragsdienst.log
+Log auf dem Server:              /tmp/sb-auftragsdienst.log
+Pfade: Standard = NAS; auf der Docker-VM setzt die Cron-Zeile SB_LIVE, SB_QUELLE, SB_PROBE, SB_RELEASES (auftragsdienst-einrichten.sh).
 
 Was er tut – und NUR das:
   0. Not-Aus (1.4.0): Liegt config/notaus.json im Live-Ordner, stoppt er den Tunnel (jede Minute als Erstes) und spielt nichts ein.
@@ -30,10 +31,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Pfade und Container – per Umgebung nur zum Testen gegen den Teststand änderbar (SB_LIVE, SB_LIVE_C, …)
+# Pfade und Container – per Umgebung (Cron-Zeile auf der VM; zum Testen gegen den Teststand: SB_LIVE, SB_LIVE_C, …)
 LIVE = Path(os.environ.get("SB_LIVE", "/volume1/docker/spielebibliothek"))
 QUELLE = Path(os.environ.get("SB_QUELLE", "/volume1/docker/spielebibliothek-quelle"))   # vollständiger Live-Stand (nas-deploy.sh)
 PROBE = Path(os.environ.get("SB_PROBE", "/volume1/docker/spielebibliothek-probe"))
+RELEASES = Path(os.environ.get("SB_RELEASES", "/volume1/docker/spielebibliothek-releases"))
 LIVE_C = os.environ.get("SB_LIVE_C", "spielebibliothek-savesvc")
 PROBE_C = os.environ.get("SB_PROBE_C", "sbprobe-savesvc")
 TUNNEL_C = os.environ.get("SB_TUNNEL_C", "spielebibliothek-cloudflared")
@@ -160,7 +162,7 @@ def deploy_nach_freigabe() -> None:
             skript.write_bytes(mitglied.read() if mitglied else b"")
         # Ziel immer ausdrücklich mitgeben – nas-deploy.sh soll nie stillschweigend auf seine Standardpfade zurückfallen
         ok, ausgabe = ausfuehren(["sh", str(skript), str(tar), version, commit], ZEITLIMIT["deploy"],
-                                 umgebung={"ZIEL": str(LIVE), "QUELLE": str(QUELLE)})
+                                 umgebung={"ZIEL": str(LIVE), "QUELLE": str(QUELLE), "RELEASES": str(RELEASES)})
     kurz = f"Zentrale {version} ist live" if ok else "Live-Deploy fehlgeschlagen – die bisherige Version läuft weiter bzw. scripts/deploy.sh --zurueck"
     log(kurz)
     if lauft(PROBE_C):

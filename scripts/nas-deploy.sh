@@ -1,11 +1,12 @@
 #!/bin/sh
-# Spielt einen Release-Stand LIVE ein – läuft auf der NAS (Zentrale 1.3.0).
+# Spielt einen Release-Stand LIVE ein – läuft auf dem Server, NAS oder Docker-VM (Zentrale 1.3.0, Name aus NAS-Zeiten).
 # Aufgerufen von scripts/deploy.sh (Mac, über ssh) und vom Auftragsdienst nach der Freigabe in der Probe.
 #
 #   sh nas-deploy.sh <release.tar> <version> <commit>
 #
 # <release.tar> = alle von git verfolgten Dateien eines Commits, unverändert (auch examples/).
-# Umgebung (nur zum Testen ändern): ZIEL, RELEASES, QUELLE, STARTEN=0 (nicht starten), SICHERN=0 (keine DB-Sicherung)
+# Umgebung: ZIEL, RELEASES, QUELLE (Standard = Pfade der NAS; deploy.sh und der Auftragsdienst geben sie immer mit),
+#           STARTEN=0 (nicht starten), SICHERN=0 (keine DB-Sicherung) – beide nur zum Testen
 #
 # Ablauf – wie bisher in deploy.sh:
 #   1. laufenden Stand archivieren ($RELEASES/<alte Version>.tar, die letzten 5) und Datenbank sichern (vor-deploy/, die letzten 10)

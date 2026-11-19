@@ -55,13 +55,15 @@ Wächter (laufen in `scripts/deploy.sh` mit, ein Fehler bricht ab):
 
 ## 2. Wo ausprobieren
 
-- **Design-Spielwiese** (nur Tailscale, Kopie der echten Daten, automatisch als seb): `scripts/deploy.sh --design`,
-  schnelle Runden `scripts/deploy.sh --design --nur-site` → `http://<NAS_GH>:18288`.
+- **Design-Spielwiese:** seit 20.11.2026 geschlossen (gibt es auf der Docker-VM nicht). Früher nur Tailscale, Kopie der echten Daten,
+  automatisch als seb: `scripts/deploy.sh --design` → `http://<NAS_GH>:18288`, geht nur noch mit `SERVER_ORT=nas`.
   **Nie eine Cloudflare-Route auf die Ports 18288–18290 legen** (Auto-Anmeldung, Lehre vom 07.11.2026).
 - Nicht ungefragt auf live oder den Testserver (`test.cuby0401.uk`) deployen. Live-Deploys macht Seb.
 
 ## 3. Sonst
 
 - Ablauf, Probe/Testserver, Versionen, Tests: `docs/entwicklung.md`. Betrieb: `docs/betrieb.md`.
-- Datenbanken auf der NAS nur im Container lesen (`docker exec`), nie `sqlite3` auf dem Host.
+- Die Zentrale läuft seit 20.11.2026 auf der Docker-VM (`SERVER_ORT=vm` in `lokal.env`), die Spiele liegen per SMB auf der NAS.
+  Datenbanken nur auf der lokalen Platte des Servers, nie auf einer Freigabe; Freigaben nur per SMB, nie NFS (`docs/betrieb.md`).
+- Datenbanken nur im Container lesen (`docker exec`), nie `sqlite3` auf dem Host.
 - Projektwissen und Entscheidungen stehen im Vault `~/seb-brain` unter `Projekte/Spielebibliothek/`.
