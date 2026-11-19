@@ -45,6 +45,17 @@
       "erwartet": "Nach dem Neuladen bist du wieder im selben Raum, der Bot ist noch da, die Steine liegen unverändert, und der Bot zieht weiter, wenn er dran ist."
     },
     {
+      "id": "keine-bots",
+      "bereich": "Bots",
+      "titel": "Hinweis bei Spielen ohne Bots",
+      "schritte": [
+        "Öffne ein Multiplayer-Spiel ohne eigene Bots (z. B. ein Spiel eines Entwicklers, das noch keine Bots hat) und schau dir die Lobby an.",
+        "Erstelle einen Raum.",
+        "Gründe eine Gruppe, setze einen Bot dazu und schau dir dieses Spiel unter „Spiel aussuchen“ an."
+      ],
+      "erwartet": "Die Lobby zeigt „… Spieler · noch keine Bots“. In der Raum-Karte gibt es keinen Knopf „Bot hinzufügen“, stattdessen steht dort „Für dieses Spiel gibt es noch keine Bots.“ In der Gruppe mit Bot ist das Spiel ausgegraut mit „Noch keine Bots“. Bei „Vier gewinnt“ steht nichts davon, dort gibt es „Bot hinzufügen“."
+    },
+    {
       "id": "gruppe-gruenden",
       "bereich": "Gruppen",
       "titel": "Gruppe gründen und Link verschicken",

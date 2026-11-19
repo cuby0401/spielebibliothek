@@ -676,7 +676,7 @@ function mpLobby(spiel, code = null) {
 	feld.eingabe.addEventListener("keydown", (ev) => { if (ev.key === "Enter") beitreten(); });
 	const liste = UI.h("div", { id: "mp-raeume" }, UI.laden({ art: "skelett", zeilen: 2 }));
 	const mitBots = (spiel.multiplayer.bots || []).length > 0;
-	el("rahmen").replaceChildren(UI.karte({ id: "mp-lobby", titel: "Mehrspieler", untertitel: mpSpielerText(spiel.multiplayer) + (mitBots ? " · auch mit Bots" : "") + (mpIstEntwurf(spiel)
+	el("rahmen").replaceChildren(UI.karte({ id: "mp-lobby", titel: "Mehrspieler", untertitel: mpSpielerText(spiel.multiplayer) + (mitBots ? " · auch mit Bots" : " · noch keine Bots") + (mpIstEntwurf(spiel)
 		? (mitBots ? " · Entwurf: Erstelle einen Raum und setze Bots dazu – oder öffne den Entwurf in einem zweiten Tab." : " · Entwurf: Öffne den Entwurf in einem zweiten Tab, um gegen dich selbst zu spielen.") : ""),
 	inhalt: UI.stapel([
 		UI.knopf({ art: "primaer", text: "Neuen Raum erstellen", ikon: "plus", id: "mp-neu", onclick: () => mpBeitreten(spiel, { neu: true }) }),
@@ -803,6 +803,8 @@ function mpRaumInhalt(r, o) {
 			botMenue,
 		].filter(Boolean)),
 		UI.liste(spielerZeilen, { ohneRahmen: true, label: r.art === "gruppe" ? "Mitglieder der Gruppe" : "Spieler im Raum" }),
+		// Spiel ohne eigene Bots (1.6.2): sagen, warum es keinen Knopf „Bot hinzufügen“ gibt
+		!stufen.length ? UI.text("Für dieses Spiel gibt es noch keine Bots.", { art: "leise", id: "mp-keine-bots" }) : null,
 		istHost && o.offenSchalter ? UI.schalter({ label: "Bei „Offene Räume“ zeigen", hinweis: "Sonst kommt nur rein, wer den Code oder Link hat.", an: r.offen,
 			onwechsel: (an) => o.senden({ t: "offen", an }) }) : null,
 		UI.leiste([o.gruppe || null,
@@ -879,7 +881,7 @@ function gruppeZeigen(r) {
 		const m = sp.multiplayer;
 		if (!m) return "Nur allein spielbar";
 		if (anzahl < m.min || anzahl > m.max) return `Für ${mpSpielerText(m)}`;
-		if (botsDa && !(m.bots || []).length) return "Ohne Bots";
+		if (botsDa && !(m.bots || []).length) return "Noch keine Bots";
 		return null;
 	};
 	const liste = spiele.filter((sp) => sp.complete && !sp.testspiel).map((sp) => ({ sp, nein: grund(sp) }))

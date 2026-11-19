@@ -19,6 +19,8 @@ unverzichtbar sind. Konzept im Vault: `Projekte/Spielebibliothek/Architektur/Bot
 - **Neu: Gruppen.** „Zusammen spielen“ auf der Startseite gründet eine Gruppe mit Beitrittslink `#/gruppe/CODE` (Einladen auch über die Glocke).
   Der Host sucht ein Spiel aus, alle in der Gruppe (und ihre Bots) wechseln automatisch in einen Raum dafür. Einzelspieler-Spiele und Spiele
   mit falscher Spielerzahl stehen ausgegraut mit Grund da. „Zurück zur Gruppe“ in der Raum-Karte, die Gruppe bleibt während des Spiels verbunden.
+- **Spiele ohne Bots** sagen es: Lobby „noch keine Bots“, Raum-Karte „Für dieses Spiel gibt es noch keine Bots.“, in einer Gruppe mit Bots
+  ausgegraut „Noch keine Bots“.
 - **Vier gewinnt** hat Bots in drei Stufen (zufällig, gewinnen/blocken, 5 Züge vorausrechnen).
 - **Handbuch:** Abschnitte „Bots“ und „Gruppen“ in Kapitel 9c, KI-Anleitung ergänzt. Neues Icon `bot`.
 
@@ -34,7 +36,7 @@ unverzichtbar sind. Konzept im Vault: `Projekte/Spielebibliothek/Architektur/Bot
   Baustein `UI.buehne`: `.inhalt(an)` – der Rahmen ist dann so hoch wie sein Inhalt und hat keine eigene Fläche.
 - **Tests:** 4 neue Tests in `test_mcp.py` (Sperre, Token-Erneuerung, Rücksprung-Adressen, Grenze je IP), 4 in `test_multiplayer.py`
   (Bots setzen/entfernen, Bot wird nie Host, Gruppe wählt Spiel samt Bots, Spielerzahl und Einladen), Bots in `scripts/gamesave-mp-test.js`,
-  17 neue Prüfpunkte in `e2e-zentrale-1.6.mjs` (Lobby ohne leeren Rahmen, Gruppe mit Bot bis zum Zug des Bots). Testplan 1.6.2 mit 12 Tests.
+  17 neue Prüfpunkte in `e2e-zentrale-1.6.mjs` (Lobby ohne leeren Rahmen, Gruppe mit Bot bis zum Zug des Bots). Testplan 1.6.2 mit 13 Tests.
   `e2e-zentrale-1.4-crm` prüft nur noch, dass ein Testplan erscheint (nicht mindestens 5 Tests).
 
 ## 1.6.1 – 17.11.2026

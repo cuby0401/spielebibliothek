@@ -401,6 +401,8 @@ frist(zustand) {
         <code>raum.mitBots</code> sagt, ob gerade Bots mitspielen.</li>
       <li>Bots bekommen keine Bestenlisten-Einträge und keine Erfolge. Ob ein Sieg gegen einen leichten Bot in die Bestenliste soll, entscheidest du
         (Tipp: <code>if (!spiel.raum.mitBots) GameSave.submitScore(…)</code>).</li>
+      <li>Hat dein Spiel keine <code>bots</code> in der <code>game.json</code>, steht für die Spieler „Für dieses Spiel gibt es noch keine Bots.“ in der
+        Raum-Karte (in einer Gruppe mit Bots: ausgegraut „Noch keine Bots“). Du kannst Bots jederzeit mit einem Update nachliefern.</li>
       <li><strong>Allein testen:</strong> Lokal (ein Tab reicht) <code>spiel.raum.botHinzufuegen("leicht")</code> aufrufen, im Entwurf in der Raum-Karte
         „Bot hinzufügen“ klicken.</li>
     </ul>
