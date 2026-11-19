@@ -21,6 +21,14 @@ Schließ-Codes: 4000 in anderem Tab übernommen, 4001 rausgeworfen, 4003 verbote
 4008 zu viele Nachrichten, 4009 Nachricht zu groß, 4401 nicht angemeldet, 4404 Raum nicht gefunden, 4409 Raum voll,
 4429 zu viele neue Räume, 4503 Not-Aus.
 
+Bots (1.6.2): Der Host setzt Bots auf freie Plätze ({t: "bot", stufe}), entfernt sie mit „rauswerfen“. Ein Bot ist nur ein
+Eintrag in der Spielerliste (bot: Stufe) ohne Verbindung – seine Züge rechnet der Browser des Hosts mit dem Code des Spiels
+(GameSave.multiplayer.spiel, Regel bot). Auf der NAS läuft auch dafür nichts.
+
+Gruppen (1.6.2): Raum ohne Spiel (WebSocket /api/mp/gruppe, Link #/gruppe/CODE). Der Host wählt ein Multiplayer-Spiel
+({t: "spiel", spiel: "user/ordner"}): Der Dienst legt dafür einen Raum an, übernimmt die Bots der Gruppe und nennt den Raum
+allen in der Gruppe (aktuell). Die Gruppe bleibt während des Spiels verbunden.
+
 Räume liegen nur im Arbeitsspeicher. Nach einem Neustart des Dienstes sind sie weg – die Browser verbinden neu, finden
 ihren Raum nicht mehr und landen wieder in der Lobby. Spielstände der Spieler (GameSave.save) sind davon nicht betroffen.
 """
@@ -55,6 +63,9 @@ HOST_GNADE = 10.0                                   # s: so lange behält ein Ho
 GETRENNT_ENTFERNEN = 5 * 60                         # s: getrennte Mitglieder fliegen danach aus der Liste
 RAUM_LEER_LOESCHEN = 15 * 60                        # s: Raum ohne verbundene Mitglieder wird danach gelöscht
 EINLADUNGEN_PRO_10_MIN = 20
+GRUPPE_MAX = 16                                     # Mitglieder einer Gruppe (Menschen und Bots)
+GRUPPE_STUFEN = ["leicht", "mittel", "schwer"]      # Bots in der Gruppe – im Spiel auf dessen Stufen abgebildet
+BOT_PID = "~bot"
 
 
 @dataclass
@@ -67,9 +78,14 @@ class Mitglied:
     seit: float
     ws: WebSocket | None = None
     getrennt_seit: float | None = None
+    bot: str | None = None     # Bots (1.6.2): Schwierigkeitsstufe; ein Bot hat keine Verbindung und ist trotzdem „da“
 
     @property
     def verbunden(self) -> bool:
+        return self.ws is not None or self.bot is not None
+
+    @property
+    def mensch_da(self) -> bool:
         return self.ws is not None
 
 
@@ -88,9 +104,17 @@ class Raum:
     leer_seit: float | None = None
     host_timer: asyncio.Task | None = None
     erstellt: float = field(default_factory=time.time)
+    bots: list[str] = field(default_factory=list)     # Stufen, die das Spiel anbietet (leer = keine Bots)
+    art: str = "spiel"                                # "spiel" oder "gruppe" (1.6.2)
+    gruppe: str | None = None                         # Raum eines Spiels, das eine Gruppe gestartet hat: Code der Gruppe
+    aktuell: dict | None = None                       # Gruppe: gerade gewähltes Spiel {spiel, code, titel}
+    host_wunsch: str | None = None                    # Raum aus einer Gruppe: deren Host soll auch hier Host sein
 
     def verbundene(self) -> list[Mitglied]:
-        return [m for m in self.mitglieder.values() if m.verbunden]
+        return [m for m in self.mitglieder.values() if m.mensch_da]
+
+    def menschen(self) -> list[Mitglied]:
+        return self.verbundene()
 
     def spieler(self) -> list[Mitglied]:
         return [m for m in self.mitglieder.values() if not m.zuschauer]
@@ -168,6 +192,7 @@ class Raeume:
             host = r.mitglieder.get(r.host) if r.host else None
             liste.append({"code": r.code, "host": host.name if host else None,
                           "spieler": sum(1 for m in r.spieler() if m.verbunden), "max": r.max,
+                          "bots": sum(1 for m in r.spieler() if m.bot),
                           "voll": len(r.spieler()) >= r.max, "erstellt": int(r.erstellt)})
         return sorted(liste, key=lambda x: -x["erstellt"])
 
@@ -176,8 +201,9 @@ class Raeume:
     def zustand(self, r: Raum, fuer: Mitglied) -> dict:
         return {"code": r.code, "spiel": r.spiel, "ich": fuer.id, "host": r.host, "offen": r.offen,
                 "min": r.min, "max": r.max, "entwurf": r.entwurf, "zuschauer": fuer.zuschauer,
+                "art": r.art, "bots": r.bots, "gruppe": r.gruppe, "aktuell": r.aktuell,
                 "spieler": [{"id": m.id, "name": m.name, "verbunden": m.verbunden, "zuschauer": m.zuschauer,
-                             "host": m.id == r.host} for m in r.mitglieder.values()]}
+                             "host": m.id == r.host, "bot": m.bot} for m in r.mitglieder.values()]}
 
     async def senden(self, m: Mitglied, nachricht: dict | str) -> None:
         ws = m.ws
@@ -200,7 +226,7 @@ class Raeume:
     # ---------- Host ----------
 
     def nachfolger(self, r: Raum, ausser: str | None = None) -> Mitglied | None:
-        kandidaten = [m for m in r.mitglieder.values() if m.verbunden and m.id != ausser]
+        kandidaten = [m for m in r.mitglieder.values() if m.mensch_da and m.id != ausser]   # nie ein Bot
         kandidaten.sort(key=lambda m: (m.zuschauer, m.seit))
         return kandidaten[0] if kandidaten else None
 
@@ -266,7 +292,7 @@ class Raeume:
             r.mitglieder[mid] = m
         r.leer_seit = None
         host = r.mitglieder.get(r.host) if r.host else None
-        if host is None or (not host.verbunden and r.host_timer is None):
+        if host is None or (not host.verbunden and r.host_timer is None) or (r.host_wunsch == pid and r.stand is None):
             r.host = m.id
         if r.host == m.id:
             if r.host_timer:
@@ -338,12 +364,12 @@ class Raeume:
             ziel = r.mitglieder.get(n.get("wer")) if isinstance(n.get("wer"), str) else None
             if not ist_host or ziel is None or ziel.id == m.id:
                 return await self.senden(m, {"t": "fehler", "text": "Rauswerfen darf nur der Host, und nur andere."})
-            if ziel.pid != m.pid:      # sich selbst im zweiten Tab (Entwurf) nicht für immer aussperren
+            if ziel.pid != m.pid and not ziel.bot:      # sich selbst im zweiten Tab (Entwurf) nicht für immer aussperren
                 r.gesperrt.add(ziel.pid)
             await self.entfernen(r, ziel, 4001, f"{m.name} hat dich aus dem Raum geworfen.")
         elif art == "host":
             ziel = r.mitglieder.get(n.get("wer")) if isinstance(n.get("wer"), str) else None
-            if not ist_host or ziel is None or not ziel.verbunden:
+            if not ist_host or ziel is None or not ziel.mensch_da:
                 return await self.senden(m, {"t": "fehler", "text": "Den Host weitergeben darf nur der Host, an einen verbundenen Spieler."})
             await self.host_wechseln(r, ziel)
         elif art == "offen":
@@ -353,6 +379,40 @@ class Raeume:
             await self.verteilen(r)
         elif art == "verlassen":
             await self.entfernen(r, m, 1000, "Raum verlassen")
+        elif art == "bot":
+            stufe = n.get("stufe")
+            if not ist_host:
+                return await self.senden(m, {"t": "fehler", "text": "Bots setzt nur der Host."})
+            if stufe not in r.bots:
+                return await self.senden(m, {"t": "fehler", "text": "Dieses Spiel hat keine Bots mit dieser Stufe."})
+            if len(r.spieler()) >= r.max:
+                return await self.senden(m, {"t": "fehler", "text": "Kein Platz mehr frei."})
+            self.bot_setzen(r, stufe)
+            await self.verteilen(r)
+        elif art == "spiel" and r.art == "gruppe":
+            if not ist_host:
+                return await self.senden(m, {"t": "fehler", "text": "Das Spiel sucht der Host der Gruppe aus."})
+            fehler = await self.spiel_fuer_gruppe(r, m, n.get("spiel"))
+            if fehler:
+                return await self.senden(m, {"t": "fehler", "text": fehler})
+        elif art == "zurueck" and r.art == "gruppe":
+            if ist_host and r.aktuell:
+                r.aktuell = None
+                await self.verteilen(r)
+
+    def bot_setzen(self, r: Raum, stufe: str, bot_id: str | None = None, name: str | None = None) -> Mitglied:
+        if bot_id is None:
+            n = 1
+            while f"bot~{n}" in r.mitglieder:
+                n += 1
+            bot_id, name = f"bot~{n}", f"Bot {n} ({stufe[:1].upper() + stufe[1:]})"
+        b = Mitglied(id=bot_id, pid=BOT_PID, tab=None, name=name or bot_id, zuschauer=False, seit=time.time(), bot=stufe)
+        r.mitglieder[bot_id] = b
+        return b
+
+    async def spiel_fuer_gruppe(self, g: Raum, m: Mitglied, sid: object) -> str | None:
+        """Wird von registrieren() gesetzt (braucht die Spiele-Prüfung)."""
+        return "Spiele auswählen geht gerade nicht."
 
 
 class Abweisung(Exception):
@@ -387,11 +447,82 @@ def registrieren(app: FastAPI, e, db, spieler, crm) -> Raeume:
             raise Abweisung(4004, "Dieses Spiel ist kein Multiplayer-Spiel (game.json: \"multiplayer\").")
         return f"{user}/{game}", mp, entwurf
 
+    def stufe_im_spiel(stufe: str, stufen: list[str]) -> str:
+        """Bot der Gruppe (leicht/mittel/schwer) → passende Stufe des Spiels (gleicher Name oder gleiche Lage)."""
+        if stufe in stufen:
+            return stufe
+        i = GRUPPE_STUFEN.index(stufe) if stufe in GRUPPE_STUFEN else 1
+        return stufen[int(i * (len(stufen) - 1) / (len(GRUPPE_STUFEN) - 1) + 0.5)]   # kaufmännisch runden
+
+    async def spiel_fuer_gruppe(g: Raum, m: Mitglied, sid: object) -> str | None:
+        if not isinstance(sid, str) or sid.count("/") != 1:
+            return "Unbekanntes Spiel."
+        user, game = sid.split("/")
+        if game.endswith(versionen.ENTWURF):
+            return "Entwürfe kann man nicht in einer Gruppe spielen."
+        try:
+            sid, mp, _ = spiel_pruefen(m.ws, user, game, m.pid)
+        except Abweisung as a:
+            return a.text
+        menschen = [x for x in g.mitglieder.values() if not x.bot and x.mensch_da]
+        bots = [x for x in g.mitglieder.values() if x.bot]
+        anzahl = len(menschen) + len(bots)
+        if bots and not mp["bots"]:
+            return "Dieses Spiel hat keine Bots – nimm die Bots aus der Gruppe oder such ein anderes Spiel aus."
+        if not mp["min"] <= anzahl <= mp["max"]:
+            spanne = f"{mp['min']}" if mp["min"] == mp["max"] else f"{mp['min']}–{mp['max']}"
+            return f"Dieses Spiel ist für {spanne} Spieler, ihr seid {anzahl}."
+        raeume.aufraeumen()
+        if len(raeume.raeume) >= RAEUME_MAX:
+            return "Gerade sind zu viele Räume offen – bitte später noch einmal."
+        r = Raum(code=raeume.neuer_code(), spiel=sid, min=mp["min"], max=mp["max"], entwurf=False, bots=mp["bots"],
+                 offen=False, gruppe=g.code, host_wunsch=(g.mitglieder[g.host].pid if g.host in g.mitglieder else None))
+        r.leer_seit = time.time()        # kommt niemand, räumt aufraeumen() den Raum nach 15 Minuten weg
+        for b in bots:
+            raeume.bot_setzen(r, stufe_im_spiel(b.bot, mp["bots"]), b.id, b.name)
+        raeume.raeume[r.code] = r
+        try:
+            titel = games.beschreibung(e.spiele_dir, user, game)["title"]
+        except Exception:
+            titel = game
+        g.aktuell = {"spiel": sid, "code": r.code, "titel": titel}
+        log.info("Gruppe %s spielt %s (Raum %s)", g.code, sid, r.code)
+        await raeume.verteilen(g)
+        return None
+
+    raeume.spiel_fuer_gruppe = spiel_fuer_gruppe
+
     def http_spiel(request: Request, user: str, game: str, player: str):
         try:
             return spiel_pruefen(request, user, game, player)
         except Abweisung as a:
             raise HTTPException(404, a.text) from None
+
+    @app.post("/api/mp/gruppe/einladen")
+    def gruppe_einladen(player: str = Depends(spieler), body: dict = Body(...)):
+        """Mitspieler über die Glocke in die Gruppe einladen (1.6.2). Nur wer selbst in der Gruppe ist."""
+        code, an = body.get("code"), body.get("an")
+        g = raeume.raeume.get(code) if isinstance(code, str) else None
+        if not g or g.art != "gruppe" or not any(m.pid == player and m.mensch_da for m in g.mitglieder.values()):
+            raise HTTPException(404, "Gruppe nicht gefunden")
+        ziele = einladungs_ziele(an, player)
+        for pid in ziele:
+            db.melden(pid, f"{name_von(player)} lädt dich in die Gruppe {g.code} ein.", f"#/gruppe/{g.code}")
+        return {"eingeladen": len(ziele)}
+
+    def einladungs_ziele(an, player: str) -> list[str]:
+        if not isinstance(an, list) or not an or len(an) > 10 or not all(isinstance(x, str) for x in an):
+            raise HTTPException(422, "an: Liste mit 1 bis 10 Spielern")
+        ziele = []
+        for name in an:
+            pid = identitaet.id_von(name)
+            person = crm.person(pid) if (crm and pid) else None
+            if not pid or not person or person.get("status") not in ("aktiv", "verwarnt", "eingeladen") or pid == player:
+                raise HTTPException(404, f"Spieler {name} nicht gefunden")
+            ziele.append(pid)
+        if not raeume.darf_einladen(player, len(ziele)):
+            raise HTTPException(429, "Zu viele Einladungen – in ein paar Minuten wieder.")
+        return ziele
 
     @app.get("/api/mp/{user}/{game}/raeume")
     def offene_raeume(request: Request, user: str = P(...), game: str = P(...), player: str = Depends(spieler)):
@@ -416,27 +547,22 @@ def registrieren(app: FastAPI, e, db, spieler, crm) -> Raeume:
         r = raeume.raeume.get(code) if isinstance(code, str) else None
         if not r or r.spiel != sid or not any(m.pid == player and m.verbunden for m in r.mitglieder.values()):
             raise HTTPException(404, "Raum nicht gefunden")
-        if not isinstance(an, list) or not an or len(an) > 10 or not all(isinstance(x, str) for x in an):
-            raise HTTPException(422, "an: Liste mit 1 bis 10 Spielern")
-        ziele = []
-        for name in an:
-            pid = identitaet.id_von(name)
-            person = crm.person(pid) if (crm and pid) else None
-            if not pid or not person or person.get("status") not in ("aktiv", "verwarnt", "eingeladen") or pid == player:
-                raise HTTPException(404, f"Spieler {name} nicht gefunden")
-            ziele.append(pid)
-        if not raeume.darf_einladen(player, len(ziele)):
-            raise HTTPException(429, "Zu viele Einladungen – in ein paar Minuten wieder.")
+        ziele = einladungs_ziele(an, player)
         titel = games.beschreibung(e.spiele_dir, user, game)["title"]
         for pid in ziele:
             db.melden(pid, f"{name_von(player)} lädt dich zu „{titel}“ ein (Raum {r.code}).", f"#/spiel/{sid}?raum={r.code}")
         return {"eingeladen": len(ziele)}
 
+    @app.websocket("/api/mp/gruppe")
+    async def gruppe_verbindung(ws: WebSocket):
+        await verbindung(ws, None, None)
+
     @app.websocket("/api/mp/{user}/{game}")
-    async def verbindung(ws: WebSocket, user: str, game: str):
+    async def verbindung(ws: WebSocket, user: str | None, game: str | None):
         # Nur die Bibliothek selbst (gleiche Herkunft) – sonst könnte eine fremde Seite mit der Anmeldung des Besuchers mitspielen
         herkunft, host = ws.headers.get("origin"), ws.headers.get("host")
         await ws.accept()
+        gruppe = user is None
         try:
             if not herkunft or urlsplit(herkunft).netloc != host:
                 raise Abweisung(4003, "Verbindung nur aus der Bibliothek.")
@@ -446,7 +572,10 @@ def registrieren(app: FastAPI, e, db, spieler, crm) -> Raeume:
                 player = spieler(ws)
             except HTTPException as f:
                 raise Abweisung(4401 if f.status_code == 401 else 4403, str(f.detail)) from None
-            sid, mp, entwurf = spiel_pruefen(ws, user, game, player)
+            if gruppe:
+                sid, mp, entwurf = "gruppe", {"min": 1, "max": GRUPPE_MAX, "bots": GRUPPE_STUFEN}, False
+            else:
+                sid, mp, entwurf = spiel_pruefen(ws, user, game, player)
             q = ws.query_params
             tab = q.get("tab") if TAB_MUSTER.match(q.get("tab") or "") else None
             raeume.aufraeumen()
@@ -455,7 +584,8 @@ def registrieren(app: FastAPI, e, db, spieler, crm) -> Raeume:
                     raise Abweisung(4429, "Gerade sind zu viele Räume offen – bitte später noch einmal.")
                 if not raeume.darf_neu(player):
                     raise Abweisung(4429, "Zu viele neue Räume in kurzer Zeit – bitte kurz warten.")
-                r = Raum(code=raeume.neuer_code(), spiel=sid, min=mp["min"], max=mp["max"], entwurf=entwurf)
+                r = Raum(code=raeume.neuer_code(), spiel=sid, min=mp["min"], max=mp["max"], entwurf=entwurf, bots=mp["bots"],
+                         art="gruppe" if gruppe else "spiel")
                 raeume.raeume[r.code] = r
             else:
                 code = (q.get("raum") or "").strip().upper()

@@ -51,6 +51,64 @@ function vierInReihe(brett, z, s) {
 	return false;
 }
 
+// ---------------- Bots: leicht = zufällig, mittel = gewinnen/blocken, schwer = ein paar Züge vorausrechnen ----------------
+function freieZeile(brett, s) { for (let z = ZEILEN - 1; z >= 0; z--) if (brett[z][s] === null) return z; return -1; }
+function gueltige(brett) { return [3, 2, 4, 1, 5, 0, 6].filter((s) => brett[0][s] === null); }   // Mitte zuerst
+function gewinntMit(brett, s, farbe) {
+	const z = freieZeile(brett, s);
+	if (z < 0) return false;
+	brett[z][s] = farbe; const ja = vierInReihe(brett, z, s); brett[z][s] = null;
+	return ja;
+}
+function bewerten(brett, farbe) {   // Fenster zu viert zählen: eigene Reihen gut, fremde schlecht, Mitte leicht bevorzugt
+	let p = 0;
+	for (let z = 0; z < ZEILEN; z++) if (brett[z][3] === farbe) p += 3;
+	for (const [dz, ds] of [[0, 1], [1, 0], [1, 1], [1, -1]]) for (let z = 0; z < ZEILEN; z++) for (let s = 0; s < SPALTEN; s++) {
+		const ez = z + 3 * dz, es = s + 3 * ds;
+		if (ez < 0 || ez >= ZEILEN || es < 0 || es >= SPALTEN) continue;
+		let ich = 0, du = 0;
+		for (let i = 0; i < 4; i++) { const f = brett[z + i * dz][s + i * ds]; if (f === farbe) ich++; else if (f !== null) du++; }
+		if (du === 0) p += [0, 1, 5, 50][ich] || 0;
+		if (ich === 0) p -= [0, 1, 6, 80][du] || 0;
+	}
+	return p;
+}
+function negamax(brett, tiefe, a, b, farbe) {
+	const zuege = gueltige(brett);
+	if (!zuege.length) return 0;
+	for (const s of zuege) if (gewinntMit(brett, s, farbe)) return 100000 + tiefe;
+	if (tiefe === 0) return bewerten(brett, farbe);
+	let best = -Infinity;
+	for (const s of zuege) {
+		const z = freieZeile(brett, s);
+		brett[z][s] = farbe;
+		const w = -negamax(brett, tiefe - 1, -b, -a, 1 - farbe);
+		brett[z][s] = null;
+		if (w > best) best = w;
+		if (best > a) a = best;
+		if (a >= b) break;
+	}
+	return best;
+}
+function botSpalte(brett, farbe, stufe) {
+	brett = brett.map((r) => r.slice());
+	const zuege = gueltige(brett);
+	const zufall = () => zuege[Math.floor(Math.random() * zuege.length)];
+	if (stufe === "leicht") return zufall();
+	for (const s of zuege) if (gewinntMit(brett, s, farbe)) return s;          // gewinnen
+	for (const s of zuege) if (gewinntMit(brett, s, 1 - farbe)) return s;      // blocken
+	if (stufe === "mittel") return Math.random() < 0.5 ? zuege[0] : zufall();
+	let beste = zuege[0], bestWert = -Infinity;                                  // schwer: 5 Züge vorausrechnen
+	for (const s of zuege) {
+		const z = freieZeile(brett, s);
+		brett[z][s] = farbe;
+		const w = -negamax(brett, 4, -Infinity, Infinity, 1 - farbe);
+		brett[z][s] = null;
+		if (w > bestWert) { bestWert = w; beste = s; }
+	}
+	return beste;
+}
+
 const regeln = {
 	// spieler: IDs aller verbundenen Mitspieler (ohne Zuschauer), Reihenfolge wie beim Betreten
 	// vorher: der letzte Zustand im Raum (oder null) – daraus kommt der Siegzähler
@@ -79,6 +137,11 @@ const regeln = {
 	// Zeitgeber: Der Host führt bei Ablauf zug(z, null, null) aus – auch ein neuer Host nach einem Wechsel
 	frist(z) {
 		return z.zugBis ? { bis: z.zugBis, aktion: null } : null;
+	},
+	// Bot (Stufen aus der game.json): bekommt nur seine Sicht wie ein Mensch, null = nicht dran. Läuft im Browser des Hosts.
+	bot(sicht, stufe) {
+		if (sicht.sieger !== null || sicht.voll || sicht.dran !== sicht.meineFarbe) return null;
+		return { spalte: botSpalte(sicht.brett, sicht.meineFarbe, stufe) };
 	},
 	// Was ein Spieler sehen darf. Bei Vier gewinnt ist nichts geheim – bei Kartenspielen hier fremde Hände weglassen.
 	sicht(z, fuer) {

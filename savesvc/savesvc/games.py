@@ -137,7 +137,13 @@ def multiplayer(daten: dict) -> dict | None:
         return w if isinstance(w, int) and not isinstance(w, bool) else standard
     mx = max(1, min(MP_MAX, zahl(roh.get("max"), 8)))
     mn = max(1, min(mx, zahl(roh.get("min"), 2)))
-    return {"min": mn, "max": mx}
+    # Bots (1.6.2): Schwierigkeitsstufen, z. B. ["leicht", "mittel", "schwer"]. Die Bots rechnet der Browser des Hosts.
+    bots = []
+    for s in roh.get("bots") if isinstance(roh.get("bots"), list) else []:
+        s = s.strip().lower() if isinstance(s, str) else ""
+        if re.fullmatch(r"[a-zäöüß0-9 -]{1,20}", s) and s not in bots:
+            bots.append(s)
+    return {"min": mn, "max": mx, "bots": bots[:5]}
 
 
 def _text(wert, laenge: int) -> str | None:

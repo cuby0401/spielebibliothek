@@ -306,8 +306,10 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
       Geht der Host (oder ist seine Verbindung länger als 10 Sekunden weg), wird ein anderer Spieler Host – mit genau dem zuletzt abgelegten Stand.
       Das Spiel läuft einfach weiter.</p>
     <h3><code>game.json</code></h3>
-<pre><code>"multiplayer": { "min": 2, "max": 4 }</code></pre>
-    <p><code>min</code>/<code>max</code> = Spieler je Raum (höchstens 16). Wer dazukommt, wenn der Raum voll ist, schaut zu. Die Lobby zeigt „2–4 Spieler“.</p>
+<pre><code>"multiplayer": { "min": 2, "max": 4, "bots": ["leicht", "mittel", "schwer"] }</code></pre>
+    <p><code>min</code>/<code>max</code> = Spieler je Raum (höchstens 16). Wer dazukommt, wenn der Raum voll ist, schaut zu. Die Lobby zeigt „2–4 Spieler“.
+      <code>bots</code> (freiwillig) = Schwierigkeitsstufen deiner Bots, siehe unten. Am besten <code>leicht</code>, <code>mittel</code>, <code>schwer</code> –
+      so passen die Bots aus einer Gruppe direkt.</p>
     <h3>Der einfache Weg: <code>GameSave.multiplayer.spiel</code></h3>
     <p>Du schreibst die Regeln wie auf einem Spieleserver – drei Funktionen, die nur mit dem Zustand (einfaches JSON) arbeiten:</p>
 <pre><code>const regeln = {
@@ -331,6 +333,8 @@ if (migriert) await GameSave.save("spielstand", data);   // umgewandelten Stand 
   spielerGeaendert(zustand, spieler) { return zustand; },
   // optional: Zeitgeber – siehe unten
   frist(zustand) { return null; },
+  // optional: Bot – siehe unten
+  bot(sicht, stufe, botId) { return null; },
 };
 
 const spiel = await GameSave.multiplayer.spiel(regeln, {
@@ -377,6 +381,33 @@ frist(zustand) {
       <li>Kurze Sperren (z. B. 2,5 Sekunden nach einer gelegten Karte nichts annehmen) brauchen keine Frist: in <code>zug</code> den Zeitpunkt
         prüfen und zu frühe Züge mit <code>throw</code> ablehnen.</li>
     </ul>
+    <h3>Bots: allein testen und spielen</h3>
+    <p>Mit Bots kannst du dein Spiel allein testen, und Spieler ohne Mitspieler können trotzdem spielen. Die Bibliothek liefert die Plätze im Raum,
+      die Stufen und den Takt. <strong>Was ein guter Zug ist, schreibst du</strong> in <code>bot</code>. Bots rechnet der Browser des Hosts, nicht der Server.</p>
+<pre><code>bot(sicht, stufe, botId) {
+  if (sicht.spieler[sicht.dran] !== botId) return null;   // nicht dran → null
+  const zuege = moeglicheZuege(sicht);
+  if (stufe === "leicht") return zufaellig(zuege);
+  if (stufe === "mittel") return gewinnenOderBlocken(zuege, sicht) || zufaellig(zuege);
+  return besterZug(zuege, sicht);                          // „schwer“: ein paar Züge vorausrechnen
+},</code></pre>
+    <ul>
+      <li>Der Bot bekommt nur seine <strong>Sicht</strong> (was <code>sicht(zustand, botId)</code> liefert), so wie ein Mensch. Er sieht also keine fremden Karten.</li>
+      <li>Seine Aktion geht durch <code>zug(zustand, aktion, botId)</code> und wird geprüft wie jede andere. Lehnt <code>zug</code> sie ab, kommt dieser Bot
+        bis zum nächsten Zug nicht mehr dran. Es gibt also keine Endlosschleife, aber dein Spiel bleibt dann stehen: Prüf in der Konsole die Warnung „GameSave: Bot …“.</li>
+      <li>Bots ziehen mit kurzer Denkzeit (0,6–1,4 s), damit man mitkommt. Halte <code>bot</code> schnell (unter 100 ms), sonst ruckelt der Host.</li>
+      <li>Bots setzt der Host in der Raum-Karte („Bot hinzufügen“) oder im Spiel selbst mit <code>spiel.raum.botHinzufuegen("mittel")</code> bzw.
+        <code>botEntfernen(id)</code>. In <code>raum.spieler</code> hat ein Bot <code>bot: "mittel"</code>, die ID beginnt mit <code>bot~</code>.
+        <code>raum.mitBots</code> sagt, ob gerade Bots mitspielen.</li>
+      <li>Bots bekommen keine Bestenlisten-Einträge und keine Erfolge. Ob ein Sieg gegen einen leichten Bot in die Bestenliste soll, entscheidest du
+        (Tipp: <code>if (!spiel.raum.mitBots) GameSave.submitScore(…)</code>).</li>
+      <li><strong>Allein testen:</strong> Lokal (ein Tab reicht) <code>spiel.raum.botHinzufuegen("leicht")</code> aufrufen, im Entwurf in der Raum-Karte
+        „Bot hinzufügen“ klicken.</li>
+    </ul>
+    <h3>Gruppen</h3>
+    <p>Spieler können auf der Startseite mit <strong>„Zusammen spielen“</strong> eine Gruppe gründen und den Link verschicken. Der Host der Gruppe sucht
+      ein Spiel aus, und alle landen automatisch in einem Raum dafür, die Bots der Gruppe auch. Für dich ändert sich nichts. Dein Spiel muss nur
+      die richtige Spielerzahl in der <code>game.json</code> haben, und wer Bots in Gruppen erlauben will, braucht <code>bots</code>.</p>
     <h3>Der Raum</h3>
 <pre><code>const raum = spiel.raum;   // oder: const raum = await GameSave.multiplayer.raum();
 raum.code; raum.ich; raum.host; raum.istHost; raum.zuschauer; raum.min; raum.max;

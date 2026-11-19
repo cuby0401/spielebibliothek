@@ -147,7 +147,7 @@ Formularbausteine haben `.wert` (lesen/setzen) und `.eingabe` (das eigentliche S
 `UI.ikon(name)`: suche, glocke, daumen, stern, herz, schliessen, haken, plus, minus, pfeil-links/-rechts/-hoch/-runter,
 winkel-runter/-rechts/-links, mehr, einstellungen, benutzer, personen, abmelden, hochladen, herunterladen, spielen, spiel,
 pokal, info, warnung, fehler, erfolg, bearbeiten, loeschen, kopieren, extern, auge, schloss, filter, sortieren, kalender,
-uhr, bild, sonne, mond, geraet, raster, liste, aktualisieren, nachricht, verlauf, ordner, datei, schild, test, start,
+uhr, bild, sonne, mond, geraet, bot, raster, liste, aktualisieren, nachricht, verlauf, ordner, datei, schild, test, start,
 hilfe, buch. Neues Icon: in `site/ui/ikonen.js` eintragen (Stil Lucide, 24×24, Strich).
 
 ## Muster großer Seiten, die die Bausteine übernehmen

@@ -7,7 +7,20 @@ Zurück auf eine frühere Version: `scripts/deploy.sh --zurueck <version>`.
 
 ## 1.6.2 – 19.11.2026
 
-Patch: zwei Sicherheitspunkte aus der Prüfung vor dem Live-Gang von 1.6.0 und ein Darstellungsfehler der Lobby.
+Bots und Gruppen für Multiplayer, dazu zwei Sicherheitspunkte aus der Prüfung vor dem Live-Gang von 1.6.0 und ein Darstellungsfehler der
+Lobby. Nach dem Schema eigentlich ein kleines Update – auf Wunsch des Admins trotzdem 1.6.2, weil Bots für das Testen von Multiplayer-Spielen
+unverzichtbar sind. Konzept im Vault: `Projekte/Spielebibliothek/Architektur/Bots-und-Gruppen.md`.
+
+- **Neu: Bots.** In der `game.json` `"multiplayer": {…, "bots": ["leicht", "mittel", "schwer"]}`, in den Regeln
+  `bot(sicht, stufe, botId) → aktion oder null`. Der Bot bekommt nur seine Sicht, seine Aktion geht durch `zug()`. Der Host setzt Bots über
+  „Bot hinzufügen“ in der Raum-Karte (oder `raum.botHinzufuegen(stufe)`), entfernt sie mit ✕. Bots rechnet der Browser des Hosts mit kurzer
+  Denkzeit, auf der NAS läuft nichts. Ein Bot wird nie Host, nach einem Host-Wechsel ziehen die Bots beim neuen Host weiter. Lokal (ohne
+  Bibliothek) gehen Bots auch mit einem einzigen Tab – so testen Entwickler allein.
+- **Neu: Gruppen.** „Zusammen spielen“ auf der Startseite gründet eine Gruppe mit Beitrittslink `#/gruppe/CODE` (Einladen auch über die Glocke).
+  Der Host sucht ein Spiel aus, alle in der Gruppe (und ihre Bots) wechseln automatisch in einen Raum dafür. Einzelspieler-Spiele und Spiele
+  mit falscher Spielerzahl stehen ausgegraut mit Grund da. „Zurück zur Gruppe“ in der Raum-Karte, die Gruppe bleibt während des Spiels verbunden.
+- **Vier gewinnt** hat Bots in drei Stufen (zufällig, gewinnen/blocken, 5 Züge vorausrechnen).
+- **Handbuch:** Abschnitte „Bots“ und „Gruppen“ in Kapitel 9c, KI-Anleitung ergänzt. Neues Icon `bot`.
 
 - **Sicherheit: Gesperrte verlieren den KI-Zugang.** Vor `/mcp` steht kein Cloudflare Access. Bisher behielt eine im CRM gesperrte
   oder archivierte Person ihren Claude-Code-Schlüssel bzw. ihr Claude-App-Token. Jetzt prüft der MCP-Server bei jeder Anfrage und
@@ -19,8 +32,10 @@ Patch: zwei Sicherheitspunkte aus der Prüfung vor dem Live-Gang von 1.6.0 und e
   (10 je Stunde), damit einer allein die Grenze nicht für alle ausschöpft.
 - **Behoben: Weiße Fläche unter der Lobby.** Die Lobby stand im Spielrahmen (16:10, im dunklen Thema heller Hintergrund). Neu am
   Baustein `UI.buehne`: `.inhalt(an)` – der Rahmen ist dann so hoch wie sein Inhalt und hat keine eigene Fläche.
-- **Tests:** 4 neue Tests in `test_mcp.py` (Sperre, Token-Erneuerung, Rücksprung-Adressen, Grenze je IP),
-  2 neue Prüfpunkte in `e2e-zentrale-1.6.mjs` (kein leerer Rahmen unter der Lobby).
+- **Tests:** 4 neue Tests in `test_mcp.py` (Sperre, Token-Erneuerung, Rücksprung-Adressen, Grenze je IP), 4 in `test_multiplayer.py`
+  (Bots setzen/entfernen, Bot wird nie Host, Gruppe wählt Spiel samt Bots, Spielerzahl und Einladen), Bots in `scripts/gamesave-mp-test.js`,
+  17 neue Prüfpunkte in `e2e-zentrale-1.6.mjs` (Lobby ohne leeren Rahmen, Gruppe mit Bot bis zum Zug des Bots). Testplan 1.6.2 mit 12 Tests.
+  `e2e-zentrale-1.4-crm` prüft nur noch, dass ein Testplan erscheint (nicht mindestens 5 Tests).
 
 ## 1.6.1 – 17.11.2026
 

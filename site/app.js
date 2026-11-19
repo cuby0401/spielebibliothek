@@ -255,7 +255,11 @@ function werkzeugleiste(sichtbar) {
 		optionen: [["alphabetisch", "Alphabetisch"], ["zuletzt", "Zuletzt gespielt"], ["neu", "Neueste zuerst"], ["meistgespielt", "Meistgespielt"]],
 		onchange: async (w) => { await einstellungenSpeichern({ sortierung: w }); inhaltZeigen(); } });
 	sort.eingabe.setAttribute("aria-label", "Spiele sortieren");
-	return UI.stapel([UI.leiste([such, sort], { verteilt: true }), alleTags.length ? tags : null], { abstand: "s" });
+	// Gruppe (1.6.2): zusammen mehrere Multiplayer-Spiele hintereinander – wer schon in einer ist, kommt zurück hinein
+	const g = Bridge.gruppe.raum;
+	const gruppe = UI.knopf({ art: "standard", ikon: "personen", text: g ? `Gruppe ${g.code}` : "Zusammen spielen", id: "gruppe-gruenden",
+		href: g ? `#/gruppe/${g.code}` : "#/gruppe/neu" });
+	return UI.stapel([UI.leiste([such, UI.leiste([gruppe, sort])], { verteilt: true }), alleTags.length ? tags : null], { abstand: "s" });
 }
 
 function uebersichtZeigen() {
@@ -616,6 +620,8 @@ function route() {
 	if (ent) { letzteRoute = location.hash; return zeigeEntwurf(ent[1], ent[2]); }
 	const m = location.hash.match(/^#\/spiel\/([^?]+)(?:\?raum=([A-Za-z]{4}))?$/);
 	if (m && ID_MUSTER.test(m[1])) { letzteRoute = location.hash; return zeigeSpiel(m[1], null, null, m[2] ? m[2].toUpperCase() : null); }
+	const gr = location.hash.match(/^#\/gruppe\/(neu|[A-Za-z]{4})$/);
+	if (gr) { gruppeCode = gr[1] === "neu" ? null : gr[1].toUpperCase(); return zeigeSeite("gruppe"); }
 	if (location.hash === "#/anmeldungen") { location.replace("#/sicherheit"); return; }   // alte Links (vor 1.4.0)
 	const pr = location.hash.match(/^#\/profil(?:\/([a-z0-9][a-z0-9_~-]*))?$/);
 	if (pr) { profilName = pr[1] ? decodeURIComponent(pr[1]) : (ich.ansicht ? `${ich.player}~${ich.ansicht}` : ich.player); return zeigeSeite("profil"); }
@@ -669,8 +675,9 @@ function mpLobby(spiel, code = null) {
 	};
 	feld.eingabe.addEventListener("keydown", (ev) => { if (ev.key === "Enter") beitreten(); });
 	const liste = UI.h("div", { id: "mp-raeume" }, UI.laden({ art: "skelett", zeilen: 2 }));
-	el("rahmen").replaceChildren(UI.karte({ id: "mp-lobby", titel: "Mehrspieler", untertitel: mpSpielerText(spiel.multiplayer) + (mpIstEntwurf(spiel)
-		? " · Entwurf: Öffne den Entwurf in einem zweiten Tab, um gegen dich selbst zu spielen." : ""),
+	const mitBots = (spiel.multiplayer.bots || []).length > 0;
+	el("rahmen").replaceChildren(UI.karte({ id: "mp-lobby", titel: "Mehrspieler", untertitel: mpSpielerText(spiel.multiplayer) + (mitBots ? " · auch mit Bots" : "") + (mpIstEntwurf(spiel)
+		? (mitBots ? " · Entwurf: Erstelle einen Raum und setze Bots dazu – oder öffne den Entwurf in einem zweiten Tab." : " · Entwurf: Öffne den Entwurf in einem zweiten Tab, um gegen dich selbst zu spielen.") : ""),
 	inhalt: UI.stapel([
 		UI.knopf({ art: "primaer", text: "Neuen Raum erstellen", ikon: "plus", id: "mp-neu", onclick: () => mpBeitreten(spiel, { neu: true }) }),
 		UI.leiste([feld, UI.knopf({ art: "standard", text: "Beitreten", id: "mp-beitreten", onclick: beitreten })]),
@@ -715,7 +722,7 @@ async function mpBeitreten(spiel, wie) {
 	}
 }
 
-async function mpEinladen(spiel, r) {
+async function mpEinladen(spiel, r, url = `/api/mp/${idPfad(spiel.id)}/einladen`, wohin = "in diesen Raum") {
 	let leute = [];
 	try { leute = await Bridge.json("GET", "/api/mp/mitspieler"); } catch (e) { meldung(e.message, "fehler"); return; }
 	const imRaum = new Set(r.spieler.map((s) => s.id));
@@ -726,12 +733,12 @@ async function mpEinladen(spiel, r) {
 	const senden = UI.knopf({ art: "primaer", text: "Einladen", deaktiviert: true, onclick: async () => {
 		senden.laden(true);
 		try {
-			const d = await Bridge.json("POST", `/api/mp/${idPfad(spiel.id)}/einladen`, { code: r.code, an: [...gewaehlt] });
+			const d = await Bridge.json("POST", url, { code: r.code, an: [...gewaehlt] });
 			meldung(d.eingeladen === 1 ? "Einladung verschickt." : `${d.eingeladen} Einladungen verschickt.`, "erfolg");
 			api.schliessen(true);
 		} catch (e) { senden.laden(false); meldung(e.message, "fehler"); }
 	} });
-	api = UI.dialog({ id: "mp-einladen", titel: "Mitspieler einladen", text: "Sie bekommen eine Meldung in der Glocke mit einem Link in diesen Raum.",
+	api = UI.dialog({ id: "mp-einladen", titel: "Mitspieler einladen", text: `Sie bekommen eine Meldung in der Glocke mit einem Link ${wohin}.`,
 		inhalt: UI.stapel(leute.slice(0, 50).map((p) => UI.haken({ label: p.name, onwechsel: (an) => {
 			if (an) gewaehlt.add(p.id); else gewaehlt.delete(p.id);
 			senden.aus(!gewaehlt.size || gewaehlt.size > 10);
@@ -742,18 +749,35 @@ async function mpEinladen(spiel, r) {
 
 function mpKarteZeigen(spiel, r) {
 	if (!r) return;
-	const istHost = r.host === r.ich;
 	const link = `${location.origin}/#/spiel/${spiel.id}?raum=${r.code}`;
+	el("mp-inhalt").replaceChildren(mpRaumInhalt(r, {
+		senden: (n) => Bridge.mp.senden(n), link,
+		einladen: r.entwurf ? null : () => mpEinladen(spiel, r),
+		gruppe: r.gruppe ? UI.knopf({ art: "standard", groesse: "s", ikon: "personen", text: "Zurück zur Gruppe", id: "mp-gruppe-zurueck", href: `#/gruppe/${r.gruppe}` }) : null,
+		offenSchalter: !r.gruppe,
+		verlassenText: "Raum verlassen", verlassenId: "mp-verlassen",
+	}));
+	el("mp-titel").textContent = `Raum ${r.code} · ${r.spieler.filter((s) => s.verbunden && !s.zuschauer).length}/${r.max}`;
+	el("mp-karte").hidden = false;
+}
+
+// Inhalt der Raum-Karte und der Gruppe (1.6.2): Code, Link, Einladen, Spieler mit Bots, Host-Aktionen, Verlassen
+function mpRaumInhalt(r, o) {
+	const istHost = r.host === r.ich;
 	const kopieren = async (text, erfolg) => {
 		try { await navigator.clipboard.writeText(text); meldung(erfolg, "erfolg"); } catch { UI.hinweisDialog({ titel: "Bitte selbst kopieren", text }); }
 	};
 	const spielerZeilen = r.spieler.map((s) => {
+		if (s.bot) {
+			return { ikon: "bot", titel: s.name, text: "Bot", aktionen: istHost ? [UI.knopf({ art: "gefahr-leise", groesse: "s", nurIkon: true, ikon: "schliessen",
+				label: `${s.name} entfernen`, onclick: () => o.senden({ t: "rauswerfen", wer: s.id }) })] : undefined };
+		}
 		const aktionen = istHost && s.id !== r.ich ? [
 			s.verbunden && !s.zuschauer ? UI.knopf({ art: "leise", groesse: "s", nurIkon: true, ikon: "stern", label: `${s.name} zum Host machen`,
-				onclick: () => Bridge.mp.senden({ t: "host", wer: s.id }) }) : null,
+				onclick: () => o.senden({ t: "host", wer: s.id }) }) : null,
 			UI.knopf({ art: "gefahr-leise", groesse: "s", nurIkon: true, ikon: "schliessen", label: `${s.name} rauswerfen`, onclick: async () => {
-				if (await UI.bestaetigen({ titel: `${s.name} rauswerfen?`, text: "Wer rausgeworfen wurde, kann diesem Raum nicht wieder beitreten.", ja: "Rauswerfen", gefahr: true })) {
-					Bridge.mp.senden({ t: "rauswerfen", wer: s.id });
+				if (await UI.bestaetigen({ titel: `${s.name} rauswerfen?`, text: "Wer rausgeworfen wurde, kann nicht wieder beitreten.", ja: "Rauswerfen", gefahr: true })) {
+					o.senden({ t: "rauswerfen", wer: s.id });
 				}
 			} }),
 		].filter(Boolean) : undefined;
@@ -761,23 +785,121 @@ function mpKarteZeigen(spiel, r) {
 		return { avatar: { name: s.name, groesse: "s" }, titel: s.name + (s.id === r.ich ? " (du)" : ""), text: status, aktionen };
 	});
 	const verbindung = UI.hinweis({ art: "warnung", text: "Verbindung verloren – verbinde neu …" });
-	verbindung.id = "mp-verbindung";
+	verbindung.id = r.art === "gruppe" ? "gruppe-verbindung" : "mp-verbindung";
 	verbindung.hidden = true;
-	el("mp-inhalt").replaceChildren(UI.stapel([
+	const stufen = r.bots || [];
+	const plaetze = r.spieler.filter((s) => !s.zuschauer).length;
+	const botMenue = istHost && stufen.length && plaetze < r.max ? UI.menue({
+		ausloeser: UI.knopf({ art: "standard", groesse: "s", ikon: "bot", text: "Bot hinzufügen", id: r.art === "gruppe" ? "gruppe-bot" : "mp-bot" }),
+		eintraege: [{ titel: "Schwierigkeit" }, ...stufen.map((st) => ({ text: st[0].toUpperCase() + st.slice(1), onclick: () => o.senden({ t: "bot", stufe: st }) }))] }) : null;
+	return UI.stapel([
 		verbindung,
-		UI.leiste([UI.code(r.code, { gross: true, id: "mp-code" }),
-			UI.knopf({ art: "standard", groesse: "s", ikon: "kopieren", text: "Code", label: "Raumcode kopieren", onclick: () => kopieren(r.code, "Raumcode kopiert.") })]),
+		UI.leiste([UI.code(r.code, { gross: true, id: r.art === "gruppe" ? "gruppe-code" : "mp-code" }),
+			UI.knopf({ art: "standard", groesse: "s", ikon: "kopieren", text: "Code", label: "Code kopieren", onclick: () => kopieren(r.code, "Code kopiert.") })]),
 		UI.leiste([
-			UI.knopf({ art: "standard", groesse: "s", ikon: "extern", text: "Link kopieren", onclick: () => kopieren(link, "Einladungslink kopiert.") }),
-			r.entwurf ? null : UI.knopf({ art: "standard", groesse: "s", ikon: "glocke", text: "Einladen", id: "mp-einladen-knopf", onclick: () => mpEinladen(spiel, r) }),
+			UI.knopf({ art: "standard", groesse: "s", ikon: "extern", text: "Link kopieren", id: r.art === "gruppe" ? "gruppe-link" : null,
+				onclick: () => kopieren(o.link, "Einladungslink kopiert.") }),
+			o.einladen ? UI.knopf({ art: "standard", groesse: "s", ikon: "glocke", text: "Einladen", id: r.art === "gruppe" ? "gruppe-einladen" : "mp-einladen-knopf", onclick: o.einladen }) : null,
+			botMenue,
 		].filter(Boolean)),
-		UI.liste(spielerZeilen, { ohneRahmen: true, label: "Spieler im Raum" }),
-		istHost ? UI.schalter({ label: "Bei „Offene Räume“ zeigen", hinweis: "Sonst kommt nur rein, wer den Code oder Link hat.", an: r.offen,
-			onwechsel: (an) => Bridge.mp.senden({ t: "offen", an }) }) : null,
-		UI.knopf({ art: "standard", groesse: "s", ikon: "abmelden", text: "Raum verlassen", id: "mp-verlassen", onclick: () => Bridge.mp.senden({ t: "verlassen" }) }),
-	].filter(Boolean)));
-	el("mp-titel").textContent = `Raum ${r.code} · ${r.spieler.filter((s) => s.verbunden && !s.zuschauer).length}/${r.max}`;
-	el("mp-karte").hidden = false;
+		UI.liste(spielerZeilen, { ohneRahmen: true, label: r.art === "gruppe" ? "Mitglieder der Gruppe" : "Spieler im Raum" }),
+		istHost && o.offenSchalter ? UI.schalter({ label: "Bei „Offene Räume“ zeigen", hinweis: "Sonst kommt nur rein, wer den Code oder Link hat.", an: r.offen,
+			onwechsel: (an) => o.senden({ t: "offen", an }) }) : null,
+		UI.leiste([o.gruppe || null,
+			UI.knopf({ art: "standard", groesse: "s", ikon: "abmelden", text: o.verlassenText, id: o.verlassenId, onclick: () => o.senden({ t: "verlassen" }) })].filter(Boolean)),
+	].filter(Boolean));
+}
+
+// ---------- Gruppen (1.6.2) ----------
+// Eine Gruppe ist ein Raum ohne Spiel: Link #/gruppe/CODE. Der Host sucht ein Multiplayer-Spiel aus, alle (und die Bots der
+// Gruppe) landen automatisch in einem Raum dafür. Die Gruppe bleibt verbunden, solange man in der Bibliothek ist.
+let gruppeCode = null;          // Code aus der Adresse (null = neue Gruppe gründen)
+let gruppeSpielGesehen = null;  // Code des zuletzt gesehenen Spiel-Raums der Gruppe – neuer Code → alle wechseln hinein
+
+function gruppeVerbinden(wie) {
+	Bridge.gruppe.beiRaum = (r) => {
+		if (r.aktuell && r.aktuell.code !== gruppeSpielGesehen) {
+			const erstes = gruppeSpielGesehen === null && !wie.neu && location.hash.startsWith("#/spiel/");
+			gruppeSpielGesehen = r.aktuell.code;
+			const ziel = `#/spiel/${r.aktuell.spiel}?raum=${r.aktuell.code}`;
+			// Wer schon im Spiel der Gruppe ist (z. B. nach Neu laden), bleibt; sonst geht es ins neue Spiel
+			if (!erstes && location.hash !== ziel) { meldung(`Weiter geht's mit „${r.aktuell.titel}“.`, "erfolg"); location.hash = ziel; return; }
+		}
+		if (!r.aktuell) gruppeSpielGesehen = null;
+		if (location.hash.startsWith("#/gruppe/") && el("gruppe-seite")) gruppeZeigen(r);
+	};
+	Bridge.gruppe.beiVerbindung = (ok) => { const h = el("gruppe-verbindung"); if (h) h.hidden = ok; };
+	Bridge.gruppe.beiFehler = (text) => meldung(text, "fehler");
+	Bridge.gruppe.beiEnde = (code, text) => {
+		gruppeSpielGesehen = null;
+		if (code !== 1000 && text) meldung(text, "fehler");
+		if (location.hash.startsWith("#/gruppe/")) location.hash = "#/";
+	};
+	return Bridge.gruppe.verbinden(wie);
+}
+
+seiten.gruppe = async (ziel) => {
+	ziel.append(UI.seite({ id: "gruppe-seite", titel: "Gruppe", untertitel: "Zusammen spielen: Link schicken, der Host sucht das Spiel aus.",
+		inhalt: UI.h("div", { id: "gruppe-inhalt" }, UI.laden({ label: "Gruppe wird geöffnet …" })) }));
+	const da = Bridge.gruppe.raum;
+	if (da && (gruppeCode === null ? false : da.code === gruppeCode)) { gruppeZeigen(da); return; }
+	if (gruppeCode === null && da) { history.replaceState(null, "", `#/gruppe/${da.code}`); gruppeCode = da.code; gruppeZeigen(da); return; }
+	try {
+		const r = await gruppeVerbinden(gruppeCode === null ? { neu: true } : { code: gruppeCode });
+		gruppeCode = r.code;
+		history.replaceState(null, "", `#/gruppe/${r.code}`);
+		gruppeZeigen(r);
+	} catch (e) {
+		el("gruppe-inhalt").replaceChildren(UI.leer({ ikon: "personen", titel: "Gruppe nicht gefunden", text: e.message,
+			aktion: UI.knopf({ art: "primaer", text: "Neue Gruppe gründen", href: "#/gruppe/neu" }) }));
+	}
+};
+
+function gruppeZeigen(r) {
+	const ziel = el("gruppe-inhalt");
+	if (!ziel) return;
+	const istHost = r.host === r.ich;
+	const titel = el("gruppe-seite").querySelector("h1");
+	if (titel) titel.textContent = `Gruppe ${r.code}`;
+	const leute = r.spieler.filter((s) => s.verbunden && !s.zuschauer);
+	const anzahl = leute.length, botsDa = leute.some((s) => s.bot);
+	const mitglieder = UI.karte({ id: "gruppe-mitglieder", titel: `Mitglieder · ${anzahl}`, inhalt: mpRaumInhalt(r, {
+		senden: (n) => Bridge.gruppe.senden(n), link: `${location.origin}/#/gruppe/${r.code}`,
+		einladen: () => mpEinladen(null, r, "/api/mp/gruppe/einladen", "in diese Gruppe"),
+		offenSchalter: false, verlassenText: "Gruppe verlassen", verlassenId: "gruppe-verlassen",
+	}) });
+	const teile = [];
+	if (r.aktuell) {
+		teile.push(UI.hinweis({ art: "akzent", titel: `Ihr spielt „${r.aktuell.titel}“`, text: istHost ? "Such ein anderes Spiel aus, um zu wechseln." : "Der Host kann jederzeit ein anderes Spiel aussuchen.",
+			aktion: UI.leiste([UI.knopf({ art: "primaer", groesse: "s", ikon: "spielen", text: "Zum Spiel", id: "gruppe-zum-spiel", href: `#/spiel/${r.aktuell.spiel}?raum=${r.aktuell.code}` }),
+				istHost ? UI.knopf({ art: "standard", groesse: "s", text: "Spiel beenden", onclick: () => Bridge.gruppe.senden({ t: "zurueck" }) }) : null].filter(Boolean)) }));
+	}
+	// Alle Spiele, Multiplayer zuerst; was nicht passt, steht ausgegraut mit Grund da (Entscheidung des Admins, 19.11.2026)
+	const grund = (sp) => {
+		const m = sp.multiplayer;
+		if (!m) return "Nur allein spielbar";
+		if (anzahl < m.min || anzahl > m.max) return `Für ${mpSpielerText(m)}`;
+		if (botsDa && !(m.bots || []).length) return "Ohne Bots";
+		return null;
+	};
+	const liste = spiele.filter((sp) => sp.complete && !sp.testspiel).map((sp) => ({ sp, nein: grund(sp) }))
+		.sort((a, b) => (!!a.nein - !!b.nein) || (!!b.sp.multiplayer - !!a.sp.multiplayer) || a.sp.title.localeCompare(b.sp.title, "de"));
+	const kacheln = liste.map(({ sp, nein }) => {
+		const bild = sp.vorschau || (sp.thumbnail ? spielPfad(sp.id) + sp.thumbnail.split("/").map(encodeURIComponent).join("/") : null);
+		const marken = sp.multiplayer ? [{ text: mpSpielerText(sp.multiplayer), art: "info" }] : [];
+		if (sp.multiplayer && (sp.multiplayer.bots || []).length) marken.push({ text: "mit Bots", art: "neutral" });
+		if (nein) marken.push({ text: nein, art: "neutral" });
+		const k = UI.spielkachel({ titel: sp.title, untertitel: "von " + anzeige(sp.author), beschreibung: sp.description, bild, marken, spielId: sp.id,
+			deaktiviert: nein || false,
+			onclick: nein ? null : istHost ? () => Bridge.gruppe.senden({ t: "spiel", spiel: sp.id }) : () => meldung("Das Spiel sucht der Host der Gruppe aus.") });
+		const img = k.querySelector(".b-kachel__bild img");
+		if (img) img.addEventListener("error", () => { img.replaceWith(UI.ikon("spiel", { groesse: "xl" })); });
+		return k;
+	});
+	ziel.replaceChildren(UI.stapel([...teile.filter(Boolean), mitglieder,
+		UI.abschnitt({ id: "gruppe-spiele", titel: istHost ? "Spiel aussuchen" : "Spiele", untertitel: istHost ? "Klick auf ein Spiel – alle in der Gruppe wechseln mit."
+			: "Der Host sucht das Spiel aus.", inhalt: kacheln.length ? UI.raster(kacheln, { id: "gruppe-kacheln" }) : UI.leer({ klein: true, ikon: "spiel", titel: "Noch keine Spiele" }) }),
+	], { abstand: "l" }));
 }
 
 // ---------- Glocke (Zentrale 1.2.0) ----------

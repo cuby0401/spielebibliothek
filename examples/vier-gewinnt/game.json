@@ -1,9 +1,14 @@
 {
   "title": "Vier gewinnt",
-  "description": "Beispiel für Multiplayer: zu zweit im selben Raum, wer zuerst vier in einer Reihe hat, gewinnt.",
+  "description": "Beispiel für Multiplayer: zu zweit im selben Raum, wer zuerst vier in einer Reihe hat, gewinnt – oder gegen einen Bot.",
   "thumbnail": "thumb.svg",
   "multiplayer": {
     "min": 2,
-    "max": 2
+    "max": 2,
+    "bots": [
+      "leicht",
+      "mittel",
+      "schwer"
+    ]
   }
 }

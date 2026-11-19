@@ -1,14 +1,14 @@
 // Testgerüst: GameSave.multiplayer.spiel mit zwei nachgestellten Tabs (lokaler Modus über BroadcastChannel)
 // Aufruf: node scripts/gamesave-mp-test.js lib/gamesave.js
-// Prüft den Zeitgeber frist() (1.6.0): löst beim Host aus, läuft nach einem Host-Wechsel weiter, keine Schleife;
+// Prüft die Bots (1.6.2) und den Zeitgeber frist() (1.6.0): löst beim Host aus, läuft nach einem Host-Wechsel weiter, keine Schleife;
 // dazu den bisherigen Zustand als drittes Argument von neu() (Siegzähler).
 const fs = require("fs"), vm = require("vm"), assert = require("assert");
 const code = fs.readFileSync(process.argv[2] || "lib/gamesave.js", "utf8");
 const warte = (ms) => new Promise((ja) => setTimeout(ja, ms));
 
-function tab() {
+function tab(pfad = "/test") {
   const weg = [];
-  const window = { name: "", location: { pathname: "/test" }, addEventListener: (t, f) => { if (t === "pagehide") weg.push(f); } };
+  const window = { name: "", location: { pathname: pfad }, addEventListener: (t, f) => { if (t === "pagehide") weg.push(f); } };
   window.parent = window;
   const ctx = vm.createContext({ window, location: window.location, BroadcastChannel, setTimeout, clearTimeout, console,
     JSON, Math, Date, Object, Array, Promise, Error, String, Number, isFinite, localStorage: undefined });
@@ -54,6 +54,45 @@ const regeln = {
 
   sb.neu();
   assert.strictEqual(sichtB.at(-1).siege, 1, "neu() bekommt den bisherigen Zustand (Siegzähler)");
-  console.log("✓ GameSave.multiplayer: Zeitgeber und Siegzähler ok");
+  b.schliessen();
+
+  // ---------- Bots (1.6.2): ein Tab allein mit zwei Bots ----------
+  const c = tab("/bots");
+  const sichtC = [], gefragt = [];
+  const reihum = {
+    neu: (ids) => ({ ids, dran: 0, zuege: [] }),
+    zug: (z, aktion, von) => {
+      if (z.ids[z.dran] !== von) throw new Error("nicht dran");
+      if (aktion !== "ok") throw new Error("ungültig");
+      z.zuege.push(von); z.dran = (z.dran + 1) % z.ids.length; return z;
+    },
+    sicht: (z, fuer) => ({ ...z, ich: fuer }),
+    bot: (sicht, stufe, id) => {
+      gefragt.push([sicht.ich, stufe]);
+      if (sicht.ids[sicht.dran] !== id) return null;
+      return id === "bot~2" ? "kaputt" : "ok";     // Bot 2 liefert Unsinn → wird übersprungen, keine Schleife
+    },
+  };
+  const sc = await c.GameSave.multiplayer.spiel(reihum, { zeigen: (s) => sichtC.push(s) });
+  assert.strictEqual(JSON.stringify(sc.raum.botStufen), JSON.stringify(["leicht", "mittel", "schwer"]));
+  sc.raum.botHinzufuegen("schwer");
+  sc.raum.botHinzufuegen("leicht");
+  await warte(50);
+  assert.ok(sc.raum.mitBots && sc.raum.spieler.filter((s) => s.bot).length === 2, "zwei Bots im Raum");
+  assert.ok(sc.raum.istHost, "ein Bot wird nie Host");
+  sc.neu();
+  const ich = sc.raum.ich;
+  sc.zug("ok");                                                       // Mensch zieht, dann Bot 1
+  await warte(1600);
+  let z = sichtC.at(-1);
+  assert.strictEqual(JSON.stringify(z.zuege), JSON.stringify([ich, "bot~1"]), "Bot 1 hat nach Denkzeit gezogen, Bot 2 hängt (abgelehnt)");
+  assert.ok(gefragt.every(([fuer]) => fuer.startsWith("bot~")), "Bots bekommen nur ihre eigene Sicht");
+  assert.ok(gefragt.some(([, st]) => st === "schwer") && gefragt.some(([, st]) => st === "leicht"), "Stufe kommt beim Bot an");
+  await warte(1600);
+  assert.strictEqual(sichtC.at(-1).zuege.length, 2, "abgelehnter Bot zieht nicht in einer Schleife weiter");
+  sc.raum.botEntfernen("bot~2");
+  await warte(50);
+  assert.strictEqual(sc.raum.spieler.filter((s) => s.bot).length, 1, "Bot entfernt");
+  console.log("✓ GameSave.multiplayer: Zeitgeber, Siegzähler und Bots ok");
   process.exit(0);
 })().catch((e) => { console.error("✗", e.message); process.exit(1); });

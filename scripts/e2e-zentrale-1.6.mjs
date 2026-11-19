@@ -130,6 +130,40 @@ function mcp(pfad, { methode = "POST", body, token, form } = {}) {
   await eval_(B, `document.querySelector('#mp-inhalt [aria-label$="rauswerfen"]').click(); true`);
   ok(await bis(A, `!!document.getElementById("mp-lobby")`), "Rausgeworfen: zurück in der Lobby");
 
+  // 6b) Gruppe mit Bot (1.6.2): Gruppe gründen, Bot dazu, Einzelspieler-Spiele ausgegraut, Vier gewinnt wählen, der Bot zieht
+  await cdp("Page.bringToFront", {}, A);
+  await cdp("Page.navigate", { url: G + "/#/" }, A);
+  ok(await bis(A, `!!document.getElementById("gruppe-gruenden")`), "1.6.2: Startseite hat „Zusammen spielen“");
+  await eval_(A, `document.getElementById("gruppe-gruenden").click(); true`);
+  ok(await bis(A, `/^[A-Z]{4}$/.test((document.getElementById("gruppe-code") || {}).textContent || "") && location.hash.startsWith("#/gruppe/")`), "Gruppe gegründet, Code und Link #/gruppe/CODE");
+  const gcode = await eval_(A, `document.getElementById("gruppe-code").textContent`);
+  ok(await eval_(A, `location.hash === "#/gruppe/${gcode}"`), "Adresse ist der Beitrittslink");
+  ok(await bis(A, `[...document.querySelectorAll("#gruppe-kacheln .b-kachel--aus")].some((k) => k.textContent.includes("Nur allein spielbar"))`),
+    "Einzelspieler-Spiele stehen ausgegraut mit Grund da");
+  ok(await eval_(A, `[...document.querySelectorAll("#gruppe-kacheln .b-kachel--aus")].some((k) => k.textContent.includes("Vier gewinnt") && k.textContent.includes("Für 2 Spieler"))`),
+    "Vier gewinnt allein: ausgegraut „Für 2 Spieler“");
+  await eval_(A, `document.getElementById("gruppe-bot").click(); true`);
+  ok(await bis(A, `[...document.querySelectorAll(".b-menue__eintrag")].some((e) => e.textContent === "Mittel")`), "Bot hinzufügen: Stufen leicht/mittel/schwer");
+  await eval_(A, `[...document.querySelectorAll(".b-menue__eintrag")].find((e) => e.textContent === "Mittel").click(); true`);
+  ok(await bis(A, `document.querySelectorAll("#gruppe-mitglieder .b-zeile").length === 2 && document.getElementById("gruppe-mitglieder").textContent.includes("Bot 1 (Mittel)")`),
+    "Bot sitzt in der Gruppe");
+  ok(await bis(A, `[...document.querySelectorAll("#gruppe-kacheln .b-kachel:not(.b-kachel--aus)")].some((k) => k.textContent.includes("Vier gewinnt"))`),
+    "Mit Bot passt Vier gewinnt");
+  await eval_(A, `[...document.querySelectorAll("#gruppe-kacheln .b-kachel:not(.b-kachel--aus)")].find((k) => k.textContent.includes("Vier gewinnt")).querySelector(".b-kachel__ziel").click(); true`);
+  ok(await bis(A, `location.hash.startsWith("#/spiel/seb/vier-gewinnt?raum=") && !document.getElementById("mp-karte").hidden`, 15000), "Host wählt das Spiel: alle wechseln in den Raum");
+  ok(await bis(A, `!!document.getElementById("mp-gruppe-zurueck") && document.getElementById("mp-inhalt").textContent.includes("Bot 1 (Mittel)")`),
+    "Raum-Karte: Bot aus der Gruppe dabei, „Zurück zur Gruppe“");
+  ok(await bisImSpiel(A, `!document.getElementById("neu").hidden && document.getElementById("status").textContent.includes("starte")`), "Host kann mit dem Bot starten");
+  await imSpiel(A, `document.getElementById("neu").click(); true`);
+  ok(await bisImSpiel(A, `document.getElementById("status").textContent.includes("Du bist dran")`), "Spiel gegen den Bot läuft");
+  await imSpiel(A, `document.querySelector('.feld[data-spalte="3"]').click(); true`);
+  ok(await bisImSpiel(A, `document.querySelectorAll('.feld[data-farbe="1"]').length === 1 && document.getElementById("status").textContent.includes("Du bist dran")`, 8000),
+    "Der Bot zieht von selbst (im Browser des Hosts)");
+  await eval_(A, `document.getElementById("mp-gruppe-zurueck").click(); true`);
+  ok(await bis(A, `location.hash === "#/gruppe/${gcode}" && !!document.getElementById("gruppe-zum-spiel")`), "Zurück zur Gruppe: „Ihr spielt Vier gewinnt“ mit „Zum Spiel“");
+  await eval_(A, `document.getElementById("gruppe-verlassen").click(); true`);
+  ok(await bis(A, `location.hash === "#/" || location.hash === ""`), "Gruppe verlassen: zurück zur Startseite");
+
   // 7) MCP: Schlüssel für Claude Code auf der Upload-Seite, Werkzeuge über den MCP-Server
   // Tab A nach vorn: Im Hintergrund-Tab laufen keine Animationen, Dialoge schließen dort nie fertig
   await cdp("Page.bringToFront", {}, A);

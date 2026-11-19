@@ -11,7 +11,8 @@ HERKUNFT = "http://testserver"
 @pytest.fixture
 def mp(umgebung, request):
     for ordner, meta in [("vier", {"title": "Vier", "multiplayer": {"min": 2, "max": 2}}),
-                         ("solo", {"title": "Solo"})]:
+                         ("solo", {"title": "Solo"}),
+                         ("karten", {"title": "Karten", "multiplayer": {"min": 2, "max": 4, "bots": ["Leicht", "schwer", "x" * 30, 7]}})]:
         o = umgebung.spiele / "seb" / ordner
         o.mkdir(parents=True)
         (o / "index.html").write_text("<!doctype html>")
@@ -161,7 +162,7 @@ def test_offene_raeume_und_einladen(mp, pid):
 
 def test_spieleliste_zeigt_multiplayer(mp):
     spiele = {s["id"]: s for s in mp.get("/api/games", headers=mp.als()).json()}
-    assert spiele["seb/vier"]["multiplayer"] == {"min": 2, "max": 2}
+    assert spiele["seb/vier"]["multiplayer"] == {"min": 2, "max": 2, "bots": []}
     assert spiele["seb/solo"]["multiplayer"] is None
 
 
@@ -188,3 +189,103 @@ def test_mitspieler_zum_einladen(mp):
     mp.get("/api/me", headers=mp.als("paul@example.com"))     # eingeladen → aktiv bei der ersten Anmeldung
     liste = mp.get("/api/mp/mitspieler", headers=mp.als()).json()
     assert [x["id"] for x in liste] == ["eli", "max", "paul"]      # ohne einen selbst
+
+
+# ---------- Bots und Gruppen (1.6.2) ----------
+
+def test_bots_setzen_und_entfernen(mp):
+    with mp.verbinden(neu=1, pfad="seb/karten") as a:
+        raum = naechste(a, "raum")["raum"]
+        assert raum["bots"] == ["leicht", "schwer"]                      # aus game.json, bereinigt
+        a.send_text(json.dumps({"t": "bot", "stufe": "mittel"}))
+        assert naechste(a, "fehler")["text"].startswith("Dieses Spiel hat keine Bots")
+        a.send_text(json.dumps({"t": "bot", "stufe": "schwer"}))
+        raum = naechste(a, "raum")["raum"]
+        bot = raum["spieler"][1]
+        assert bot == {"id": "bot~1", "name": "Bot 1 (Schwer)", "verbunden": True, "zuschauer": False, "host": False, "bot": "schwer"}
+        with mp.verbinden("paul@example.com", raum=raum["code"], pfad="seb/karten") as b:
+            naechste(b, "raum")
+            b.send_text(json.dumps({"t": "bot", "stufe": "leicht"}))
+            assert naechste(b, "fehler")["text"] == "Bots setzt nur der Host."
+            b.send_text(json.dumps({"t": "an", "an": "bot~1", "daten": 1}))   # an einen Bot geht nichts (kein Fehler)
+        for _ in range(2):
+            a.send_text(json.dumps({"t": "bot", "stufe": "leicht"}))
+        raum = naechste(a, "raum")["raum"]
+        while len(raum["spieler"]) < 4:
+            raum = naechste(a, "raum")["raum"]
+        a.send_text(json.dumps({"t": "bot", "stufe": "leicht"}))
+        assert naechste(a, "fehler")["text"] == "Kein Platz mehr frei."
+        a.send_text(json.dumps({"t": "rauswerfen", "wer": "bot~1"}))
+        raum = naechste(a, "raum")["raum"]
+        assert "bot~1" not in [s["id"] for s in raum["spieler"]]
+        a.send_text(json.dumps({"t": "host", "wer": "bot~2"}))
+        assert naechste(a, "fehler")["text"].startswith("Den Host weitergeben")
+
+
+def test_host_geht_bot_wird_nie_host(mp):
+    with mp.verbinden(neu=1, pfad="seb/karten") as a:
+        code = naechste(a, "raum")["raum"]["code"]
+        a.send_text(json.dumps({"t": "bot", "stufe": "leicht"}))
+        naechste(a, "raum")
+        with mp.verbinden("paul@example.com", raum=code, pfad="seb/karten") as b:
+            naechste(b, "raum")
+            a.send_text(json.dumps({"t": "verlassen"}))
+            raum = naechste(b, "raum")["raum"]
+            while raum["host"] != "paul":
+                raum = naechste(b, "raum")["raum"]
+            assert [s["id"] for s in raum["spieler"]] == ["bot~1", "paul"]
+
+
+def test_gruppe_waehlt_spiel_mit_bots(mp):
+    with mp.verbinden(neu=1, pfad="gruppe") as a:
+        g = naechste(a, "raum")["raum"]
+        assert g["art"] == "gruppe" and g["bots"] == ["leicht", "mittel", "schwer"] and g["aktuell"] is None
+        with mp.verbinden("paul@example.com", raum=g["code"], pfad="gruppe") as b:
+            naechste(b, "raum")
+            b.send_text(json.dumps({"t": "spiel", "spiel": "seb/karten"}))
+            assert naechste(b, "fehler")["text"] == "Das Spiel sucht der Host der Gruppe aus."
+            a.send_text(json.dumps({"t": "spiel", "spiel": "seb/solo"}))
+            assert "kein Multiplayer-Spiel" in naechste(a, "fehler")["text"]
+            a.send_text(json.dumps({"t": "spiel", "spiel": "seb/vier~entwurf"}))
+            assert naechste(a, "fehler")["text"].startswith("Entwürfe")
+            a.send_text(json.dumps({"t": "bot", "stufe": "mittel"}))
+            naechste(a, "raum")
+            a.send_text(json.dumps({"t": "spiel", "spiel": "seb/vier"}))      # 3 Spieler, Vier ist nur zu zweit
+            assert naechste(a, "fehler")["text"] == "Dieses Spiel hat keine Bots – nimm die Bots aus der Gruppe oder such ein anderes Spiel aus."
+            a.send_text(json.dumps({"t": "spiel", "spiel": "seb/karten"}))
+            g = naechste(b, "raum")["raum"]
+            while not g["aktuell"]:
+                g = naechste(b, "raum")["raum"]
+            assert g["aktuell"]["spiel"] == "seb/karten" and g["aktuell"]["titel"] == "Karten"
+            code = g["aktuell"]["code"]
+            # Erst der Mitspieler, dann der Host der Gruppe: Host im Spiel wird trotzdem der Host der Gruppe
+            with mp.verbinden("paul@example.com", raum=code, pfad="seb/karten") as bs:
+                r = naechste(bs, "raum")["raum"]
+                assert r["gruppe"] == g["code"] and r["offen"] is False
+                bot = [s for s in r["spieler"] if s["bot"]][0]
+                assert bot["id"] == "bot~1" and bot["bot"] == "schwer"          # „mittel“ → nächste Stufe des Spiels
+                with mp.verbinden(raum=code, pfad="seb/karten") as as_:
+                    assert naechste(as_, "raum")["raum"]["host"] == "seb"
+            a.send_text(json.dumps({"t": "zurueck"}))
+            g = naechste(b, "raum")["raum"]
+            while g["aktuell"]:
+                g = naechste(b, "raum")["raum"]
+
+
+def test_gruppe_zu_viele_fuer_das_spiel_und_einladen(mp):
+    with mp.verbinden(neu=1, pfad="gruppe") as a:
+        code = naechste(a, "raum")["raum"]["code"]
+        with mp.verbinden("paul@example.com", raum=code, pfad="gruppe") as b, \
+             mp.verbinden("eli@example.com", raum=code, pfad="gruppe") as c:
+            naechste(b, "raum"); naechste(c, "raum")
+            a.send_text(json.dumps({"t": "spiel", "spiel": "seb/vier"}))
+            assert naechste(a, "fehler")["text"] == "Dieses Spiel ist für 2 Spieler, ihr seid 3."
+        r = mp.post("/api/mp/gruppe/einladen", json={"code": code, "an": ["max"]}, headers=mp.als())
+        assert r.status_code == 200 and r.json() == {"eingeladen": 1}
+        r = mp.post("/api/mp/gruppe/einladen", json={"code": code, "an": ["max"]}, headers=mp.als("max@example.com"))
+        assert r.status_code == 404                                       # nur wer selbst in der Gruppe ist
+    # Gruppen-Code gilt nicht als Raum eines Spiels
+    with mp.verbinden(neu=1, pfad="gruppe") as a:
+        code = naechste(a, "raum")["raum"]["code"]
+        with mp.verbinden("paul@example.com", raum=code, pfad="seb/vier") as x:
+            assert geschlossen(x) == 4404

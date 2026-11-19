@@ -181,7 +181,7 @@ async function bis(ausdruck, ms = 10000) { const ende = Date.now() + ms; while (
 
   // 8b) Tester-Panel (1.4.0, E76): Plan aus tests/manuell, Ergebnis eintragen, Zusammenfassung
   await gehe(G + "/tester/", 3500);
-  ok(await bis(`document.querySelectorAll("#inhalt [data-test]").length>=5`), "Tester-Panel zeigt den Testplan");
+  ok(await bis(`document.querySelectorAll("#inhalt [data-test]").length>=1`), "Tester-Panel zeigt den Testplan");   // Patches haben oft nur wenige Tests
   ok(await eval_(OHNE_NULL), "Tester-Panel: kein leeres „null“");
   await eval_(`document.querySelector('#inhalt [data-test] [data-ergebnis="nein"]').click(); true`);
   ok(await bis(`[...document.querySelectorAll("#meldung, .b-meldung__text")].map(e=>e.textContent).join(" ").includes("beschreiben")`), "„Hat nicht geklappt“ ohne Begründung wird abgelehnt");

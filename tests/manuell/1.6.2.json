@@ -1,6 +1,6 @@
 {
   "version": "1.6.2",
-  "hinweis": "Neu in 1.6.2: zwei Sicherheitskorrekturen am Claude-Zugang (MCP) und die weiße Fläche unter der Mehrspieler-Lobby. Hier stehen nur Dinge, die in 1.6.2 NEU sind.",
+  "hinweis": "Neu in 1.6.2: Bots für Multiplayer-Spiele, Gruppen mit Beitrittslink, zwei Sicherheitskorrekturen am Claude-Zugang (MCP) und die weiße Fläche unter der Lobby. Zum Testen: „Vier gewinnt“ (hat Bots in drei Stufen). Für die Gruppen-Tests braucht ihr zwei Personen. Hier stehen nur Dinge, die in 1.6.2 NEU sind.",
   "tests": [
     {
       "id": "lobby-keine-weisse-flaeche",
@@ -12,6 +12,96 @@
         "Erstelle einen Raum."
       ],
       "erwartet": "Unter der Karte „Mehrspieler“ ist keine helle Fläche mehr, die Seite endet unter der Karte. Nach dem Erstellen des Raums hat das Spiel wieder seinen normalen, großen Rahmen."
+    },
+    {
+      "id": "bot-hinzufuegen",
+      "bereich": "Bots",
+      "titel": "Allein gegen einen Bot spielen",
+      "schritte": [
+        "Öffne „Vier gewinnt“ und erstelle einen neuen Raum.",
+        "Klicke in der Raum-Karte rechts auf „Bot hinzufügen“ und wähle „Leicht“.",
+        "Klicke im Spiel auf „Spiel starten“ und setze einen Stein."
+      ],
+      "erwartet": "„Bot hinzufügen“ zeigt die Stufen Leicht, Mittel und Schwer. In der Raum-Karte steht danach „Bot 1 (Leicht)“ mit Roboter-Symbol und „Bot“, oben „2/2“. Nach deinem Stein setzt der Bot nach etwa einer Sekunde von selbst einen roten Stein, dann bist du wieder dran."
+    },
+    {
+      "id": "bot-stufen",
+      "bereich": "Bots",
+      "titel": "Die Stufen sind verschieden stark",
+      "schritte": [
+        "Spiel je eine Runde gegen „Leicht“ und gegen „Schwer“ (Bot entfernen mit dem ✕ neben ihm, dann neu hinzufügen).",
+        "Versuche bei beiden, drei Steine in eine Reihe zu legen."
+      ],
+      "erwartet": "„Leicht“ setzt erkennbar zufällig und lässt dich gewinnen. „Schwer“ blockt deine Dreierreihen und ist schwer zu schlagen. Das ✕ entfernt den Bot ohne Rückfrage."
+    },
+    {
+      "id": "bot-host-wechsel",
+      "bereich": "Bots",
+      "titel": "Bots spielen nach dem Neuladen weiter",
+      "schritte": [
+        "Erstelle in „Vier gewinnt“ einen Raum, setze einen Bot dazu, starte und setze einen Stein.",
+        "Lade die Seite neu (F5), solange der Bot noch nachdenkt oder gerade gezogen hat."
+      ],
+      "erwartet": "Nach dem Neuladen bist du wieder im selben Raum, der Bot ist noch da, die Steine liegen unverändert, und der Bot zieht weiter, wenn er dran ist."
+    },
+    {
+      "id": "gruppe-gruenden",
+      "bereich": "Gruppen",
+      "titel": "Gruppe gründen und Link verschicken",
+      "schritte": [
+        "Auf der Startseite oben auf „Zusammen spielen“ klicken.",
+        "„Link kopieren“ klicken und Person 2 schicken.",
+        "Person 2 öffnet den Link."
+      ],
+      "erwartet": "Es öffnet sich die Seite „Gruppe KXRT“ (vier Buchstaben) mit „Mitglieder“ und „Spiel aussuchen“. Nach dem Öffnen des Links sind beide in der Mitgliederliste (Person 1 mit „Host“). Auf der Startseite steht bei beiden statt „Zusammen spielen“ jetzt „Gruppe KXRT“."
+    },
+    {
+      "id": "gruppe-ausgegraut",
+      "bereich": "Gruppen",
+      "titel": "Was nicht passt, ist ausgegraut",
+      "schritte": [
+        "Beide sind in der Gruppe. Schau dir die Spiele unter „Spiel aussuchen“ an."
+      ],
+      "erwartet": "Oben stehen die spielbaren Multiplayer-Spiele (z. B. „Vier gewinnt“ mit „2 Spieler“). Einzelspieler-Spiele stehen ausgegraut darunter mit „Nur allein spielbar“. Person 2 kann nichts auswählen (Klick zeigt „Das Spiel sucht der Host der Gruppe aus.“)."
+    },
+    {
+      "id": "gruppe-spiel-waehlen",
+      "bereich": "Gruppen",
+      "titel": "Host sucht das Spiel aus, alle wechseln",
+      "schritte": [
+        "Person 1 (Host) klickt in der Gruppe auf „Vier gewinnt“."
+      ],
+      "erwartet": "Beide landen ohne weiteren Klick im selben Raum von „Vier gewinnt“ (Meldung „Weiter geht's mit „Vier gewinnt““). In der Raum-Karte steht „Zurück zur Gruppe“. Person 1 ist Host und kann starten."
+    },
+    {
+      "id": "gruppe-naechstes-spiel",
+      "bereich": "Gruppen",
+      "titel": "Nächstes Spiel aus der Gruppe",
+      "schritte": [
+        "Nach einer Runde klickt Person 1 auf „Zurück zur Gruppe“.",
+        "Person 1 wählt ein anderes passendes Spiel (oder noch einmal „Vier gewinnt“). Person 2 bleibt im alten Spiel."
+      ],
+      "erwartet": "In der Gruppe steht oben „Ihr spielt „Vier gewinnt““ mit „Zum Spiel“. Wählt Person 1 ein Spiel, wechselt Person 2 automatisch mit, auch wenn sie noch im alten Spiel war."
+    },
+    {
+      "id": "gruppe-bot",
+      "bereich": "Gruppen",
+      "titel": "Bots in der Gruppe",
+      "schritte": [
+        "Person 1 gründet allein eine Gruppe und klickt „Bot hinzufügen“ → „Mittel“.",
+        "Person 1 wählt „Vier gewinnt“."
+      ],
+      "erwartet": "Allein ist „Vier gewinnt“ zuerst ausgegraut („Für 2 Spieler“), mit dem Bot ist es wählbar. Im Raum sitzt „Bot 1 (Mittel)“ und spielt mit."
+    },
+    {
+      "id": "gruppe-einladen",
+      "bereich": "Gruppen",
+      "titel": "In die Gruppe einladen (Glocke)",
+      "schritte": [
+        "Person 1 klickt in der Gruppe auf „Einladen“, wählt Person 2 und klickt „Einladen“.",
+        "Person 2 öffnet die Glocke und klickt die Meldung."
+      ],
+      "erwartet": "Person 2 bekommt „<Name> lädt dich in die Gruppe KXRT ein.“ und landet mit dem Klick in der Gruppe."
     },
     {
       "id": "ki-gesperrt",
