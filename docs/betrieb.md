@@ -11,7 +11,7 @@ die Pfade je Ort stehen in `scripts/lokal.sh`.
 | Pfad auf der VM | Inhalt | liegt | schreibt |
 |---|---|---|---|
 | `/mnt/nas/games/spiele/<benutzer>/<spiel>/` | hochgeladene Spiele, Entwürfe, Versionen | NAS, Freigabe `games` per **SMB** | Upload-Dienst (UID 10021) |
-| `/mnt/nas/games/vm-sicherung/` | nächtliche Kopie der Datenbanken und Konfiguration | NAS (borgmatic sichert sie) | root (`sicherung-export.sh`) |
+| `/mnt/nas/games/vm-sicherung/aktuell/` | nächtliche Kopie der Datenbanken und Konfiguration | NAS (borgmatic sichert sie) | root (`sicherung-export.sh`) |
 | `/opt/stacks/spielebibliothek-daten/data/` | `saves.db`, `backup/` | lokale Platte | savesvc (UID 10022) |
 | `/opt/stacks/spielebibliothek-daten/upload/` | `upload.db`, `geheimnis` | lokale Platte | Upload-Dienst (UID 10021) |
 | `/opt/stacks/spielebibliothek/` | dieses Repo (per `deploy.sh`) + `.env` + `config/` | lokale Platte | Sebi |
@@ -83,8 +83,19 @@ Nächtlich über den bestehenden borgmatic-Container `borgmatic` auf der NAS (`/
 - **01:45** – savesvc legt `data/backup/saves-latest.db` an (lokal, wie bisher).
 - **01:50** – `scripts/sicherung-export.sh` (Cron als root, `/etc/cron.d/spielebibliothek-sicherung`, Log `/var/log/sb-sicherung.log`)
   legt konsistente Kopien von `saves.db` und `upload.db` (SQLite-Backup-API in den Containern), `ergebnisse.db`, `geheimnis`,
-  `vor-deploy/`, `config/` und `.env` (als `env`) nach `/mnt/nas/games/vm-sicherung/` – erst vollständig, dann getauscht, jede
-  Datenbank-Kopie mit `integrity_check` geprüft.
+  `vor-deploy/`, `config/` und `.env` (als `env`) nach `/mnt/nas/games/vm-sicherung/aktuell/` – erst vollständig, dann getauscht,
+  jede Datenbank-Kopie mit `integrity_check` geprüft.
+- **Einmalig auf der NAS** (mit sudo), bevor der Export läuft: Der Ordner `vm-sicherung/` braucht enge Rechte, weil darin Tunnel-Token
+  und Schlüssel liegen. Ein über SMB direkt in `games` angelegter Ordner wäre auf der NAS für alle lesbar (777); das Skript legt ihn
+  deshalb nie selbst an. Eigentümer ist der SMB-Benutzer der VM, Default-ACLs vererben die engen Rechte an alles, was neu entsteht:
+
+  ```sh
+  sudo mkdir -p /volume1/games/vm-sicherung
+  sudo chown -R <SMB-Benutzer der VM> /volume1/games/vm-sicherung
+  sudo setfacl -R -b /volume1/games/vm-sicherung
+  sudo chmod -R u=rwX,go= /volume1/games/vm-sicherung
+  sudo find /volume1/games/vm-sicherung -type d -exec setfacl -d -m u::rwx,g::---,o::--- {} +
+  ```
 - **02:00** – borgmatic sichert `/volume1/games` und damit auch die Spiele und `vm-sicherung/` außer Haus.
 - Zusätzlich sichert Proxmox die ganze VM nachts auf die NAS (Freigabe `proxmox-backups`) – das liegt aber nur im Haus und reicht
   allein nicht, deshalb der Export.
@@ -98,9 +109,9 @@ Nächtlich über den bestehenden borgmatic-Container `borgmatic` auf der NAS (`/
 
 ## Wiederherstellen
 
-**Docker-VM:** Spiele wie unten aus `mnt/games/spiele/…`. Datenbanken aus `mnt/games/vm-sicherung/` (bzw. aus dem Proxmox-Backup der VM):
+**Docker-VM:** Spiele wie unten aus `mnt/games/spiele/…`. Datenbanken aus `mnt/games/vm-sicherung/aktuell/` (bzw. aus dem Proxmox-Backup der VM):
 1. `docker compose down` in `/opt/stacks/spielebibliothek`
-2. `vm-sicherung/saves.db` → `/opt/stacks/spielebibliothek-daten/data/saves.db` (alte `-wal`/`-shm` vorher löschen),
+2. `vm-sicherung/aktuell/saves.db` → `/opt/stacks/spielebibliothek-daten/data/saves.db` (alte `-wal`/`-shm` vorher löschen),
    `upload.db` und `geheimnis` → `…-daten/upload/`, `config/` und `env` (als `.env`) → Stack-Ordner
 3. `sudo sh scripts/server-setup.sh <LAN-Adresse der NAS>` (setzt die Rechte neu), dann `docker compose up -d`
 
@@ -159,12 +170,14 @@ Ablauf: VM einrichten (`server-setup.sh`) → auf der NAS Auftragsdienst stillle
 Neustart-Regel `no` (nichts gelöscht) → `data/`, `filebrowser/upload/`, `config/`, `.env`, Release-Archiv, `-quelle`, `-tests` bei
 gestoppten Diensten auf die VM kopieren → `lokal.env`: `SERVER_ORT=vm` → `scripts/deploy.sh --ohne-probe` → Probe neu aufbauen
 (`deploy.sh --probe`), Tunnel-Routen des Testservers auf `<SERVER_LAN>` stellen → testen.
+Auf einer frischen Debian-VM fehlte `cron` – `server-setup.sh` installiert ihn seitdem mit (sonst laufen weder Auftragsdienst noch Sicherung).
 Es läuft nie mehr als ein Tunnel: Der Tunnel der NAS ist gestoppt, bevor der auf der VM startet (gleicher `TUNNEL_TOKEN`).
 
 **Rückweg auf die NAS** (die Daten der NAS sind auf dem Stand des Umzugs – was seitdem auf der VM gespeichert wurde, fehlt,
 außer man kopiert `saves.db` und `upload.db` vorher bei gestoppten Diensten zurück):
 ```sh
-ssh $VM  'cd /opt/stacks/spielebibliothek && docker compose down'
+ssh $VM  'cd /opt/stacks/spielebibliothek && docker compose down && docker rm -f sbprobe-caddy sbprobe-savesvc sbprobe-upload'
+ssh $VM  'sudo rm /etc/cron.d/spielebibliothek-auftragsdienst /etc/cron.d/spielebibliothek-sicherung'   # nur die Cron-Einträge
 ssh $NAS 'cd /volume1/docker/spielebibliothek && docker update --restart unless-stopped $(docker compose ps -aq) && docker compose start'
 ssh $NAS 'cd /volume1/docker/spielebibliothek && mv scripts/auftragsdienst.py.aus scripts/auftragsdienst.py'
 # lokal.env: SERVER_ORT=nas; Tunnel-Routen des Testservers wieder auf <NAS_LAN>; Probe mit scripts/deploy.sh --probe neu

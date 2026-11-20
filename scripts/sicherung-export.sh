@@ -3,7 +3,7 @@
 # legt scripts/server-setup.sh an). Log: /var/log/sb-sicherung.log
 #
 # Warum: Auf der VM liegen die Datenbanken auf der lokalen Platte. Das Proxmox-Backup sichert die ganze VM, aber nur auf die NAS –
-# nicht außer Haus. Deshalb kommen konsistente Kopien in die Freigabe „games“ (Ordner vm-sicherung/), die borgmatic um 02:00
+# nicht außer Haus. Deshalb kommen konsistente Kopien in die Freigabe „games“ (Ordner vm-sicherung/aktuell/), die borgmatic um 02:00
 # ohnehin verschlüsselt zur Hetzner Storage Box sichert.
 #
 # Kopiert werden:
@@ -20,10 +20,14 @@ DATEN=${SB_DATEN:-/opt/stacks/spielebibliothek-daten/data}
 UDATEN=${SB_UDATEN:-/opt/stacks/spielebibliothek-daten/upload}
 TESTS=${SB_TESTS:-/opt/stacks/spielebibliothek-tests}
 MNT=${SB_MNT:-/mnt/nas/games}
-ZIEL=$MNT/vm-sicherung
+# vm-sicherung/ wird einmal von Hand auf der NAS mit engen Rechten angelegt (docs/betrieb.md) – NICHT von hier aus: ein über SMB
+# angelegter Ordner direkt in „games“ wäre auf der NAS für alle lesbar (777), und hier liegen Token und Schlüssel.
+BASIS=$MNT/vm-sicherung
+ZIEL=$BASIS/aktuell
 echo "$(date -Is) Sicherung beginnt"
 mountpoint -q "$MNT" || mount "$MNT"
 mountpoint -q "$MNT" || { echo "✗ $MNT nicht eingebunden – keine Sicherung"; exit 1; }
+[ -d "$BASIS" ] || { echo "✗ $BASIS fehlt – erst auf der NAS mit engen Rechten anlegen (docs/betrieb.md)"; exit 1; }
 TMP=$(mktemp -d /tmp/sb-sicherung.XXXXXX)
 trap 'rm -rf "$TMP"' EXIT
 

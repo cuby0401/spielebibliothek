@@ -34,6 +34,9 @@ GRUPPE=sbspiele     # GID 10021 = Upload-Dienst
 # Werkzeuge: setfacl (deploy.sh setzt Rechte auf config/), mount.cifs
 command -v setfacl >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq acl; }
 [ -x /sbin/mount.cifs ] || [ -x /usr/sbin/mount.cifs ] || apt-get install -y -qq cifs-utils
+# cron für Auftragsdienst und Sicherung – fehlt in einer minimalen Debian-Installation
+command -v cron >/dev/null 2>&1 || [ -x /usr/sbin/cron ] || apt-get install -y -qq cron
+systemctl enable --now cron >/dev/null 2>&1 || true
 
 # Gruppe 10021 für den Lesezugriff auf die Spiele
 getent group 10021 >/dev/null || groupadd -g 10021 "$GRUPPE"
